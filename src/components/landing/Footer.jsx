@@ -1,5 +1,5 @@
 import "./Footer.css";
-
+import { LeafyGreen } from "lucide-react";
 const Footer = () => {
   const footerLinks = {
     Products: [
@@ -27,7 +27,7 @@ const Footer = () => {
       "Webinars",
     ],
     Company: [
-      "About AGRIVI",
+      "About AGRIC",
       "Newsroom",
       "Careers",
       "Partner Program",
@@ -41,23 +41,11 @@ const Footer = () => {
         <div className="container footer__top-inner">
           <div className="footer__brand">
             <div className="footer__logo">
-              <svg width="130" height="36" viewBox="0 0 130 36" fill="none">
-                <path d="M8 30L18 6L28 30H23L18 18L13 30H8Z" fill="#4caf50" />
-                <path
-                  d="M25 22H32C34 22 35 20.5 35 19C35 17.5 34 16 32 16H25V22Z"
-                  fill="#74c69d"
-                />
-                <text
-                  x="40"
-                  y="25"
-                  fontFamily="Manrope"
-                  fontWeight="800"
-                  fontSize="20"
-                  fill="white"
-                >
-                  AGRIVI
-                </text>
-              </svg>
+              <LeafyGreen
+                size={22}
+                strokeWidth={2.5}
+              />
+              <span className="logo-text">AGRIC</span>
             </div>
             <p className="footer__tagline">
               Global digital agriculture solutions supporting the entire
@@ -119,7 +107,7 @@ const Footer = () => {
       <div className="footer__bottom">
         <div className="container footer__bottom-inner">
           <span className="footer__copyright">
-            © 2024 AGRIVI d.o.o. All rights reserved.
+            © 2026 AGRIC d.o.o. All rights reserved.
           </span>
           <div className="footer__legal">
             {[
