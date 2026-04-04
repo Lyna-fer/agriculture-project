@@ -340,7 +340,7 @@ export default function ResultsPanel({
     >
     
       <div className="rp-hero">
-        {/* Topbar */}
+       
         <div className="rp-topbar">
           <div className="rp-breadcrumb">
             <span className="rp-live-dot" />
@@ -521,7 +521,7 @@ export default function ResultsPanel({
           </div>
         )}
 
-        {/* ── DEPTHS ── */}
+       
         {tab === "depths" && (
           <div className="cy-flow">
             <div className="cy-intro-banner">
