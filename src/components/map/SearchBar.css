@@ -1,0 +1,118 @@
+.search-bar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  width: 280px;
+}
+
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: white;
+  border-radius: 30px;
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: var(--transition);
+}
+.search-input-wrap:focus-within {
+  border-color: var(--leaf);
+  box-shadow: 0 4px 24px rgba(74, 124, 47, 0.18);
+}
+
+.search-icon {
+  padding: 5px 12px 0 16px;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  color: #92700a;
+}
+
+.search-input {
+  flex: 1;
+  padding: 11px 0;
+  border: none;
+  outline: none;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.84rem;
+  color: var(--soil-dark);
+  background: transparent;
+  min-width: 0;
+}
+.search-input::placeholder { color: var(--soil-light); }
+
+.search-clear {
+  padding: 0 14px;
+  border: none;
+  background: transparent;
+  color: var(--soil-mid);
+  cursor: pointer;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+.search-clear:hover { color: var(--soil-dark); }
+
+
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0; right: 0;
+  background: white;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: dropIn 0.2s ease;
+}
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.search-result {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+  text-align: left;
+  gap: 10px;
+}
+.search-result:hover { background: var(--cream); }
+
+.result-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.result-flag { font-size: 1rem; }
+.result-name {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--soil-dark);
+}
+.result-code { font-size: 0.68rem; color: var(--soil-mid); }
+.result-zone {
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+
+.search-footer {
+  padding: 8px 14px;
+  font-size: 0.65rem;
+  color: var(--soil-mid);
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
