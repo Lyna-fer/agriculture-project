@@ -1,6 +1,6 @@
 import { useState } from "react";
 import "./Testimonials.css";
-
+import fermier from "../../assets/fermier.png";
 const testimonials = [
   {
     quote:
@@ -8,7 +8,7 @@ const testimonials = [
     name: "Karim Bensalem",
     role: "Vegetable Farmer",
     company: "Wilaya of Blida",
-    avatar: "KB",
+    avatar: fermier,
     color: "#3a7d44",
     country: "🇩🇿 Algeria — Tell",
   },
@@ -18,7 +18,7 @@ const testimonials = [
     name: "Fatima Chérif",
     role: "Farm Operator",
     company: "Wilaya of Tipaza",
-    avatar: "FC",
+    avatar: fermier,
     color: "#2d6a4f",
     country: "🇩🇿 Algeria — Mediterranean",
   },
@@ -29,7 +29,7 @@ const testimonials = [
 
     role: "Farmer",
     company: "Wilaya of Tiaret",
-    avatar: "AM",
+    avatar: fermier,
     color: "#1b4332",
     country: "🇩🇿 Algeria — High Plateaus",
   },
@@ -39,7 +39,7 @@ const testimonials = [
     name: "Nadia Belkacem",
     role: "Agricultural Engineer",
     company: "DSA Wilaya of Sétif",
-    avatar: "NB",
+    avatar: fermier,
     color: "#4a7c59",
     country: "🇩🇿 Algeria — High Plateaus",
   },
@@ -72,11 +72,15 @@ const Testimonials = () => {
                   className={`testimonials__avatar-btn ${i === active ? "testimonials__avatar-btn--active" : ""}`}
                   onClick={() => setActive(i)}
                 >
+                
                   <div
                     className="testimonials__avatar"
-                    style={{ background: t.color }}
+                    style={{
+                      borderColor: i === active ? t.color : "var(--gray-200)",
+                      borderWidth: i === active ? "2px" : "1px",
+                    }}
                   >
-                    {t.avatar}
+                    <img src={t.avatar} alt={t.name} />
                   </div>
                   <div className="testimonials__avatar-info">
                     <span className="testimonials__avatar-name">{t.name}</span>
@@ -118,11 +122,13 @@ const Testimonials = () => {
                 <p className="testimonials__quote">{t.quote}</p>
 
                 <div className="testimonials__author">
-                  <div
-                    className="testimonials__author-avatar"
-                    style={{ background: t.color }}
-                  >
-                    {t.avatar}
+                  
+                  <div className="testimonials__author-avatar">
+                    <img
+                      src={t.avatar}
+                      alt={t.name}
+                     
+                    />
                   </div>
                   <div>
                     <span className="testimonials__author-name">{t.name}</span>
