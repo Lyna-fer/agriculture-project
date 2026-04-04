@@ -1,20 +1,29 @@
 import { useState, useMemo } from "react";
 import "./ResultsPanel.css";
 import { CULTURES } from "../../data/cultures";
+import epingle from "../../assets/epingle.png";
+
+
+const hl = (t = "") =>
+  t.replace(
+    /(\d+[–\-]\d+|\d+\s*cm|\d+\s*j|\d+\s*sem\.|\d+\s*ans)/g,
+    "<b>$1</b>",
+  );
+
 
 function PatternDiagram({ type, color, size = 110 }) {
-  const s = size;
-  const c = color;
-
+  const s = size,
+    c = color,
+    h = Math.round(s * 0.73);
   const diagrams = {
     zigzag: (
-      <svg viewBox="0 0 110 80" width={s} height={Math.round(s * 0.73)}>
-        <rect width="110" height="80" rx="3" fill={`${c}12`} />
+      <svg viewBox="0 0 110 80" width={s} height={h}>
+        <rect width="110" height="80" rx="12" fill={`${c}18`} />
         <polyline
           points="8,62 22,18 36,62 50,18 64,62 78,18 92,62 106,40"
           fill="none"
           stroke={c}
-          strokeWidth="1.6"
+          strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
@@ -27,7 +36,7 @@ function PatternDiagram({ type, color, size = 110 }) {
           [78, 18],
           [92, 62],
         ].map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r="3.5" fill={c} />
+          <circle key={i} cx={x} cy={y} r="4" fill={c} />
         ))}
         <text
           x="55"
@@ -36,20 +45,20 @@ function PatternDiagram({ type, color, size = 110 }) {
           fill={c}
           fontSize="7"
           fontFamily="monospace"
-          opacity=".6"
+          opacity=".5"
         >
           ZIGZAG
         </text>
       </svg>
     ),
     W: (
-      <svg viewBox="0 0 110 80" width={s} height={Math.round(s * 0.73)}>
-        <rect width="110" height="80" rx="3" fill={`${c}12`} />
+      <svg viewBox="0 0 110 80" width={s} height={h}>
+        <rect width="110" height="80" rx="12" fill={`${c}18`} />
         <polyline
           points="8,20 24,60 40,30 56,60 72,30 88,60 104,20"
           fill="none"
           stroke={c}
-          strokeWidth="1.6"
+          strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
         />
@@ -62,7 +71,7 @@ function PatternDiagram({ type, color, size = 110 }) {
           [88, 60],
           [104, 20],
         ].map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r="3.5" fill={c} />
+          <circle key={i} cx={x} cy={y} r="4" fill={c} />
         ))}
         <text
           x="55"
@@ -71,22 +80,22 @@ function PatternDiagram({ type, color, size = 110 }) {
           fill={c}
           fontSize="7"
           fontFamily="monospace"
-          opacity=".6"
+          opacity=".5"
         >
           EN W
         </text>
       </svg>
     ),
     x: (
-      <svg viewBox="0 0 110 80" width={s} height={Math.round(s * 0.73)}>
-        <rect width="110" height="80" rx="3" fill={`${c}12`} />
+      <svg viewBox="0 0 110 80" width={s} height={h}>
+        <rect width="110" height="80" rx="12" fill={`${c}18`} />
         <line
           x1="10"
           y1="10"
           x2="100"
           y2="70"
           stroke={c}
-          strokeWidth="1.5"
+          strokeWidth="1.8"
           strokeDasharray="5 3"
         />
         <line
@@ -95,7 +104,7 @@ function PatternDiagram({ type, color, size = 110 }) {
           x2="10"
           y2="70"
           stroke={c}
-          strokeWidth="1.5"
+          strokeWidth="1.8"
           strokeDasharray="5 3"
         />
         {[
@@ -105,7 +114,7 @@ function PatternDiagram({ type, color, size = 110 }) {
           [10, 70],
           [55, 40],
         ].map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r="3.5" fill={c} />
+          <circle key={i} cx={x} cy={y} r="4" fill={c} />
         ))}
         <text
           x="55"
@@ -114,15 +123,15 @@ function PatternDiagram({ type, color, size = 110 }) {
           fill={c}
           fontSize="7"
           fontFamily="monospace"
-          opacity=".6"
+          opacity=".5"
         >
           EN X
         </text>
       </svg>
     ),
     radial: (
-      <svg viewBox="0 0 110 80" width={s} height={Math.round(s * 0.73)}>
-        <rect width="110" height="80" rx="3" fill={`${c}12`} />
+      <svg viewBox="0 0 110 80" width={s} height={h}>
+        <rect width="110" height="80" rx="12" fill={`${c}18`} />
         {[
           [55, 12],
           [90, 32],
@@ -138,12 +147,12 @@ function PatternDiagram({ type, color, size = 110 }) {
             x2={x}
             y2={y}
             stroke={c}
-            strokeWidth="1.2"
+            strokeWidth="1.5"
             strokeDasharray="4 3"
-            opacity=".7"
+            opacity=".65"
           />
         ))}
-        <circle cx="55" cy="40" r="4" fill={c} />
+        <circle cx="55" cy="40" r="5" fill={c} />
         {[
           [55, 12],
           [90, 32],
@@ -152,7 +161,7 @@ function PatternDiagram({ type, color, size = 110 }) {
           [20, 58],
           [20, 32],
         ].map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r="3" fill={c} opacity=".8" />
+          <circle key={i} cx={x} cy={y} r="3.5" fill={c} opacity=".85" />
         ))}
         <text
           x="55"
@@ -161,24 +170,24 @@ function PatternDiagram({ type, color, size = 110 }) {
           fill={c}
           fontSize="7"
           fontFamily="monospace"
-          opacity=".6"
+          opacity=".5"
         >
           RADIAL
         </text>
       </svg>
     ),
     grille: (
-      <svg viewBox="0 0 110 80" width={s} height={Math.round(s * 0.73)}>
-        <rect width="110" height="80" rx="3" fill={`${c}12`} />
+      <svg viewBox="0 0 110 80" width={s} height={h}>
+        <rect width="110" height="80" rx="12" fill={`${c}18`} />
         {[20, 55, 90].flatMap((x) =>
           [16, 38, 60].map((y) => (
             <circle
               key={`${x}-${y}`}
               cx={x}
               cy={y}
-              r="3.5"
+              r="4"
               fill={c}
-              opacity=".6"
+              opacity=".65"
             />
           )),
         )}
@@ -189,22 +198,22 @@ function PatternDiagram({ type, color, size = 110 }) {
           fill={c}
           fontSize="7"
           fontFamily="monospace"
-          opacity=".6"
+          opacity=".5"
         >
           GRILLE
         </text>
       </svg>
     ),
     transect: (
-      <svg viewBox="0 0 110 80" width={s} height={Math.round(s * 0.73)}>
-        <rect width="110" height="80" rx="3" fill={`${c}12`} />
+      <svg viewBox="0 0 110 80" width={s} height={h}>
+        <rect width="110" height="80" rx="12" fill={`${c}18`} />
         <line
           x1="10"
           y1="40"
           x2="100"
           y2="40"
           stroke={c}
-          strokeWidth="1.5"
+          strokeWidth="1.8"
           strokeDasharray="5 3"
         />
         <line
@@ -213,7 +222,7 @@ function PatternDiagram({ type, color, size = 110 }) {
           x2="55"
           y2="70"
           stroke={c}
-          strokeWidth="1.5"
+          strokeWidth="1.8"
           strokeDasharray="5 3"
         />
         {[
@@ -225,7 +234,7 @@ function PatternDiagram({ type, color, size = 110 }) {
           [55, 10],
           [55, 70],
         ].map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r="3.5" fill={c} />
+          <circle key={i} cx={x} cy={y} r="4" fill={c} />
         ))}
         <text
           x="55"
@@ -234,7 +243,7 @@ function PatternDiagram({ type, color, size = 110 }) {
           fill={c}
           fontSize="7"
           fontFamily="monospace"
-          opacity=".6"
+          opacity=".5"
         >
           TRANSECT
         </text>
@@ -244,6 +253,61 @@ function PatternDiagram({ type, color, size = 110 }) {
   return diagrams[type] || diagrams.zigzag;
 }
 
+
+function buildKpis(data, nSamples, parcelleHa) {
+  const fmtHa = (ha) =>
+    ha < 0.1 ? `${(ha * 10000).toFixed(0)} m²` : `${ha.toFixed(2)} ha`;
+  return [
+    {
+      val: nSamples,
+      lbl: "Points\nprélèvement",
+      icon: "📍",
+      bg: "#fff0f6",
+      color: "#ff6b9d",
+    },
+    {
+      val: `${data.depths.at(-1).label.split("–")[1].trim()} cm`,
+      lbl: "Profondeur\nmax.",
+      icon: "⬇️",
+      bg: "#e6f7ff",
+      color: "#5bc4f5",
+    },
+    {
+      val: fmtHa(parcelleHa),
+      lbl: "Surface\nparcelle",
+      icon: "🌿",
+      bg: "#e0faf4",
+      color: "#00d4a0",
+    },
+    {
+      val: data.depths.length,
+      lbl: "Horizons\nrequis",
+      icon: "🪨",
+      bg: "#f0eeff",
+      color: "#9b8ff5",
+    },
+  ];
+}
+
+
+const TABS = [
+  { id: "schema", label: "Schéma", icon: "🗺" },
+  { id: "depths", label: "Horizons", icon: "⛏" },
+  { id: "protocole", label: "Protocole", icon: "📋" },
+  { id: "gear", label: "Matériel", icon: "🧰" },
+];
+
+const PALETTE = [
+  "#81C8F5",
+  "#A8E6CF",
+  "#FFB6C1",
+  "#FFDAB9",
+  "#C8B9F5",
+  "#B5EAD7",
+];
+const GEAR_EMOJIS = ["🔧", "🪣", "🛍", "📡", "🧤", "📋", "🗂", "⚗"];
+
+
 export default function ResultsPanel({
   open,
   onClose,
@@ -251,46 +315,38 @@ export default function ResultsPanel({
   parcelleHa = 0,
   region = "",
 }) {
-  const [activeTab, setActiveTab] = useState("schema");
-  // const data = CULTURE_DATA[cultureId]
+  const [tab, setTab] = useState("schema");
+
   const data = CULTURES.find((c) => c.id === cultureId);
   const nSamples = useMemo(() => {
     if (!data || parcelleHa <= 0) return 0;
-    if (data.sampleFormula) {
-      return data.sampleFormula(parcelleHa);
-    }
-
+    if (data.sampleFormula) return data.sampleFormula(parcelleHa);
     return Math.max(data.minSamples, Math.round(parcelleHa * data.sampleNote));
   }, [data, parcelleHa]);
 
   const fmtHa = (ha) =>
     ha < 0.1 ? `${(ha * 10000).toFixed(0)} m²` : `${ha.toFixed(2)} ha`;
-
   if (!data) return null;
 
-  const accent = data.color;
-  const accentBg = data.colorLight;
-  const accentLight = data.color;
-
-  const TABS = [
-    { id: "schema", label: "Schéma" },
-    { id: "depths", label: "Horizons" },
-    { id: "protocole", label: "Protocole" },
-    { id: "gear", label: "Matériel" },
-  ];
+  const A = data.color;
+  const AB = data.colorLight;
   const Icon = data.icon;
+  const kpis = buildKpis(data, nSamples, parcelleHa);
+
   return (
-    <div className={`sp-root ${open ? "sp-root--open" : ""}`}>
-      <header
-        className="sp-header"
-        style={{ "--a": accent, "--ab": accentBg, "--al": accentLight }}
-      >
-        <div className="sp-header-top">
-          <div className="sp-breadcrumb">
-            <span className="sp-breadcrumb-dot" />
+    <div
+      className={`cy-root ${open ? "cy-root--open" : ""}`}
+      style={{ "--a": A, "--ab": AB }}
+    >
+    
+      <div className="rp-hero">
+        {/* Topbar */}
+        <div className="rp-topbar">
+          <div className="rp-breadcrumb">
+            <span className="rp-live-dot" />
             Échantillonnage · {region || "Algérie"}
           </div>
-          <button className="sp-close" onClick={onClose}>
+          <button className="rp-close-btn" onClick={onClose}>
             <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
               <path
                 d="M1 1l9 9M10 1L1 10"
@@ -302,377 +358,358 @@ export default function ResultsPanel({
           </button>
         </div>
 
-        <div className="sp-identity">
-          <div className="sp-identity-left">
+        
+        <div className="rp-identity-card">
+          <div className="rp-icon-bubble" style={{ background: AB }}>
+            <Icon size={26} color={data.iconColor} />
+          </div>
+          <div className="rp-identity-text">
             <div
-              className="sp-culture-tag"
-              style={{ background: accentBg, color: accent }}
+              className="rp-group-badge"
+              style={{ background: AB, color: A, borderColor: `${A}33` }}
             >
               Groupe {data.id}
             </div>
-            <h1 className="sp-title">{data.nameShort}</h1>
-            <p className="sp-sub">{data.examples}</p>
-          </div>
-          {/* <div className="sp-identity-icon">{data.icon}</div> */}
-          <div className="sp-identity-icon">
-            <Icon size={28} color={data.iconColor} />
+            <div className="rp-culture-name">{data.nameShort}</div>
+            <div className="rp-culture-examples">{data.examples}</div>
           </div>
         </div>
 
-        <div className="sp-kpi-row">
-          <div className="sp-kpi sp-kpi--main">
-            <span className="sp-kpi-n" style={{ color: accent }}>
-              {nSamples}
-            </span>
-            <span className="sp-kpi-label">
-              points de
-              <br />
-              prélèvement
-            </span>
-          </div>
-          <div className="sp-kpi-divider" />
-          <div className="sp-kpi">
-            <span className="sp-kpi-n">
-              {data.depths.at(-1).label.split("–")[1].trim()}
-            </span>
-            <span className="sp-kpi-label">
-              cm
-              <br />
-              max.
-            </span>
-          </div>
-          <div className="sp-kpi-divider" />
-          <div className="sp-kpi">
-            <span className="sp-kpi-n">{fmtHa(parcelleHa)}</span>
-            <span className="sp-kpi-label">
-              surface
-              <br />
-              parcelle
-            </span>
-          </div>
-          <div className="sp-kpi-divider" />
-          <div className="sp-kpi">
-            <span className="sp-kpi-n">{data.depths.length}</span>
-            <span className="sp-kpi-label">
-              horizons
-              <br />
-              requis
-            </span>
-          </div>
+        
+        <div className="rp-kpis">
+          {kpis.map((k, i) => (
+            <div key={i} className="rp-kpi-pill">
+              <div className="rp-kpi-pill-icon" style={{ background: k.bg }}>
+                {k.icon}
+              </div>
+              <div className="rp-kpi-pill-body">
+                <div
+                  className="rp-kpi-pill-val"
+                  style={{ color: i === 0 ? A : "#1a1825" }}
+                >
+                  {k.val}
+                </div>
+                <div className="rp-kpi-pill-lbl">
+                  {k.lbl.split("\n").map((l, j) => (
+                    <span key={j}>
+                      {l}
+                      {j === 0 ? " " : ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
-        <nav className="sp-tabs">
+        
+        <div className="cy-tab-rail">
           {TABS.map((t) => (
             <button
               key={t.id}
-              className={`sp-tab ${activeTab === t.id ? "sp-tab--on" : ""}`}
-              style={activeTab === t.id ? { "--a": accent } : {}}
-              onClick={() => setActiveTab(t.id)}
+              className={`cy-tab-pill ${tab === t.id ? "cy-tab-pill--on" : ""}`}
+              style={
+                tab === t.id
+                  ? {
+                      background: A,
+                      color: "#fff",
+                      boxShadow: `0 6px 18px ${A}50`,
+                    }
+                  : {}
+              }
+              onClick={() => setTab(t.id)}
             >
-              {t.label}
+              <span>{t.icon}</span>
+              <span>{t.label}</span>
             </button>
           ))}
-        </nav>
-      </header>
-
-      <div className="sp-body">
-        {activeTab === "schema" && (
-          <div className="sp-tab-content">
-            <div className="sp-pills">
-              <span className="sp-pill">⏱ {data.timing}</span>
-              <span className="sp-pill">🔁 {data.freq}</span>
+        </div>
+      </div>
+     
+      <div className="cy-body">
+        
+        {tab === "schema" && (
+          <div className="cy-flow">
+            <div className="cy-tag-row">
+              <span
+                className="cy-tag"
+                style={{ background: `${PALETTE[0]}30`, color: "#4a6080" }}
+              >
+                ⏱ {data.timing}
+              </span>
+              <span
+                className="cy-tag"
+                style={{ background: `${PALETTE[1]}30`, color: "#2d6a4f" }}
+              >
+                🔁 {data.freq}
+              </span>
             </div>
 
             <div
-              className="sp-formula-block"
-              style={{ "--a": accent, "--ab": accentBg }}
+              className="cy-slab cy-slab--formula"
+              style={{ borderColor: `${A}30` }}
             >
-              <div className="sp-formula-left">
-                <div className="sp-formula-label">Formule de calcul</div>
-                <div className="sp-formula-eq">
-                  <span className="sp-formula-val" style={{ color: accent }}>
+              <div className="cy-slab-left" style={{ background: `${A}10` }}>
+                <div className="cy-slab-micro">🧮 Formule de calcul</div>
+                <div className="cy-formula-eq">
+                  <span className="cy-formula-n" style={{ color: A }}>
                     {nSamples}
                   </span>
-                  <span className="sp-formula-op">=</span>
-                  <span className="sp-formula-part">{fmtHa(parcelleHa)}</span>
-                  <span className="sp-formula-op">×</span>
-                  {/* <span className="sp-formula-part">{data.sampleNote}/ha</span> */}
-                  <span className="sp-formula-part">{data.sampleNote}</span>
+                  <span className="cy-formula-op">=</span>
+                  <span className="cy-formula-p">{fmtHa(parcelleHa)}</span>
+                  <span className="cy-formula-op">×</span>
+                  <span className="cy-formula-p">{data.sampleNote}</span>
                 </div>
-                <div className="sp-formula-note">
-                  minimum {data.sampleNote} points quelle que soit la surface
+                <div className="cy-formula-note">
+                  min. {data.sampleNote} pts quelle que soit la surface
                 </div>
               </div>
-              <div className="sp-formula-rule">
-                <div className="sp-formula-rule-title">Règle terrain</div>
-                <div className="sp-formula-rule-text">
-                  Répartir les {nSamples} points selon le schéma ci-dessous.
-                  Chaque point = 1 enfoncement de tarière jusqu'à la profondeur
-                  cible.
+              <div className="cy-slab-right">
+                <div className="cy-slab-micro">📌 Règle terrain</div>
+                <div className="cy-slab-text">
+                  Répartir les <b>{nSamples}</b> points selon le schéma. Chaque
+                  point = 1 enfoncement de tarière jusqu'à la profondeur cible.
                 </div>
               </div>
             </div>
 
-            <div className="sp-patterns-title">Schémas disponibles</div>
-            <div className="sp-patterns">
+            <div className="cy-pat-row">
               <div
-                className="sp-pattern sp-pattern--rec"
-                style={{ "--a": accent, "--ab": accentBg }}
+                className="cy-pat-card cy-pat-card--rec"
+                style={{ borderColor: `${A}40`, background: `${A}07` }}
               >
-                <div
-                  className="sp-pattern-badge"
-                  style={{ background: accent }}
-                >
-                  Recommandé
+                <div className="cy-pat-ribbon" style={{ background: A }}>
+                  ⭐ Recommandé
                 </div>
-                <PatternDiagram type={data.pattern} color={accent} size={110} />
-                <div className="sp-pattern-footer">
-                  <span className="sp-pattern-name" style={{ color: accent }}>
-                    {data.pattern.toUpperCase()}
-                  </span>
-                  <span className="sp-pattern-why">
-                    {data.id === 1 && "Couvre l'hétérogénéité max."}
-                    {data.id === 2 && "Capture la variabilité diagonale"}
-                    {data.id === 3 && "Suit la distribution racinaire"}
-                  </span>
+                <PatternDiagram type={data.pattern} color={A} size={100} />
+                <div className="cy-pat-name" style={{ color: A }}>
+                  {data.pattern?.toUpperCase()}
+                </div>
+                <div className="cy-pat-why">
+                  {data.id === 1 && "Couvre l'hétérogénéité max."}
+                  {data.id === 2 && "Capture la variabilité diagonale"}
+                  {data.id === 3 && "Suit la distribution racinaire"}
                 </div>
               </div>
-
-              <div className="sp-pattern sp-pattern--alt">
+              <div className="cy-pat-card" style={{ borderColor: "#e2e8f0" }}>
+                <div
+                  className="cy-pat-ribbon"
+                  style={{ background: "#94a3b8" }}
+                >
+                  Alternatif
+                </div>
                 <PatternDiagram
                   type={data.patternAlt}
-                  color="#9ca3a0"
-                  size={110}
+                  color="#94a3b8"
+                  size={100}
                 />
-                <div className="sp-pattern-footer">
-                  <span className="sp-pattern-name">
-                    {data.patternAlt.toUpperCase()}
-                  </span>
-                  <span className="sp-pattern-why">Alternatif</span>
+                <div className="cy-pat-name" style={{ color: "#94a3b8" }}>
+                  {data.patternAlt?.toUpperCase()}
                 </div>
+                <div className="cy-pat-why">Schéma de secours</div>
               </div>
             </div>
 
-            {/* alerts */}
-            <div className="sp-alerts">
-              {data.alerts.map((a, i) => (
-                <div className="sp-alert" key={i}>
-                  <svg
-                    className="sp-alert-icon"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                  >
-                    <path
-                      d="M8 1.5L1 14h14L8 1.5z"
-                      stroke="#92700a"
-                      strokeWidth="1.3"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M8 6v3.5"
-                      stroke="#92700a"
-                      strokeWidth="1.4"
-                      strokeLinecap="round"
-                    />
-                    <circle cx="8" cy="11.5" r=".75" fill="#92700a" />
-                  </svg>
-                  {a}
+            <div className="cy-alerts">
+              {data.alerts?.map((a, i) => (
+                <div key={i} className="cy-alert-toast">
+                  <div className="cy-alert-orb">⚠</div>
+                  <div className="cy-alert-txt">{a}</div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {activeTab === "depths" && (
-          <div className="sp-tab-content">
-            <p className="sp-tab-intro">
-              Chaque horizon constitue un <strong>échantillon distinct</strong>.
-              Ne jamais mélanger les profondeurs dans un même sac.
-            </p>
-
-            <div className="sp-profile">
-              <div className="sp-profile-col">
-                {data.depths.map((d, i) => {
-                  const h = i === 0 ? 72 : i === 1 ? 56 : 44;
-                  return (
-                    <div
-                      key={i}
-                      className="sp-profile-layer"
-                      style={{ height: h, background: d.color }}
-                    >
-                      <span className="sp-profile-cm">{d.label} cm</span>
-                    </div>
-                  );
-                })}
-                <div className="sp-profile-subsoil" />
-              </div>
-              <div className="sp-profile-details">
-                {data.depths.map((d, i) => (
-                  <div
-                    key={i}
-                    className="sp-profile-detail"
-                    style={{
-                      "--h": data.depths[i < data.depths.length ? i : 0],
-                    }}
-                  >
-                    <div className="sp-profile-connector">
-                      <div
-                        className="sp-profile-dot"
-                        style={{ background: d.color }}
-                      />
-                      <div
-                        className="sp-profile-line"
-                        style={{ background: `${d.color}40` }}
-                      />
-                    </div>
-                    <div className="sp-profile-info">
-                      <div className="sp-profile-range">{d.label} cm</div>
-                      <div className="sp-profile-role">{d.desc}</div>
-
-                      {d.priority && (
-                        <span
-                          className="sp-profile-prio"
-                          style={{
-                            color: accent,
-                            borderColor: `${accent}40`,
-                            background: accentBg,
-                          }}
-                        >
-                          obligatoire
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
+        {/* ── DEPTHS ── */}
+        {tab === "depths" && (
+          <div className="cy-flow">
+            <div className="cy-intro-banner">
+              <span className="cy-intro-icon">🪨</span>
+              <div>
+                Chaque horizon = <b>échantillon distinct</b>. Ne jamais mélanger
+                les profondeurs.
               </div>
             </div>
 
-            <div className="sp-depth-rule">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect
-                  x="1"
-                  y="1"
-                  width="12"
-                  height="12"
-                  rx="2"
-                  stroke={accent}
-                  strokeWidth="1.2"
-                />
-                <path
-                  d="M4 5h6M4 7h6M4 9h4"
-                  stroke={accent}
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <span>
-                Pour les cultures {data.nameShort.toLowerCase()},{" "}
-                {data.depths.filter((d) => d.priority).length ===
-                data.depths.length
+            {data.depths?.map((d, i) => (
+              <div
+                key={i}
+                className="cy-hz-slab"
+                style={{ borderLeft: `5px solid ${d.color}` }}
+              >
+                <div className="cy-hz-slab-left">
+                  <div
+                    className="cy-hz-swatch"
+                    style={{
+                      background: d.color,
+                      height: i === 0 ? 60 : i === 1 ? 46 : 34,
+                    }}
+                  />
+                  <div className="cy-hz-num">H{i + 1}</div>
+                </div>
+                <div className="cy-hz-slab-body">
+                  <div className="cy-hz-range" style={{ color: d.color }}>
+                    {d.label} cm
+                  </div>
+                  <div className="cy-hz-role">{d.desc}</div>
+                  <div className="cy-hz-bottom">
+                    {d.priority ? (
+                      <span
+                        className="cy-prio"
+                        style={{ background: d.color, color: "#fff" }}
+                      >
+                        Obligatoire
+                      </span>
+                    ) : (
+                      <span className="cy-prio cy-prio--opt">Optionnel</span>
+                    )}
+                    <div className="cy-hz-prog">
+                      <div
+                        className="cy-hz-prog-fill"
+                        style={{
+                          width: i === 0 ? "100%" : i === 1 ? "65%" : "40%",
+                          background: d.color,
+                        }}
+                      />
+                    </div>
+                    <span className="cy-hz-prog-lbl">
+                      {i === 0
+                        ? "Priorité max"
+                        : i === 1
+                          ? "Si carence"
+                          : "Long terme"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <div className="cy-intro-banner cy-intro-banner--green">
+              <span className="cy-intro-icon">📌</span>
+              <div>
+                Pour les cultures {data.nameShort?.toLowerCase()},{" "}
+                {data.depths?.filter((d) => d.priority).length ===
+                data.depths?.length
                   ? "tous les horizons sont obligatoires"
-                  : `l'horizon 0–${data.depths[0].label.split("–")[1].trim()} cm est obligatoire`}
-                . Les autres sont recommandés en cas de problème nutritionnel
-                constaté.
-              </span>
+                  : `l'horizon 0–${data.depths?.[0]?.label?.split("–")[1]?.trim()} cm est obligatoire`}
+                .
+              </div>
             </div>
           </div>
         )}
 
-        {activeTab === "protocole" && (
-          <div className="sp-tab-content">
-            <div className="sp-proto-list">
-              {data.steps.map((p, i) => (
-                <div className="sp-proto" key={i}>
-                  <div className="sp-proto-left">
-                    <div className="sp-proto-n" style={{ color: accent }}>
+       
+        {tab === "protocole" && (
+          <div className="cy-flow">
+            {data.steps?.map((p, i) => {
+              const col = PALETTE[i % PALETTE.length];
+              return (
+                <div key={i} className="cy-proto-row">
+                  <div className="cy-proto-timeline">
+                    <div
+                      className="cy-proto-bubble"
+                      style={{
+                        background: col,
+                        boxShadow: `0 4px 14px ${col}66`,
+                      }}
+                    >
                       {String(i + 1).padStart(2, "0")}
                     </div>
                     {i < data.steps.length - 1 && (
                       <div
-                        className="sp-proto-connector"
-                        style={{ background: `${accent}25` }}
+                        className="cy-proto-connector"
+                        style={{ background: `${col}40` }}
                       />
                     )}
                   </div>
-                  <div className="sp-proto-right">
-                    <div className="sp-proto-step">{p.title}</div>
+                  <div
+                    className="cy-proto-slab"
+                    style={{ borderColor: `${col}30` }}
+                  >
+                    <div className="cy-proto-title" style={{ color: col }}>
+                      {p.title}
+                    </div>
                     <div
-                      className="sp-proto-body"
-                      dangerouslySetInnerHTML={{
-                        __html: p.text.replace(
-                          /(\d+[–\-]\d+|\d+\s*cm|\d+\s*j|\d+\s*sem\.|\d+\s*ans)/g,
-                          "<strong>$1</strong>",
-                        ),
-                      }}
+                      className="cy-proto-body"
+                      dangerouslySetInnerHTML={{ __html: hl(p.text) }}
                     />
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
 
-        {activeTab === "gear" && (
-          <div className="sp-tab-content">
-            <div className="sp-gear-list">
-              {data.gear.map((g, i) => (
+       
+        {tab === "gear" && (
+          <div className="cy-flow">
+            {data.gear?.map((g, i) => {
+              const col = PALETTE[i % PALETTE.length];
+              return (
                 <div
-                  className="sp-gear"
                   key={i}
-                  style={{ "--a": accent, "--ab": accentBg }}
+                  className="cy-gear-pill"
+                  style={{ borderColor: `${col}50` }}
                 >
-                  <div className="sp-gear-num">
-                    {String(i + 1).padStart(2, "0")}
+                  <div
+                    className="cy-gear-icon-ball"
+                    style={{ background: `${col}30` }}
+                  >
+                    <span style={{ fontSize: 22 }}>
+                      {GEAR_EMOJIS[i] ?? "🔩"}
+                    </span>
                   </div>
-                  <div className="sp-gear-name">{g}</div>
-                  <div className="sp-gear-check">
-                    <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                  <div className="cy-gear-pill-body">
+                    <div className="cy-gear-num" style={{ color: col }}>
+                      #{String(i + 1).padStart(2, "0")}
+                    </div>
+                    <div className="cy-gear-name">{g}</div>
+                  </div>
+                  <div
+                    className="cy-gear-check-ball"
+                    style={{ background: col }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
                       <path
-                        d="M1.5 4.5l2 2 4-4"
-                        stroke={accent}
-                        strokeWidth="1.5"
+                        d="M1.5 5.5l2.5 2.5 5.5-5.5"
+                        stroke="#fff"
+                        strokeWidth="1.8"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
                     </svg>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            <div className="sp-gear-note">
-              L'ensemble du matériel doit être propre et sec avant usage. Rincer
-              à l'eau distillée entre chaque point de prélèvement pour éviter la
-              contamination croisée.
+              );
+            })}
+            <div className="cy-intro-banner cy-intro-banner--peach">
+              <span className="cy-intro-icon">💡</span>
+              <div>
+                Tout le matériel doit être propre et sec. Rincer à l'eau
+                distillée entre chaque point.
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      <footer className="sp-footer">
-        <div className="sp-footer-info">
-          <span
-            className="sp-footer-badge"
-            style={{
-              color: accent,
-              borderColor: `${accent}35`,
-              background: accentBg,
-            }}
-          >
-            <Icon size={14} color={data.iconColor} />
-            {data.nameShort}
-          </span>
-          <span className="sp-footer-sep">·</span>
-          <span className="sp-footer-stat">{nSamples} pts</span>
-          <span className="sp-footer-sep">·</span>
-          <span className="sp-footer-stat">{fmtHa(parcelleHa)}</span>
+      
+      <div className="cy-footer">
+        <div className="cy-footer-badge" style={{ background: A }}>
+          <Icon size={13} color="#fff" /> {data.nameShort}
         </div>
-        <div className="sp-footer-actions">
-          <button className="sp-btn-ghost" onClick={onClose}>
-            Fermer
-          </button>
+        <div className="cy-footer-stats">
+          <span>{nSamples} pts</span>
+          <span className="cy-footer-dot" />
+          <span>{fmtHa(parcelleHa)}</span>
+          <span className="cy-footer-dot" />
+          <span>{data.depths.length} horizons</span>
         </div>
-      </footer>
+        <button className="cy-footer-close" onClick={onClose}>
+          Fermer ✕
+        </button>
+      </div>
     </div>
   );
 }
