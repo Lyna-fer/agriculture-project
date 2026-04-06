@@ -47,3 +47,16 @@ body.page-map {
   border-radius: 50% !important;
   box-shadow: 0 0 0 3px rgba(90, 191, 106, 0.3) !important;
 }
+
+.map-page-root {
+  position: relative;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.map-layout {
+  display: flex;
+  height: 100%;
+  width: 100%;
+}
