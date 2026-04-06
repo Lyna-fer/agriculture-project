@@ -17,6 +17,9 @@ function Landing() {
 
   useEffect(() => {
     document.body.className = "page-landing";
+    return () => {
+      document.body.className = "";
+    };
   }, []);
 
   return (
@@ -36,4 +39,3 @@ function Landing() {
 }
 
 export default Landing;
-
