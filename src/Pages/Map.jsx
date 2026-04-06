@@ -174,21 +174,32 @@ export default function Map() {
     [showToast],
   );
 
+  
   const handleAnalyze = useCallback(() => {
-    if (!parcelleInfo || !selectedGroupId) return;
+   
+    const parcelle = parcelles.find((p) => p.id === selectedParcelleId);
+    if (!parcelle || !selectedGroupId) return;
 
     const culture = CULTURES.find((c) => c.id === selectedGroupId);
     if (!culture) return;
 
-    const n = culture.sampleFormula(parcelleInfo.area || 0);
+    // Convertir m² → ha pour sampleFormula
+    const ha = (parcelle.area || 0) / 10000;
+    const n = culture.sampleFormula(ha);
 
-    if (parcelleInfo.bounds) {
-      placeSamplePoints(n, culture.pattern, culture.color, parcelleInfo.bounds);
+    if (parcelle.bounds) {
+      placeSamplePoints(n, culture.pattern, culture.color, parcelle.bounds);
     }
 
     setResultsOpen(true);
     showToast(`🔬 ${n} points d'échantillonnage générés`);
-  }, [parcelleInfo, selectedGroupId, placeSamplePoints, showToast]);
+  }, [
+    parcelles,
+    selectedParcelleId,
+    selectedGroupId,
+    placeSamplePoints,
+    showToast,
+  ]);
 
   const handleSelectWilaya = useCallback(
     (wilaya) => {
@@ -202,8 +213,8 @@ export default function Map() {
   const selectedCulture = CULTURES.find((c) => c.id === selectedGroupId);
 
   return (
-    <>
-      <div style={{ display: "flex", height: "100vh" }}>
+    <div className="map-page-root">
+      <div className="map-layout">
         <LeftPanel
           parcelles={parcelles}
           selectedParcelle={selectedParcelleId}
@@ -235,11 +246,13 @@ export default function Map() {
         open={resultsOpen}
         onClose={() => setResultsOpen(false)}
         cultureId={selectedGroupId}
-        parcelleHa={parcelleInfo?.area}
+        parcelleHa={
+          (parcelles.find((p) => p.id === selectedParcelleId)?.area || 0) /
+          10000
+        }
         region={selectedWilaya?.name}
       />
-
       <Toast message={toast.msg} visible={toast.visible} />
-    </>
+    </div>
   );
 }
