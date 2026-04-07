@@ -82,6 +82,7 @@ export default function LeftPanel({
   parcelles = [],
   selectedParcelle = null,
   selectedGroup = null,
+  samplingMode = "standard",
   activeTool = null,
   pendingParcelleInfo = null,
   pendingColor = "#2ecc71",
@@ -89,6 +90,7 @@ export default function LeftPanel({
   onSelectParcelle,
   onDeleteParcelle,
   onGroupChange,
+  onSamplingModeChange,
   onGenerate,
   onClearAll,
   onSaveParcelle,
@@ -239,6 +241,30 @@ export default function LeftPanel({
             <Trash2 size={13} />
             Effacer tout
           </button>
+        )}
+
+        {canGenerate && (
+          <div className="lp-mode-selector">
+            <div className="lp-mode-label">Mode d'échantillonnage</div>
+            <div className="lp-mode-buttons">
+              <button
+                className={`lp-mode-btn ${samplingMode === "standard" ? "active" : ""}`}
+                onClick={() => onSamplingModeChange("standard")}
+                title="Maximise la précision avec plus de zones"
+              >
+                <span className="lp-mode-icon">📊</span>
+                Standard
+              </button>
+              <button
+                className={`lp-mode-btn ${samplingMode === "economic" ? "active" : ""}`}
+                onClick={() => onSamplingModeChange("economic")}
+                title="Optimise le budget avec moins de zones"
+              >
+                <span className="lp-mode-icon">💰</span>
+                Économique
+              </button>
+            </div>
+          </div>
         )}
 
         <button

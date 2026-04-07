@@ -518,3 +518,61 @@
   height: 28px;
   object-fit: contain;
 }
+
+.lp-mode-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+  border-top: 1px solid #edf2ee;
+  border-bottom: 1px solid #edf2ee;
+}
+
+.lp-mode-label {
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #86a88c;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lp-mode-buttons {
+  display: flex;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.lp-mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1.5px solid #d4e0d8;
+  background: #f8faf8;
+  color: #5a7a62;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s;
+}
+
+.lp-mode-btn:hover {
+  border-color: #b8d0c0;
+  background: #f0f8f2;
+}
+
+.lp-mode-btn.active {
+  border-color: #1a7a3f;
+  background: #e2f4eb;
+  color: #1a7a3f;
+  box-shadow: inset 0 1px 3px rgba(26, 122, 63, 0.1);
+}
+
+.lp-mode-icon {
+  font-size: 12px;
+}

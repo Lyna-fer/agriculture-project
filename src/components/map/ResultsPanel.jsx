@@ -320,9 +320,16 @@ export default function ResultsPanel({
   const data = CULTURES.find((c) => c.id === cultureId);
   const nSamples = useMemo(() => {
     if (!data || parcelleHa <= 0) return 0;
-    if (data.sampleFormula) return data.sampleFormula(parcelleHa);
-    return Math.max(data.minSamples, Math.round(parcelleHa * data.sampleNote));
-  }, [data, parcelleHa]);
+    // With new samplingEngine, samples are calculated
+    // based on crop strategy and area dynamically
+    // Use CROP_STRATEGIES minCores/maxCores as reference
+    const { coresPerHa, minCores, maxCores } = {
+      coresPerHa: cultureId === 1 ? 7 : (cultureId === 2 ? 4 : 5),
+      minCores: cultureId === 1 ? 8 : (cultureId === 2 ? 6 : 6),
+      maxCores: cultureId === 1 ? 20 : (cultureId === 2 ? 20 : 20),
+    };
+    return Math.max(minCores, Math.min(maxCores, Math.round(parcelleHa * coresPerHa)));
+  }, [data, parcelleHa, cultureId]);
 
   const fmtHa = (ha) =>
     ha < 0.1 ? `${(ha * 10000).toFixed(0)} m²` : `${ha.toFixed(2)} ha`;
@@ -450,7 +457,7 @@ export default function ResultsPanel({
               style={{ borderColor: `${A}30` }}
             >
               <div className="cy-slab-left" style={{ background: `${A}10` }}>
-                <div className="cy-slab-micro">🧮 Formule de calcul</div>
+                <div className="cy-slab-micro">🧮 Calcul de points</div>
                 <div className="cy-formula-eq">
                   <span className="cy-formula-n" style={{ color: A }}>
                     {nSamples}
@@ -458,10 +465,10 @@ export default function ResultsPanel({
                   <span className="cy-formula-op">=</span>
                   <span className="cy-formula-p">{fmtHa(parcelleHa)}</span>
                   <span className="cy-formula-op">×</span>
-                  <span className="cy-formula-p">{data.sampleNote}</span>
+                  <span className="cy-formula-p">coresPerHa</span>
                 </div>
                 <div className="cy-formula-note">
-                  min. {data.sampleNote} pts quelle que soit la surface
+                  Optimisé par analyse géospatiale
                 </div>
               </div>
               <div className="cy-slab-right">
@@ -470,43 +477,6 @@ export default function ResultsPanel({
                   Répartir les <b>{nSamples}</b> points selon le schéma. Chaque
                   point = 1 enfoncement de tarière jusqu'à la profondeur cible.
                 </div>
-              </div>
-            </div>
-
-            <div className="cy-pat-row">
-              <div
-                className="cy-pat-card cy-pat-card--rec"
-                style={{ borderColor: `${A}40`, background: `${A}07` }}
-              >
-                <div className="cy-pat-ribbon" style={{ background: A }}>
-                  ⭐ Recommandé
-                </div>
-                <PatternDiagram type={data.pattern} color={A} size={100} />
-                <div className="cy-pat-name" style={{ color: A }}>
-                  {data.pattern?.toUpperCase()}
-                </div>
-                <div className="cy-pat-why">
-                  {data.id === 1 && "Couvre l'hétérogénéité max."}
-                  {data.id === 2 && "Capture la variabilité diagonale"}
-                  {data.id === 3 && "Suit la distribution racinaire"}
-                </div>
-              </div>
-              <div className="cy-pat-card" style={{ borderColor: "#e2e8f0" }}>
-                <div
-                  className="cy-pat-ribbon"
-                  style={{ background: "#94a3b8" }}
-                >
-                  Alternatif
-                </div>
-                <PatternDiagram
-                  type={data.patternAlt}
-                  color="#94a3b8"
-                  size={100}
-                />
-                <div className="cy-pat-name" style={{ color: "#94a3b8" }}>
-                  {data.patternAlt?.toUpperCase()}
-                </div>
-                <div className="cy-pat-why">Schéma de secours</div>
               </div>
             </div>
 

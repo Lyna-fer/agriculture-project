@@ -20,19 +20,6 @@ export const CULTURES = [
     examples: "Tomates, carottes, pommes de terre, légumes...",
     desc: "Tomates · Carottes · Courgettes · Pommes de terre",
 
-    // ───────────── ÉCHANTILLONNAGE ─────────────
-    sampleFormula: (ha) => {
-      const calcul = Math.ceil(8 + 3 * Math.sqrt(ha));
-      return Math.min(25, calcul);
-    },
-    sampleNote: "Précision renforcée — Max 25 points",
-
-    // ───────────── PATTERN ─────────────
-    pattern: "zigzag",
-    patternLabel: "Zigzag",
-    patternAlt: "grille",
-    patternAltLabel: "Grille",
-
     // ───────────── PROFONDEURS ─────────────
     depths: [
       {
@@ -110,17 +97,6 @@ export const CULTURES = [
     examples: "Blé, orge, maïs, sorgho...",
     desc: "Blé dur · Orge · Maïs · Avoine",
 
-    sampleFormula: (ha) => {
-      const calcul = Math.ceil(5 + 2 * Math.sqrt(ha));
-      return Math.min(20, calcul);
-    },
-    sampleNote: "Gestion fertilisants — Max 20 points",
-
-    pattern: "x",
-    patternLabel: "Schéma X/W",
-    patternAlt: "diagonal",
-    patternAltLabel: "Diagonal",
-
     depths: [
       {
         label: "0 – 30 cm",
@@ -175,17 +151,6 @@ export const CULTURES = [
     examples: "Oliviers, agrumes, vignes...",
     desc: "Oliviers · Agrumes · Vignes · Figuiers",
 
-    sampleFormula: (ha) => {
-      const calcul = Math.ceil(4 + 1.5 * Math.sqrt(ha));
-      return Math.min(15, calcul);
-    },
-    sampleNote: "Suivi par zone — Max 15 points",
-
-    pattern: "radial",
-    patternLabel: "Radial / Couronnes",
-    patternAlt: "transect",
-    patternAltLabel: "Transect",
-
     depths: [
       {
         label: "0 – 20 cm",
@@ -235,61 +200,4 @@ export const CULTURES = [
 
 export const CULTURE_MAP = Object.fromEntries(CULTURES.map((c) => [c.id, c]));
 
-export const computeSamples = (culture, ha) => {
-  if (!culture || !culture.sampleFormula) return 0;
-  return culture.sampleFormula(ha || 1);
-};
-
 export const getCultureById = (id) => CULTURE_MAP[id];
-
-// ───────────── MAP LOGIC ─────────────
-
-export const getPatternPoints = (type, n, bounds) => {
-  const { minLat, maxLat, minLng, maxLng } = bounds;
-
-  const latRange = maxLat - minLat;
-  const lngRange = maxLng - minLng;
-
-  const cLat = (minLat + maxLat) / 2;
-  const cLng = (minLng + maxLng) / 2;
-
-  const points = [];
-
-  if (type === "zigzag") {
-    const rows = Math.ceil(Math.sqrt(n));
-    const cols = Math.ceil(n / rows);
-
-    for (let r = 0; r < rows && points.length < n; r++) {
-      const lat = minLat + ((r + 0.5) * latRange) / rows;
-
-      for (let c = 0; c < cols && points.length < n; c++) {
-        const ci = r % 2 === 0 ? c : cols - 1 - c;
-        const lng = minLng + ((ci + 0.5) * lngRange) / cols;
-
-        points.push([lat, lng]);
-      }
-    }
-  } else if (type === "x") {
-    for (let i = 0; i < n; i++) {
-      const t = (i + 0.5) / n;
-
-      points.push([
-        minLat + t * latRange,
-        minLng + (i % 2 === 0 ? t : 1 - t) * lngRange,
-      ]);
-    }
-  } else if (type === "radial") {
-    points.push([cLat, cLng]);
-
-    for (let i = 1; i < n; i++) {
-      const angle = (2 * Math.PI * i) / n;
-
-      points.push([
-        cLat + 0.3 * latRange * Math.sin(angle),
-        cLng + 0.3 * lngRange * Math.cos(angle),
-      ]);
-    }
-  }
-
-  return points;
-};

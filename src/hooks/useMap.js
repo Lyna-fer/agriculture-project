@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { getPatternPoints } from "../data/cultures";
 
 export function useMap({ onParcelleChange }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const drawnItemsRef = useRef(null);
   const sampleMarkersRef = useRef([]);
+  const zoneLayersRef = useRef([]); // Store zone boundaries
   const parcelleLayerRef = useRef(null);
   const drawControlRef = useRef(null);
 
@@ -177,21 +177,46 @@ export function useMap({ onParcelleChange }) {
     }
   }, []);
 
-  const placeSamplePoints = useCallback((n, pattern, color, bounds) => {
+  const placeSamplePoints = useCallback((zones, color) => {
+    console.log("placeSamplePoints called with", zones.length, "zones and color", color);
     const L = window.L;
     const map = mapInstanceRef.current;
-    if (!map || !L) return;
+    if (!map || !L) {
+      console.log("placeSamplePoints: early return - missing map or L");
+      return;
+    }
 
     clearSampleMarkers();
-    const points = getPatternPoints(pattern, n, bounds);
-    // if (points.length) {
-    //   map.fitBounds(points, { padding: [40, 40] });
-    // }
-    const markers = points.map((pt, i) => {
-      const icon = L.divIcon({
-        className: "",
-
-        html: `<div style="
+    
+    let totalMarkers = 0;
+    
+    // Iterate through zones and place points with per-zone numbering
+    zones.forEach((zone) => {
+      const points = zone.points || [];
+      
+      // Draw dotted line connecting all points in this zone (the pattern)
+      if (points.length > 1) {
+        try {
+          const polyline = L.polyline(points, {
+            color: color,
+            weight: 1.5,
+            opacity: 0.4,
+            dashArray: "3,4",
+          }).addTo(map);
+          
+          sampleMarkersRef.current.push(polyline);
+          console.log(`Zone ${zone.id}: drew pattern line with ${points.length} points`);
+        } catch (e) {
+          console.error(`Error drawing pattern line for zone ${zone.id}:`, e);
+        }
+      }
+      
+      points.forEach((pt, idx) => {
+        try {
+          const pointNum = idx + 1;  // Restart from 1 for each zone
+          const icon = L.divIcon({
+            className: "",
+            html: `<div style="
   width:26px; height:26px;
   background:rgba(255,255,255,0.9);
   border:1.5px solid ${color};
@@ -200,21 +225,28 @@ export function useMap({ onParcelleChange }) {
   display:flex; align-items:center; justify-content:center;
   font-size:0.65rem; font-family:'Geist Mono',monospace;
   box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
-">${i + 1}</div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
-      });
+">${pointNum}</div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
+          });
 
-      return L.marker(pt, { icon })
-        .addTo(map)
-        .bindPopup(
-          `<b>Point ${i + 1}</b><br>
-          Prélèvement n°${i + 1} / ${points.length}<br>
+          const marker = L.marker(pt, { icon })
+            .addTo(map)
+            .bindPopup(
+              `<b>${zone.id} - Point ${pointNum}</b><br>
+          Prélèvement n°${pointNum} / ${points.length}<br>
           <span style="color:#7a5230;font-size:0.75rem">Lat: ${pt[0].toFixed(5)}, Lng: ${pt[1].toFixed(5)}</span>`,
-        );
+            );
+          
+          sampleMarkersRef.current.push(marker);
+          totalMarkers++;
+        } catch (e) {
+          console.error("Error creating marker for zone point", zone.id, idx, e);
+        }
+      });
     });
-
-    sampleMarkersRef.current = markers;
+    
+    console.log("placeSamplePoints: created", totalMarkers, "markers across all zones");
   }, []);
 
   const activateDrawTool = useCallback(
@@ -244,10 +276,103 @@ export function useMap({ onParcelleChange }) {
     });
   }, []);
 
+  const clearZones = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    zoneLayersRef.current.forEach((layer) => map.removeLayer(layer));
+    zoneLayersRef.current = [];
+  }, []);
+
+  const displayZones = useCallback((zones, mode) => {
+    const L = window.L;
+    const map = mapInstanceRef.current;
+    if (!map || !L || !zones || zones.length === 0) {
+      console.log("displayZones: early return", { hasMap: !!map, hasL: !!L, hasZones: !!zones, zone_count: zones?.length });
+      return;
+    }
+
+    console.log("displayZones called with", zones.length, "zones");
+    
+    try {
+      clearZones();
+    } catch (e) {
+      console.error("Error clearing zones:", e);
+    }
+
+    const colors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12"];
+    
+    zones.forEach((zone, idx) => {
+      try {
+        if (!zone.geoJson) {
+          console.warn(`Zone ${idx}: no geoJson`);
+          return;
+        }
+        if (!zone.geoJson.geometry) {
+          console.warn(`Zone ${idx}: no geometry`);
+          return;
+        }
+        if (zone.geoJson.geometry.type !== "Polygon") {
+          console.warn(`Zone ${idx}: geometry type is ${zone.geoJson.geometry.type}, not Polygon`);
+          return;
+        }
+
+        const coords = zone.geoJson.geometry.coordinates[0];
+        if (!coords || coords.length === 0) {
+          console.warn(`Zone ${idx}: no coordinates`);
+          return;
+        }
+        
+        const latlngs = coords.map((c) => [c[1], c[0]]);
+
+        // Draw zone boundary
+        const polyline = L.polyline(latlngs, {
+          color: colors[idx % colors.length],
+          weight: 2.5,
+          opacity: 0.7,
+          dashArray: "5,5",
+        }).addTo(map);
+        
+        zoneLayersRef.current.push(polyline);
+
+        // Add zone label at center
+        const bounds = polyline.getBounds();
+        const center = bounds.getCenter();
+        const popup = `<b>${zone.id}</b><br>${zone.area} ha<br>${zone.points?.length || 0} pts`;
+        const marker = L.marker(center, {
+          icon: L.divIcon({
+            className: "",
+            html: `<div style="
+              background: ${colors[idx % colors.length]};
+              color: white;
+              padding: 4px 12px;
+              border-radius: 12px;
+              font-size: 12px;
+              font-weight: 600;
+              font-family: monospace;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            ">${zone.id}</div>`,
+            iconSize: [60, 28],
+            iconAnchor: [30, 14],
+          }),
+        })
+          .addTo(map)
+          .bindPopup(popup);
+        
+        zoneLayersRef.current.push(marker);
+        console.log(`Zone ${idx} (${zone.id}) rendered successfully`);
+      } catch (e) {
+        console.error(`Error rendering zone ${idx}:`, e, zone);
+      }
+    });
+    console.log("displayZones complete, total layers:", zoneLayersRef.current.length);
+  }, [clearZones]);
+
   return {
     mapRef,
     mapReady,
     placeSamplePoints,
+    displayZones,
+    clearZones,
     activateDrawTool,
     clearAll,
     flyToWilaya,
