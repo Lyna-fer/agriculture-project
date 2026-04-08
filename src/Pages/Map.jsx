@@ -18,9 +18,9 @@ import {
 
 // Mapping from CULTURES.id to CROP_STRATEGIES key
 const CULTURES_TO_STRATEGIES = {
-  1: "vegetables",  // Maraîchères
-  2: "cereals",     // Céréalières
-  3: "trees",       // Arbres
+  1: "vegetables", // Maraîchères
+  2: "cereals", // Céréalières
+  3: "trees", // Arbres
 };
 
 const FIELD_COLORS = [
@@ -94,7 +94,7 @@ export default function Map() {
       setPendingParcelleInfo(info);
       setPendingColor(color);
       setParcelleInfo(info);
-
+      setResultsOpen(false);
       const ha = info.area || 0;
       showToast(
         `✅ Parcelle tracée — ${ha < 0.1 ? info.areaM2?.toFixed(0) + " m²" : ha.toFixed(2) + " ha"} · Donnez-lui un nom`,
@@ -103,10 +103,17 @@ export default function Map() {
     [showToast],
   );
 
-  const { mapRef, placeSamplePoints, activateDrawTool, clearAll, flyToWilaya, displayZones, clearZones } =
-    useMap({
-      onParcelleChange: handleParcelleChange,
-    });
+  const {
+    mapRef,
+    placeSamplePoints,
+    activateDrawTool,
+    clearAll,
+    flyToWilaya,
+    displayZones,
+    clearZones,
+  } = useMap({
+    onParcelleChange: handleParcelleChange,
+  });
 
   const handleActivateTool = useCallback(
     (tool) => {
@@ -114,6 +121,7 @@ export default function Map() {
       if (tool) {
         activateDrawTool(tool);
         setPendingParcelleInfo(null);
+        setResultsOpen(false);
       } else {
         activateDrawTool(null);
       }
@@ -237,6 +245,34 @@ export default function Map() {
     // Turf.js slices the field into zones and generates points
     const numZones = computeNumZones(totalAreaHa, strategy, samplingMode);
     const zones = buildZones(drawnPolygon, totalAreaHa, numZones, strategy, samplingMode);
+    const numZones = computeNumZones(totalAreaHa, strategy, samplingMode);
+
+    console.log(
+      "handleAnalyze: strategy =",
+      cropType,
+      "numZones =",
+      numZones,
+      "samplingMode =",
+      samplingMode,
+    );
+
+    // Build zones and generate all points
+    const zones = buildZones(
+      drawnPolygon,
+      totalAreaHa,
+      numZones,
+      strategy,
+      samplingMode,
+    );
+
+    console.log(
+      "handleAnalyze: buildZones returned",
+      zones.length,
+      "zones",
+      zones,
+    );
+
+    // Flatten all points from all zones
     const allPoints = zones.flatMap((zone) => zone.points || []);
 
     if (allPoints.length === 0) {
@@ -252,6 +288,7 @@ export default function Map() {
 
     showToast("⏳ Envoi à PostGIS...");
 
+<<<<<<< HEAD
     // 4. Send to Database
     try {
       const response = await fetch('http://127.0.0.1:8000/api/generate-samples', {
@@ -269,6 +306,25 @@ export default function Map() {
           zones:zonesPayload // Send the exact calculated zones
         })
       });
+=======
+    console.log("handleAnalyze: setting resultsOpen to true");
+    setResultsOpen(true);
+
+    const modeLabel = samplingMode === "economic" ? "économique" : "standard";
+    showToast(
+      `🔬 ${allPoints.length} points (${numZones} zone${numZones > 1 ? "s" : ""} · mode ${modeLabel})`,
+    );
+
+    console.log("handleAnalyze: complete");
+  }, [
+    parcelleInfo,
+    selectedGroupId,
+    samplingMode,
+    placeSamplePoints,
+    displayZones,
+    showToast,
+  ]);
+>>>>>>> 75b4829a424e54337969bf136775739e90ffe53f
 
       // Catch strict FastAPI errors (like Pydantic 422s)
       if (!response.ok) {
@@ -306,7 +362,8 @@ export default function Map() {
   );
 
   const selectedCulture = CULTURES.find((c) => c.id === selectedGroupId);
-
+  const selectedParcelle =
+    parcelles.find((p) => p.id === selectedParcelleId) ?? null;
   return (
     <>
       <div style={{ display: "flex", height: "100vh" }}>
@@ -346,6 +403,7 @@ export default function Map() {
         parcelleHa={parcelleInfo?.area}
         region={selectedWilaya?.name}
         samplingMode={samplingMode} // 👈 ADD THIS LINE
+        parcelle={selectedParcelle}
       />
 
       <Toast message={toast.msg} visible={toast.visible} />
