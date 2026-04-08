@@ -314,26 +314,43 @@ export default function ResultsPanel({
   cultureId,
   parcelleHa = 0,
   region = "",
+  samplingMode = "standard", // 👈 Accept the new prop here
 }) {
   const [tab, setTab] = useState("schema");
+  console.log("THE MODE IS CURRENTLY:", samplingMode);
 
   const data = CULTURES.find((c) => c.id === cultureId);
+  
+  // 1. Calculate number of cores (points) depending on the mode
   const nSamples = useMemo(() => {
     if (!data || parcelleHa <= 0) return 0;
-    // With new samplingEngine, samples are calculated
-    // based on crop strategy and area dynamically
-    // Use CROP_STRATEGIES minCores/maxCores as reference
     const { coresPerHa, minCores, maxCores } = {
       coresPerHa: cultureId === 1 ? 7 : (cultureId === 2 ? 4 : 5),
       minCores: cultureId === 1 ? 8 : (cultureId === 2 ? 6 : 6),
       maxCores: cultureId === 1 ? 20 : (cultureId === 2 ? 20 : 20),
     };
-    return Math.max(minCores, Math.min(maxCores, Math.round(parcelleHa * coresPerHa)));
-  }, [data, parcelleHa, cultureId]);
+    // Economic mode uses half the points per hectare
+    const densityFactor = samplingMode === "economic" ? 0.5 : 1.0;
+    return Math.max(minCores, Math.min(maxCores, Math.round(parcelleHa * coresPerHa * densityFactor)));
+  }, [data, parcelleHa, cultureId, samplingMode]);
+
+  // 2. Calculate the number of zones depending on the mode
+  const zoneHa = cultureId === 1 ? 3 : (cultureId === 2 ? 5 : 4);
+  const calcZones = useMemo(() => {
+    if (samplingMode === "economic") {
+      if (parcelleHa <= 10) return 1;
+      if (parcelleHa <= 25) return 2;
+      return 3;
+    }
+    return Math.max(1, Math.ceil(parcelleHa / zoneHa));
+  }, [samplingMode, parcelleHa, zoneHa]);
 
   const fmtHa = (ha) =>
     ha < 0.1 ? `${(ha * 10000).toFixed(0)} m²` : `${ha.toFixed(2)} ha`;
+    
   if (!data) return null;
+
+
 
   const A = data.color;
   const AB = data.colorLight;
@@ -452,30 +469,43 @@ export default function ResultsPanel({
               </span>
             </div>
 
-            <div
+           <div
               className="cy-slab cy-slab--formula"
               style={{ borderColor: `${A}30` }}
             >
               <div className="cy-slab-left" style={{ background: `${A}10` }}>
-                <div className="cy-slab-micro">🧮 Calcul de points</div>
+                <div className="cy-slab-micro">🧮 Calcul des zones</div>
                 <div className="cy-formula-eq">
                   <span className="cy-formula-n" style={{ color: A }}>
-                    {nSamples}
+                    {calcZones}
                   </span>
-                  <span className="cy-formula-op">=</span>
-                  <span className="cy-formula-p">{fmtHa(parcelleHa)}</span>
-                  <span className="cy-formula-op">×</span>
-                  <span className="cy-formula-p">coresPerHa</span>
+                  
+                  {samplingMode === "economic" ? (
+                    <>
+                      <span className="cy-formula-op">→</span>
+                      <span className="cy-formula-p">Seuils fixes (Éco)</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="cy-formula-op">≈</span>
+                      <span className="cy-formula-p">{fmtHa(parcelleHa)}</span>
+                      <span className="cy-formula-op">/</span>
+                      <span className="cy-formula-p">{zoneHa} ha</span>
+                    </>
+                  )}
+                  
                 </div>
                 <div className="cy-formula-note">
-                  Optimisé par analyse géospatiale
+                  {samplingMode === "economic" 
+                    ? "Subdivision optimisée pour réduire les coûts" 
+                    : "Subdivision selon les normes agronomiques strictes"}
                 </div>
               </div>
               <div className="cy-slab-right">
                 <div className="cy-slab-micro">📌 Règle terrain</div>
                 <div className="cy-slab-text">
-                  Répartir les <b>{nSamples}</b> points selon le schéma. Chaque
-                  point = 1 enfoncement de tarière jusqu'à la profondeur cible.
+                  La parcelle est divisée en <b>{calcZones} zone(s)</b> de gestion homogène. 
+                  Dans chaque zone, effectuez <b>{nSamples}</b> prélèvements à mélanger dans un seau distinct.
                 </div>
               </div>
             </div>

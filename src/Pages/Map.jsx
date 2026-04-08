@@ -103,7 +103,7 @@ export default function Map() {
     [showToast],
   );
 
-  const { mapRef, placeSamplePoints, activateDrawTool, clearAll, flyToWilaya, displayZones } =
+  const { mapRef, placeSamplePoints, activateDrawTool, clearAll, flyToWilaya, displayZones, clearZones } =
     useMap({
       onParcelleChange: handleParcelleChange,
     });
@@ -160,6 +160,7 @@ export default function Map() {
 
   const handleClearAll = useCallback(() => {
     clearAll();
+    clearZones(); // 👈 This wipes the dashed boxes!
     setParcelles([]);
     setSelectedParcelleId(null);
     setParcelleInfo(null);
@@ -168,7 +169,7 @@ export default function Map() {
     setActiveTool(null);
     setResultsOpen(false);
     showToast("🗑 Tout effacé");
-  }, [clearAll, showToast]);
+  }, [clearAll, clearZones, showToast]);
 
   const handleSelectParcelle = useCallback(
     (id) => {
@@ -340,6 +341,7 @@ export default function Map() {
         cultureId={selectedGroupId}
         parcelleHa={parcelleInfo?.area}
         region={selectedWilaya?.name}
+        samplingMode={samplingMode} // 👈 ADD THIS LINE
       />
 
       <Toast message={toast.msg} visible={toast.visible} />

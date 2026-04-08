@@ -215,7 +215,7 @@ export function useMap({ onParcelleChange }) {
           const polyline = L.polyline(points, {
             color: color,
             weight: 1.5,
-            opacity: 0.4,
+            opacity: 0.8,
             dashArray: "3,4",
           }).addTo(map);
 
