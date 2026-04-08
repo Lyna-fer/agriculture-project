@@ -205,93 +205,97 @@ export default function Map() {
     [showToast],
   );
 
-  const handleAnalyze = useCallback(() => {
+  const handleAnalyze = useCallback(async () => {
     console.log("handleAnalyze: started");
     if (!parcelleInfo || !selectedGroupId) {
-      console.log("handleAnalyze: missing parcelleInfo or selectedGroupId");
+      showToast("❌ Info manquante");
       return;
     }
 
     const culture = CULTURES.find((c) => c.id === selectedGroupId);
-    if (!culture) {
-      console.log("handleAnalyze: culture not found");
-      return;
-    }
-
     const cropType = CULTURES_TO_STRATEGIES[selectedGroupId];
-    if (!cropType) {
-      showToast("❌ Type de culture non reconnu");
-      console.log("handleAnalyze: invalid crop type");
-      return;
-    }
-
-    // Build Turf polygon from latlngs
     const turf = window.turf;
-    if (!turf) {
-      showToast("❌ Turf.js non chargé");
-      console.log("handleAnalyze: Turf.js not loaded");
-      return;
-    }
 
+    if (!culture || !cropType || !turf) return;
+
+    // 1. Build the Polygon
     const coords = parcelleInfo.latlngs.map((ll) => [ll.lng, ll.lat]);
     coords.push(coords[0]);
     const drawnPolygon = turf.polygon([coords]);
     const totalAreaHa = turf.area(drawnPolygon) / 10000;
 
-    console.log("handleAnalyze: created polygon, area =", totalAreaHa, "ha");
-
     if (totalAreaHa < 0.05) {
       showToast(`❌ Surface trop petite (${totalAreaHa.toFixed(3)} ha)`);
-      console.log("handleAnalyze: area too small");
       return;
     }
 
+    // 2. Perform the Agronomic Math (Frontend calculates zigzags and slices)
     const strategy = CROP_STRATEGIES[cropType];
-    const numZones = computeNumZones(totalAreaHa, strategy, samplingMode);
+    const activeParcelle = parcelles.find(p => p.id === selectedParcelleId);
+    const parcelleName = activeParcelle ? activeParcelle.name : "Nouvelle Parcelle";
     
-    console.log("handleAnalyze: strategy =", cropType, "numZones =", numZones, "samplingMode =", samplingMode);
-
-    // Build zones and generate all points
-    const zones = buildZones(
-      drawnPolygon,
-      totalAreaHa,
-      numZones,
-      strategy,
-      samplingMode,
-    );
-
-    console.log("handleAnalyze: buildZones returned", zones.length, "zones", zones);
-
-    // Flatten all points from all zones
+    // Turf.js slices the field into zones and generates points
+    const numZones = computeNumZones(totalAreaHa, strategy, samplingMode);
+    const zones = buildZones(drawnPolygon, totalAreaHa, numZones, strategy, samplingMode);
     const allPoints = zones.flatMap((zone) => zone.points || []);
 
-    console.log("handleAnalyze: flattened points, total =", allPoints.length);
-
     if (allPoints.length === 0) {
-      showToast("❌ Impossible de générer les points");
-      console.log("handleAnalyze: no points generated");
+      showToast("❌ Erreur génération points");
       return;
     }
 
-    console.log("handleAnalyze: calling displayZones");
-    // Display zones on map
-    displayZones(zones, samplingMode);
+    // 3. Package the calculated zones for Python
+    const zonesPayload = zones.map(z => ({
+      zone_name: z.id,
+      points: z.points // Array of [lat, lng]
+    }));
 
-    console.log("handleAnalyze: calling placeSamplePoints");
-    // Display points on map (with per-zone numbering)
-    placeSamplePoints(zones, culture.color);
+    showToast("⏳ Envoi à PostGIS...");
 
-    console.log("handleAnalyze: setting resultsOpen to true");
-    setResultsOpen(true);
-    
-    const modeLabel = samplingMode === "economic" ? "économique" : "standard";
-    showToast(
-      `🔬 ${allPoints.length} points (${numZones} zone${numZones > 1 ? "s" : ""} · mode ${modeLabel})`,
-    );
-    
-    console.log("handleAnalyze: complete");
-  }, [parcelleInfo, selectedGroupId, samplingMode, placeSamplePoints, displayZones, showToast]);
+    // 4. Send to Database
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/generate-samples', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          farmer_id: 1, 
+          parcelle_name: parcelleName,
+          surface_ha: parseFloat(totalAreaHa.toFixed(2)),
+          polygon_geojson: {
+            type: "Polygon",
+            coordinates: drawnPolygon.geometry.coordinates,
+          },
+          crop_name: cropType,
+          zones:zonesPayload // Send the exact calculated zones
+        })
+      });
 
+      // Catch strict FastAPI errors (like Pydantic 422s)
+      if (!response.ok) {
+          const errData = await response.text();
+          console.error("API failed:", errData);
+          showToast("❌ Erreur API Python (Voir console)");
+          return;
+      }
+
+      const data = await response.json();
+
+      // 5. Update the UI with the exact zones React originally calculated
+      if (data.status === "success") {
+        displayZones(zones, samplingMode);
+        placeSamplePoints(zones, culture.color);
+        setResultsOpen(true); 
+        
+        const modeLabel = samplingMode === "economic" ? "économique" : "standard";
+        showToast(`🔬 ${allPoints.length} points sauvegardés dans ${zones.length} zone(s) ! (${modeLabel})`);
+      } else {
+        showToast("❌ Erreur DB: " + data.detail);
+      }
+    } catch (error) {
+      console.error("Network Error:", error);
+      showToast("❌ Erreur réseau. Uvicorn tourne-t-il ?");
+    }
+  }, [parcelleInfo, selectedGroupId, samplingMode, placeSamplePoints, displayZones, showToast, parcelles, selectedParcelleId]);
   const handleSelectWilaya = useCallback(
     (wilaya) => {
       setSelectedWilaya(wilaya);
