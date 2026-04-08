@@ -18,9 +18,9 @@ import {
 
 // Mapping from CULTURES.id to CROP_STRATEGIES key
 const CULTURES_TO_STRATEGIES = {
-  1: "vegetables",  // Maraîchères
-  2: "cereals",     // Céréalières
-  3: "trees",       // Arbres
+  1: "vegetables", // Maraîchères
+  2: "cereals", // Céréalières
+  3: "trees", // Arbres
 };
 
 const FIELD_COLORS = [
@@ -94,7 +94,7 @@ export default function Map() {
       setPendingParcelleInfo(info);
       setPendingColor(color);
       setParcelleInfo(info);
-
+      setResultsOpen(false);
       const ha = info.area || 0;
       showToast(
         `✅ Parcelle tracée — ${ha < 0.1 ? info.areaM2?.toFixed(0) + " m²" : ha.toFixed(2) + " ha"} · Donnez-lui un nom`,
@@ -103,10 +103,17 @@ export default function Map() {
     [showToast],
   );
 
-  const { mapRef, placeSamplePoints, activateDrawTool, clearAll, flyToWilaya, displayZones, clearZones } =
-    useMap({
-      onParcelleChange: handleParcelleChange,
-    });
+  const {
+    mapRef,
+    placeSamplePoints,
+    activateDrawTool,
+    clearAll,
+    flyToWilaya,
+    displayZones,
+    clearZones,
+  } = useMap({
+    onParcelleChange: handleParcelleChange,
+  });
 
   const handleActivateTool = useCallback(
     (tool) => {
@@ -114,6 +121,7 @@ export default function Map() {
       if (tool) {
         activateDrawTool(tool);
         setPendingParcelleInfo(null);
+        setResultsOpen(false);
       } else {
         activateDrawTool(null);
       }
@@ -248,8 +256,15 @@ export default function Map() {
 
     const strategy = CROP_STRATEGIES[cropType];
     const numZones = computeNumZones(totalAreaHa, strategy, samplingMode);
-    
-    console.log("handleAnalyze: strategy =", cropType, "numZones =", numZones, "samplingMode =", samplingMode);
+
+    console.log(
+      "handleAnalyze: strategy =",
+      cropType,
+      "numZones =",
+      numZones,
+      "samplingMode =",
+      samplingMode,
+    );
 
     // Build zones and generate all points
     const zones = buildZones(
@@ -260,7 +275,12 @@ export default function Map() {
       samplingMode,
     );
 
-    console.log("handleAnalyze: buildZones returned", zones.length, "zones", zones);
+    console.log(
+      "handleAnalyze: buildZones returned",
+      zones.length,
+      "zones",
+      zones,
+    );
 
     // Flatten all points from all zones
     const allPoints = zones.flatMap((zone) => zone.points || []);
@@ -283,14 +303,21 @@ export default function Map() {
 
     console.log("handleAnalyze: setting resultsOpen to true");
     setResultsOpen(true);
-    
+
     const modeLabel = samplingMode === "economic" ? "économique" : "standard";
     showToast(
       `🔬 ${allPoints.length} points (${numZones} zone${numZones > 1 ? "s" : ""} · mode ${modeLabel})`,
     );
-    
+
     console.log("handleAnalyze: complete");
-  }, [parcelleInfo, selectedGroupId, samplingMode, placeSamplePoints, displayZones, showToast]);
+  }, [
+    parcelleInfo,
+    selectedGroupId,
+    samplingMode,
+    placeSamplePoints,
+    displayZones,
+    showToast,
+  ]);
 
   const handleSelectWilaya = useCallback(
     (wilaya) => {
@@ -302,7 +329,8 @@ export default function Map() {
   );
 
   const selectedCulture = CULTURES.find((c) => c.id === selectedGroupId);
-
+  const selectedParcelle =
+    parcelles.find((p) => p.id === selectedParcelleId) ?? null;
   return (
     <>
       <div style={{ display: "flex", height: "100vh" }}>
@@ -342,6 +370,7 @@ export default function Map() {
         parcelleHa={parcelleInfo?.area}
         region={selectedWilaya?.name}
         samplingMode={samplingMode} // 👈 ADD THIS LINE
+        parcelle={selectedParcelle}
       />
 
       <Toast message={toast.msg} visible={toast.visible} />
