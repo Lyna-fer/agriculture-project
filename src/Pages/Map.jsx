@@ -245,34 +245,6 @@ export default function Map() {
     // Turf.js slices the field into zones and generates points
     const numZones = computeNumZones(totalAreaHa, strategy, samplingMode);
     const zones = buildZones(drawnPolygon, totalAreaHa, numZones, strategy, samplingMode);
-    const numZones = computeNumZones(totalAreaHa, strategy, samplingMode);
-
-    console.log(
-      "handleAnalyze: strategy =",
-      cropType,
-      "numZones =",
-      numZones,
-      "samplingMode =",
-      samplingMode,
-    );
-
-    // Build zones and generate all points
-    const zones = buildZones(
-      drawnPolygon,
-      totalAreaHa,
-      numZones,
-      strategy,
-      samplingMode,
-    );
-
-    console.log(
-      "handleAnalyze: buildZones returned",
-      zones.length,
-      "zones",
-      zones,
-    );
-
-    // Flatten all points from all zones
     const allPoints = zones.flatMap((zone) => zone.points || []);
 
     if (allPoints.length === 0) {
@@ -288,7 +260,6 @@ export default function Map() {
 
     showToast("⏳ Envoi à PostGIS...");
 
-<<<<<<< HEAD
     // 4. Send to Database
     try {
       const response = await fetch('http://127.0.0.1:8000/api/generate-samples', {
@@ -306,25 +277,6 @@ export default function Map() {
           zones:zonesPayload // Send the exact calculated zones
         })
       });
-=======
-    console.log("handleAnalyze: setting resultsOpen to true");
-    setResultsOpen(true);
-
-    const modeLabel = samplingMode === "economic" ? "économique" : "standard";
-    showToast(
-      `🔬 ${allPoints.length} points (${numZones} zone${numZones > 1 ? "s" : ""} · mode ${modeLabel})`,
-    );
-
-    console.log("handleAnalyze: complete");
-  }, [
-    parcelleInfo,
-    selectedGroupId,
-    samplingMode,
-    placeSamplePoints,
-    displayZones,
-    showToast,
-  ]);
->>>>>>> 75b4829a424e54337969bf136775739e90ffe53f
 
       // Catch strict FastAPI errors (like Pydantic 422s)
       if (!response.ok) {
