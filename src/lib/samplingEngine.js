@@ -216,6 +216,7 @@ export function buildZones(drawnPolygon, totalAreaHa, numZones, strategy, sampli
   const densityFactor = samplingMode === 'economic' ? 0.5 : 1.0;
   const zones = [];
 
+  // If only 1 zone is needed, don't slice anything
   if (numZones === 1) {
     const points = generatePoints(drawnPolygon, totalAreaHa, strategy, densityFactor);
     console.log("buildZones: single zone with", points.length, "points");
@@ -229,45 +230,66 @@ export function buildZones(drawnPolygon, totalAreaHa, numZones, strategy, sampli
     return zones;
   }
 
-  const bbox      = turf.bbox(drawnPolygon);
-  const width     = bbox[2] - bbox[0];
-  const height    = bbox[3] - bbox[1];
-  const splitByLng = width > height;   // slice along the longest dimension
+  // --- NEW: RECURSIVE SQUARE-SPLIT ALGORITHM ---
+  function splitPolygon(poly, zonesNeeded) {
+    if (zonesNeeded <= 1) return [poly];
 
-  console.log("buildZones: multi-zone splitting", { bbox, width, height, splitByLng, numZones });
+    const bbox = turf.bbox(poly);
+    const width = bbox[2] - bbox[0];
+    const height = bbox[3] - bbox[1];
+    
+    // Always split along the longest axis of the CURRENT sub-piece
+    const splitByLng = width > height;
 
-  let n = 1;
-  for (let i = 0; i < numZones; i++) {
-    const step = splitByLng ? width / numZones : height / numZones;
-    const min  = splitByLng ? bbox[0]          : bbox[1];
-    const c0   = min + i       * step;
-    const c1   = min + (i + 1) * step;
+    // Split as close to half as possible to maintain square-like shapes
+    const leftCount = Math.floor(zonesNeeded / 2);
+    const rightCount = zonesNeeded - leftCount;
+    const ratio = leftCount / zonesNeeded;
 
-    const strip = splitByLng
-      ? turf.bboxPolygon([c0, bbox[1] - 0.01, c1, bbox[3] + 0.01])
-      : turf.bboxPolygon([bbox[0] - 0.01, c0, bbox[2] + 0.01, c1]);
-
-    const clipped = safeIntersect(strip, drawnPolygon);
-    if (!clipped) {
-      console.log("buildZones: zone", i, "clipped returned null");
-      continue;
+    let stripLeft, stripRight;
+    if (splitByLng) {
+      const splitX = bbox[0] + width * ratio;
+      stripLeft = turf.bboxPolygon([bbox[0], bbox[1] - 0.01, splitX, bbox[3] + 0.01]);
+      stripRight = turf.bboxPolygon([splitX, bbox[1] - 0.01, bbox[2], bbox[3] + 0.01]);
+    } else {
+      const splitY = bbox[1] + height * ratio;
+      stripLeft = turf.bboxPolygon([bbox[0] - 0.01, bbox[1], bbox[2] + 0.01, splitY]);
+      stripRight = turf.bboxPolygon([bbox[0] - 0.01, splitY, bbox[2] + 0.01, bbox[3]]);
     }
 
+    const polyLeft = safeIntersect(stripLeft, poly);
+    const polyRight = safeIntersect(stripRight, poly);
+
+    let results = [];
+    if (polyLeft) results = results.concat(splitPolygon(polyLeft, leftCount));
+    if (polyRight) results = results.concat(splitPolygon(polyRight, rightCount));
+
+    return results;
+  }
+
+  console.log("buildZones: starting recursive square-split for", numZones, "zones");
+  const zonePolygons = splitPolygon(drawnPolygon, numZones);
+
+  let n = 1;
+  zonePolygons.forEach(clipped => {
     const ha = turf.area(clipped) / 10000;
+    
+    // Skip tiny slivers created by diagonal borders
     if (ha < 0.05) {
-      console.log("buildZones: zone", i, "too small", ha);
-      continue;
+      console.log("buildZones: skipping tiny zone sliver", ha);
+      return;
     }
 
     const points = generatePoints(clipped, ha, strategy, densityFactor);
     zones.push({
-      id:     `Zone ${n++}`,
-      area:   ha.toFixed(2),
+      id:      `Zone ${n++}`,
+      area:    ha.toFixed(2),
       geoJson: clipped,
       points:  points,
     });
     console.log("buildZones: added zone", zones[zones.length - 1].id, { ha: ha.toFixed(2), points: points.length });
-  }
+  });
+
   console.log("buildZones: returning", zones.length, "zones");
   return zones;
 }
