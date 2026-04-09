@@ -1,6 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Nunito:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap");
 
-
 :root {
   --rp-ink: #1a1825;
   --rp-ink2: #4a4660;
@@ -15,13 +14,12 @@
     0 8px 24px rgba(26, 24, 37, 0.1), 0 0 0 1px rgba(26, 24, 37, 0.04);
 }
 
-
 .cy-root {
   position: fixed;
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(520px, 100vw);
+  width: min(615px, 100vw);
   z-index: 1200;
   display: flex;
   flex-direction: column;
@@ -37,7 +35,6 @@
   transform: translateX(0);
 }
 
-
 .rp-hero {
   position: relative;
   background: var(--rp-white);
@@ -45,10 +42,9 @@
   flex-shrink: 0;
   overflow: hidden;
   border-bottom: 1px solid rgba(26, 24, 37, 0.06);
-  
+
   box-shadow: 0 2px 16px rgba(26, 24, 37, 0.06);
 }
-
 
 .rp-hero::before {
   content: "";
@@ -136,7 +132,6 @@
   transform: scale(1.08);
 }
 
-
 .rp-identity-card {
   background: var(--rp-card);
   border-radius: 20px;
@@ -209,7 +204,6 @@
   line-height: 1.4;
 }
 
-
 .rp-kpis {
   display: flex;
   gap: 7px;
@@ -253,7 +247,9 @@
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  /* text-overflow: ellipsis; */
+
+  text-overflow: clip;
 }
 .rp-kpi-pill-lbl {
   font-size: 0.52rem;
@@ -263,7 +259,6 @@
   margin-top: 2px;
   line-height: 1.2;
 }
-
 
 .cy-tab-rail {
   display: flex;
@@ -305,7 +300,6 @@
   border-color: transparent !important;
 }
 
-
 .cy-body {
   flex: 1;
   overflow-y: auto;
@@ -329,7 +323,6 @@
   gap: 12px;
 }
 
-
 .cy-tag-row {
   display: flex;
   flex-wrap: wrap;
@@ -342,7 +335,6 @@
   border-radius: 50px;
   box-shadow: var(--rp-shadow-sm);
 }
-
 
 .cy-slab {
   border-radius: 20px;
@@ -410,7 +402,6 @@
   color: var(--rp-ink);
 }
 
-
 .cy-pat-row {
   display: flex;
   gap: 10px;
@@ -461,7 +452,6 @@
   line-height: 1.4;
 }
 
-
 .cy-alerts {
   display: flex;
   flex-direction: column;
@@ -491,7 +481,6 @@
   font-weight: 600;
   line-height: 1.55;
 }
-
 
 .cy-intro-banner {
   display: flex;
@@ -526,7 +515,6 @@
   flex-shrink: 0;
   margin-top: 1px;
 }
-
 
 .cy-hz-slab {
   display: flex;
@@ -625,7 +613,6 @@
   white-space: nowrap;
 }
 
-
 .cy-proto-row {
   display: flex;
   align-items: flex-start;
@@ -690,7 +677,6 @@
   color: var(--rp-ink);
 }
 
-
 .cy-gear-pill {
   display: flex;
   align-items: center;
@@ -747,7 +733,6 @@
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
 }
 
-
 .cy-footer {
   background: var(--rp-ink);
   border-top: none;
@@ -801,7 +786,6 @@
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
 }
-
 
 @media (max-width: 600px) {
   .cy-root {
