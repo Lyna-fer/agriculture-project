@@ -234,7 +234,7 @@ export function useMap({ onParcelleChange }) {
           const icon = L.divIcon({
             className: "",
             html: `<div style="
-  width:26px; height:26px;
+  width:16px; height:16px;
   background:rgba(255,255,255,0.9);
   border:1.5px solid ${color};
   color:${color};
@@ -383,7 +383,8 @@ export function useMap({ onParcelleChange }) {
               font-size: 12px;
               font-weight: 600;
               font-family: monospace;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+             box-shadow: 0 4px 12px rgba(0,0,0,0.25), 0 0 0 2px rgba(255,255,255,0.3);
+              white-space: nowrap;
             ">${zone.id}</div>`,
               iconSize: [60, 28],
               iconAnchor: [30, 14],
