@@ -3,13 +3,11 @@ import "./ResultsPanel.css";
 import { CULTURES } from "../../data/cultures";
 import epingle from "../../assets/epingle.png";
 
-
 const hl = (t = "") =>
   t.replace(
     /(\d+[–\-]\d+|\d+\s*cm|\d+\s*j|\d+\s*sem\.|\d+\s*ans)/g,
     "<b>$1</b>",
   );
-
 
 function PatternDiagram({ type, color, size = 110 }) {
   const s = size,
@@ -253,7 +251,6 @@ function PatternDiagram({ type, color, size = 110 }) {
   return diagrams[type] || diagrams.zigzag;
 }
 
-
 function buildKpis(data, nSamples, parcelleHa) {
   const fmtHa = (ha) =>
     ha < 0.1 ? `${(ha * 10000).toFixed(0)} m²` : `${ha.toFixed(2)} ha`;
@@ -266,7 +263,7 @@ function buildKpis(data, nSamples, parcelleHa) {
       color: "#ff6b9d",
     },
     {
-      val: `${data.depths.at(-1).label.split("–")[1].trim()} cm`,
+      val: `${data.depths.at(-1).label.split("–")[1].trim()} `,
       lbl: "Profondeur\nmax.",
       icon: "⬇️",
       bg: "#e6f7ff",
@@ -289,7 +286,6 @@ function buildKpis(data, nSamples, parcelleHa) {
   ];
 }
 
-
 const TABS = [
   { id: "schema", label: "Schéma", icon: "🗺" },
   { id: "depths", label: "Horizons", icon: "⛏" },
@@ -307,7 +303,6 @@ const PALETTE = [
 ];
 const GEAR_EMOJIS = ["🔧", "🪣", "🛍", "📡", "🧤", "📋", "🗂", "⚗"];
 
-
 export default function ResultsPanel({
   open,
   onClose,
@@ -320,22 +315,25 @@ export default function ResultsPanel({
   console.log("THE MODE IS CURRENTLY:", samplingMode);
 
   const data = CULTURES.find((c) => c.id === cultureId);
-  
+
   // 1. Calculate number of cores (points) depending on the mode
   const nSamples = useMemo(() => {
     if (!data || parcelleHa <= 0) return 0;
     const { coresPerHa, minCores, maxCores } = {
-      coresPerHa: cultureId === 1 ? 7 : (cultureId === 2 ? 4 : 5),
-      minCores: cultureId === 1 ? 8 : (cultureId === 2 ? 6 : 6),
-      maxCores: cultureId === 1 ? 20 : (cultureId === 2 ? 20 : 20),
+      coresPerHa: cultureId === 1 ? 7 : cultureId === 2 ? 4 : 5,
+      minCores: cultureId === 1 ? 8 : cultureId === 2 ? 6 : 6,
+      maxCores: cultureId === 1 ? 20 : cultureId === 2 ? 20 : 20,
     };
     // Economic mode uses half the points per hectare
     const densityFactor = samplingMode === "economic" ? 0.5 : 1.0;
-    return Math.max(minCores, Math.min(maxCores, Math.round(parcelleHa * coresPerHa * densityFactor)));
+    return Math.max(
+      minCores,
+      Math.min(maxCores, Math.round(parcelleHa * coresPerHa * densityFactor)),
+    );
   }, [data, parcelleHa, cultureId, samplingMode]);
 
   // 2. Calculate the number of zones depending on the mode
-  const zoneHa = cultureId === 1 ? 3 : (cultureId === 2 ? 5 : 4);
+  const zoneHa = cultureId === 1 ? 3 : cultureId === 2 ? 5 : 4;
   const calcZones = useMemo(() => {
     if (samplingMode === "economic") {
       if (parcelleHa <= 10) return 1;
@@ -347,10 +345,8 @@ export default function ResultsPanel({
 
   const fmtHa = (ha) =>
     ha < 0.1 ? `${(ha * 10000).toFixed(0)} m²` : `${ha.toFixed(2)} ha`;
-    
+
   if (!data) return null;
-
-
 
   const A = data.color;
   const AB = data.colorLight;
@@ -362,9 +358,7 @@ export default function ResultsPanel({
       className={`cy-root ${open ? "cy-root--open" : ""}`}
       style={{ "--a": A, "--ab": AB }}
     >
-    
       <div className="rp-hero">
-       
         <div className="rp-topbar">
           <div className="rp-breadcrumb">
             <span className="rp-live-dot" />
@@ -382,7 +376,6 @@ export default function ResultsPanel({
           </button>
         </div>
 
-        
         <div className="rp-identity-card">
           <div className="rp-icon-bubble" style={{ background: AB }}>
             <Icon size={26} color={data.iconColor} />
@@ -399,7 +392,6 @@ export default function ResultsPanel({
           </div>
         </div>
 
-        
         <div className="rp-kpis">
           {kpis.map((k, i) => (
             <div key={i} className="rp-kpi-pill">
@@ -426,7 +418,6 @@ export default function ResultsPanel({
           ))}
         </div>
 
-        
         <div className="cy-tab-rail">
           {TABS.map((t) => (
             <button
@@ -449,9 +440,8 @@ export default function ResultsPanel({
           ))}
         </div>
       </div>
-     
+
       <div className="cy-body">
-        
         {tab === "schema" && (
           <div className="cy-flow">
             <div className="cy-tag-row">
@@ -469,7 +459,7 @@ export default function ResultsPanel({
               </span>
             </div>
 
-           <div
+            <div
               className="cy-slab cy-slab--formula"
               style={{ borderColor: `${A}30` }}
             >
@@ -479,7 +469,7 @@ export default function ResultsPanel({
                   <span className="cy-formula-n" style={{ color: A }}>
                     {calcZones}
                   </span>
-                  
+
                   {samplingMode === "economic" ? (
                     <>
                       <span className="cy-formula-op">→</span>
@@ -493,19 +483,20 @@ export default function ResultsPanel({
                       <span className="cy-formula-p">{zoneHa} ha</span>
                     </>
                   )}
-                  
                 </div>
                 <div className="cy-formula-note">
-                  {samplingMode === "economic" 
-                    ? "Subdivision optimisée pour réduire les coûts" 
+                  {samplingMode === "economic"
+                    ? "Subdivision optimisée pour réduire les coûts"
                     : "Subdivision selon les normes agronomiques strictes"}
                 </div>
               </div>
               <div className="cy-slab-right">
                 <div className="cy-slab-micro">📌 Règle terrain</div>
                 <div className="cy-slab-text">
-                  La parcelle est divisée en <b>{calcZones} zone(s)</b> de gestion homogène. 
-                  Dans chaque zone, effectuez <b>{nSamples}</b> prélèvements à mélanger dans un seau distinct.
+                  La parcelle est divisée en <b>{calcZones} zone(s)</b> de
+                  gestion homogène. Dans chaque zone, effectuez{" "}
+                  <b>{nSamples}</b> prélèvements à mélanger dans un seau
+                  distinct.
                 </div>
               </div>
             </div>
@@ -521,7 +512,6 @@ export default function ResultsPanel({
           </div>
         )}
 
-       
         {tab === "depths" && (
           <div className="cy-flow">
             <div className="cy-intro-banner">
@@ -599,7 +589,6 @@ export default function ResultsPanel({
           </div>
         )}
 
-       
         {tab === "protocole" && (
           <div className="cy-flow">
             {data.steps?.map((p, i) => {
@@ -641,7 +630,6 @@ export default function ResultsPanel({
           </div>
         )}
 
-       
         {tab === "gear" && (
           <div className="cy-flow">
             {data.gear?.map((g, i) => {
@@ -694,7 +682,6 @@ export default function ResultsPanel({
         )}
       </div>
 
-      
       <div className="cy-footer">
         <div className="cy-footer-badge" style={{ background: A }}>
           <Icon size={13} color="#fff" /> {data.nameShort}
