@@ -1,19 +1,17 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import "../styles/map.css";
-// import Navbar from '../components/map/Navbar';
 import LeftPanel from "../components/map/LeftPanel";
 import MapView from "../components/map/MapView";
 import ResultsPanel from "../components/map/ResultsPanel";
 import Toast from "../components/map/Toast";
 import { useMap } from "../hooks/useMap";
 import { CULTURES } from "../data/cultures";
+// Import constants/helpers that are still needed for UI (kept active in frozen samplingEngine.js)
 import {
-  generatePoints,
-  buildZones,
   computePreview,
   computeNumZones,
   CROP_STRATEGIES,
-  authenticateGEE,
+  authenticateGEE, // Stub: returns resolved promise, no GEE auth needed now
 } from "../lib/samplingEngine";
 
 // Mapping from CULTURES.id to CROP_STRATEGIES key
@@ -24,16 +22,13 @@ const CULTURES_TO_STRATEGIES = {
 };
 
 const FIELD_COLORS = [
-  "#2ecc71",
-  "#3b82f6",
-  "#e6970a",
-  "#ec4899",
-  "#06b6d4",
-  "#a855f7",
-  "#ef4444",
+  "#2ecc71", "#3b82f6", "#e6970a", "#ec4899", "#06b6d4", "#a855f7", "#ef4444",
 ];
 let colorIdx = 0;
 const nextColor = () => FIELD_COLORS[colorIdx++ % FIELD_COLORS.length];
+
+// Backend API base URL (matches your FastAPI server)
+const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 export default function Map() {
   useEffect(() => {
@@ -42,31 +37,27 @@ export default function Map() {
 
   const [parcelles, setParcelles] = useState([]);
   const [selectedParcelleId, setSelectedParcelleId] = useState(null);
-
   const [pendingParcelleInfo, setPendingParcelleInfo] = useState(null);
   const [pendingColor, setPendingColor] = useState("#2ecc71");
-
   const [parcelleInfo, setParcelleInfo] = useState(null);
-
   const [selectedGroupId, setSelectedGroupId] = useState(null);
-  const [samplingMode, setSamplingMode] = useState("standard"); // 'standard' or 'economic'
+  const [samplingMode, setSamplingMode] = useState("standard");
   const [activeTool, setActiveTool] = useState(null);
   const [resultsOpen, setResultsOpen] = useState(false);
   const [selectedWilaya, setSelectedWilaya] = useState(null);
   const [toast, setToast] = useState({ msg: "", visible: false });
   const [geeReady, setGeeReady] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false); // ✅ Loading state for DB save
   const toastTimer = useRef(null);
 
-  // Initialize GEE on mount
+  // Initialize GEE stub (non-blocking, just for compatibility)
   useEffect(() => {
     (async () => {
       try {
-        await authenticateGEE();
+        await authenticateGEE(); // Stub: resolves immediately
         setGeeReady(true);
-        showToast("✅ Google Earth Engine authenticated");
       } catch (err) {
-        console.log("GEE auth skipped:", err.message);
-        // Non-blocking: GEE is optional for preview mode
+        console.log("GEE auth stub:", err?.message || "OK");
       }
     })();
   }, []);
@@ -76,19 +67,16 @@ export default function Map() {
     setToast({ msg, visible: true });
     toastTimer.current = setTimeout(
       () => setToast((t) => ({ ...t, visible: false })),
-      3200,
+      3200
     );
   }, []);
 
   const handleParcelleChange = useCallback(
     (info) => {
       if (info.type === "marker") {
-        showToast(
-          "📍 Marqueur posé — dessinez un polygone pour calculer la surface",
-        );
+        showToast("📍 Marqueur posé — dessinez un polygone pour calculer la surface");
         return;
       }
-
       const color = nextColor();
       setActiveTool(null);
       setPendingParcelleInfo(info);
@@ -97,10 +85,10 @@ export default function Map() {
       setResultsOpen(false);
       const ha = info.area || 0;
       showToast(
-        `✅ Parcelle tracée — ${ha < 0.1 ? info.areaM2?.toFixed(0) + " m²" : ha.toFixed(2) + " ha"} · Donnez-lui un nom`,
+        `✅ Parcelle tracée — ${ha < 0.1 ? info.areaM2?.toFixed(0) + " m²" : ha.toFixed(2) + " ha"} · Donnez-lui un nom`
       );
     },
-    [showToast],
+    [showToast]
   );
 
   const {
@@ -126,13 +114,12 @@ export default function Map() {
         activateDrawTool(null);
       }
     },
-    [activateDrawTool],
+    [activateDrawTool]
   );
 
   const handleSaveParcelle = useCallback(
     ({ name, groupId }) => {
       if (!pendingParcelleInfo) return;
-
       const newP = {
         id: Date.now(),
         name,
@@ -142,23 +129,20 @@ export default function Map() {
         bounds: pendingParcelleInfo.bounds,
         latlngs: pendingParcelleInfo.latlngs,
       };
-
       setParcelles((prev) => [...prev, newP]);
       setSelectedParcelleId(newP.id);
       setSelectedGroupId(groupId);
       setPendingParcelleInfo(null);
       setResultsOpen(false);
-
       showToast(`✅ ${name} enregistrée`);
     },
-    [pendingParcelleInfo, pendingColor, showToast],
+    [pendingParcelleInfo, pendingColor, showToast]
   );
 
   const handleCancelDraw = useCallback(() => {
     setActiveTool(null);
     activateDrawTool(null);
     setPendingParcelleInfo(null);
-
     if (!parcelles.length) {
       clearAll();
       setParcelleInfo(null);
@@ -168,7 +152,7 @@ export default function Map() {
 
   const handleClearAll = useCallback(() => {
     clearAll();
-    clearZones(); // 👈 This wipes the dashed boxes!
+    clearZones();
     setParcelles([]);
     setSelectedParcelleId(null);
     setParcelleInfo(null);
@@ -183,11 +167,10 @@ export default function Map() {
     (id) => {
       setSelectedParcelleId(id);
       const p = parcelles.find((x) => x.id === id);
-
       if (p) setSelectedGroupId(p.groupId || selectedGroupId);
       setResultsOpen(false);
     },
-    [parcelles, selectedGroupId],
+    [parcelles, selectedGroupId]
   );
 
   const handleDeleteParcelle = useCallback(
@@ -200,7 +183,7 @@ export default function Map() {
       }
       showToast("🗑 Parcelle supprimée");
     },
-    [selectedParcelleId, showToast],
+    [selectedParcelleId, showToast]
   );
 
   const handleGroupChange = useCallback(
@@ -210,112 +193,95 @@ export default function Map() {
       const c = CULTURES.find((c) => c.id === groupId);
       if (c) showToast(`${c.iconEmoji} ${c.nameShort} sélectionné`);
     },
-    [showToast],
+    [showToast]
   );
 
+  // ✅ MIGRATED: Calls backend API AND saves to Neon DB
   const handleAnalyze = useCallback(async () => {
-    console.log("handleAnalyze: started");
+    if (isAnalyzing) return; // Prevent double-click
+    setIsAnalyzing(true);
+
+    console.log("handleAnalyze: started (backend + DB save mode)");
     if (!parcelleInfo || !selectedGroupId) {
       showToast("❌ Info manquante");
+      setIsAnalyzing(false);
       return;
     }
 
     const culture = CULTURES.find((c) => c.id === selectedGroupId);
     const cropType = CULTURES_TO_STRATEGIES[selectedGroupId];
-    const turf = window.turf;
-
-    if (!culture || !cropType || !turf) return;
-
-    // 1. Build the Polygon
-    const coords = parcelleInfo.latlngs.map((ll) => [ll.lng, ll.lat]);
-    coords.push(coords[0]);
-    const drawnPolygon = turf.polygon([coords]);
-    const totalAreaHa = turf.area(drawnPolygon) / 10000;
-
-    if (totalAreaHa < 0.05) {
-      showToast(`❌ Surface trop petite (${totalAreaHa.toFixed(3)} ha)`);
+    if (!culture || !cropType) {
+      setIsAnalyzing(false);
       return;
     }
 
-    // 2. Perform the Agronomic Math (Frontend calculates zigzags and slices)
-    const strategy = CROP_STRATEGIES[cropType];
-    const activeParcelle = parcelles.find(p => p.id === selectedParcelleId);
-    const parcelleName = activeParcelle ? activeParcelle.name : "Nouvelle Parcelle";
-    
-    // Turf.js slices the field into zones and generates points
-    const numZones = computeNumZones(totalAreaHa, strategy, samplingMode);
-    const zones = buildZones(drawnPolygon, totalAreaHa, numZones, strategy, samplingMode);
-    const allPoints = zones.flatMap((zone) => zone.points || []);
+    // Prepare payload for backend (matches SamplingRequest schema)
+    const payload = {
+      polygonPoints: parcelleInfo.latlngs.map((ll) => [ll.lat, ll.lng]), // [[lat, lng], ...]
+      cropType,
+      samplingMode, // "standard" or "economic"
+    };
 
-    if (allPoints.length === 0) {
-      showToast("❌ Erreur génération points");
-      return;
-    }
+    showToast("⏳ Calcul + sauvegarde en cours...");
 
-    // 3. Package the calculated zones for Python
-    const zonesPayload = zones.map(z => ({
-      zone_name: z.id,
-      points: z.points // Array of [lat, lng]
-    }));
-
-    showToast("⏳ Envoi à PostGIS...");
-
-    // 4. Send to Database
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/generate-samples', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          farmer_id: 1, 
-          parcelle_name: parcelleName,
-          surface_ha: parseFloat(totalAreaHa.toFixed(2)),
-          polygon_geojson: {
-            type: "Polygon",
-            coordinates: drawnPolygon.geometry.coordinates,
-          },
-          crop_name: cropType,
-          zones:zonesPayload // Send the exact calculated zones
-        })
+      // ✅ Call the NEW endpoint that calculates AND saves to Neon DB
+      const response = await fetch(`${API_BASE}/api/sampling/run-and-save?farmer_id=1`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-      // Catch strict FastAPI errors (like Pydantic 422s)
       if (!response.ok) {
-          const errData = await response.text();
-          console.error("API failed:", errData);
-          showToast("❌ Erreur API Python (Voir console)");
-          return;
+        const errData = await response.json().catch(() => ({}));
+        console.error("Backend API failed:", errData);
+        showToast(`❌ Erreur: ${errData.detail || response.statusText}`);
+        return;
       }
 
       const data = await response.json();
+      // ✅ Backend returns: { ..., savedParcelleId, savedSamplesCount }
 
-      // 5. Update the UI with the exact zones React originally calculated
-      if (data.status === "success") {
-        displayZones(zones, samplingMode);
-        placeSamplePoints(zones, culture.color);
-        setResultsOpen(true); 
-        
+      if (data.zones?.length > 0) {
+        // Use backend-calculated zones & points (same structure as frontend)
+        displayZones(data.zones, samplingMode);
+        placeSamplePoints(data.zones, culture.color);
+        setResultsOpen(true);
+
+        const totalPoints = data.zones.reduce((sum, z) => sum + (z.points?.length || 0), 0);
         const modeLabel = samplingMode === "economic" ? "économique" : "standard";
-        showToast(`🔬 ${allPoints.length} points sauvegardés dans ${zones.length} zone(s) ! (${modeLabel})`);
+
+        // ✅ Show save confirmation
+        if (data.savedParcelleId) {
+          showToast(
+            `🔬 ${totalPoints} points générés + 💾 Parcelle #${data.savedParcelleId} sauvegardée ! (${modeLabel})`
+          );
+        } else {
+          showToast(`🔬 ${totalPoints} points générés dans ${data.zones.length} zone(s) ! (${modeLabel})`);
+        }
       } else {
-        showToast("❌ Erreur DB: " + data.detail);
+        showToast("⚠️ Aucune zone générée — essayez une parcelle plus grande");
       }
     } catch (error) {
       console.error("Network Error:", error);
-      showToast("❌ Erreur réseau. Uvicorn tourne-t-il ?");
+      showToast("❌ Erreur réseau. Vérifiez que le backend tourne sur http://127.0.0.1:8000");
+    } finally {
+      setIsAnalyzing(false); // Always reset loading state
     }
-  }, [parcelleInfo, selectedGroupId, samplingMode, placeSamplePoints, displayZones, showToast, parcelles, selectedParcelleId]);
+  }, [parcelleInfo, selectedGroupId, samplingMode, placeSamplePoints, displayZones, showToast, isAnalyzing]);
+
   const handleSelectWilaya = useCallback(
     (wilaya) => {
       setSelectedWilaya(wilaya);
       flyToWilaya(wilaya);
       showToast(`📍 Wilaya de ${wilaya.name} · Zone ${wilaya.zone}`);
     },
-    [flyToWilaya, showToast],
+    [flyToWilaya, showToast]
   );
 
   const selectedCulture = CULTURES.find((c) => c.id === selectedGroupId);
-  const selectedParcelle =
-    parcelles.find((p) => p.id === selectedParcelleId) ?? null;
+  const selectedParcelle = parcelles.find((p) => p.id === selectedParcelleId) ?? null;
+
   return (
     <>
       <div style={{ display: "flex", height: "100vh" }}>
@@ -332,10 +298,11 @@ export default function Map() {
           onDeleteParcelle={handleDeleteParcelle}
           onGroupChange={handleGroupChange}
           onSamplingModeChange={setSamplingMode}
-          onGenerate={handleAnalyze}
+          onGenerate={handleAnalyze} // ✅ Now calls backend + saves to DB
           onClearAll={handleClearAll}
           onSaveParcelle={handleSaveParcelle}
           onCancelDraw={handleCancelDraw}
+          isAnalyzing={isAnalyzing} // ✅ Pass loading state to LeftPanel
         />
 
         <MapView
@@ -354,7 +321,7 @@ export default function Map() {
         cultureId={selectedGroupId}
         parcelleHa={parcelleInfo?.area}
         region={selectedWilaya?.name}
-        samplingMode={samplingMode} // 👈 ADD THIS LINE
+        samplingMode={samplingMode}
         parcelle={selectedParcelle}
       />
 

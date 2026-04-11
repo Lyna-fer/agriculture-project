@@ -1,6 +1,6 @@
-node_modules
-dist
-build
-.env
-.vscode
-.DS_Store
+﻿.idea/
+__pycache__/
+*.pyc
+.env.local
+node_modules/
+dist/

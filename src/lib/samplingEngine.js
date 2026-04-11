@@ -1,31 +1,17 @@
 /**
- * samplingEngine.js
- * ─────────────────────────────────────────────────────────────────────────────
- * Pure backend logic for the Precision Soil Sampling Planner.
- * No JSX, no CSS, no React state. Import and call from any frontend.
+ * ⚠️ DEPRECATED / FROZEN
+ * Core sampling pipeline & GEE auth migrated to Backend/services/sampling.py
+ * This file is kept for UI constants, live map helpers, and backward compatibility.
+ * Do not add new business logic here. Use Backend API for heavy computations.
  *
- * Dependencies (must be available in the host environment):
- *   - @turf/turf  (window.turf or import * as turf from '@turf/turf')
- *   - Google Earth Engine JS API  (window.ee)
- *   - Google Identity Services    (window.google.accounts.oauth2)
- * ─────────────────────────────────────────────────────────────────────────────
+ * Dependencies: @turf/turf
  */
-
 import * as turf from '@turf/turf';
 
-// ─── CONSTANTS ────────────────────────────────────────────────────────────────
-
-export const GEE_CLIENT_ID =
-  '512933730068-0r2t6r35po5t879bepsff84hr7q0n2mb.apps.googleusercontent.com';
-
+// ─── CONSTANTS (KEPT FOR UI & MAP COMPONENTS) ────────────────────────────────
+export const GEE_CLIENT_ID = '512933730068-0r2t6r35po5t879bepsff84hr7q0n2mb.apps.googleusercontent.com';
 export const GEE_PROJECT_ID = 'isil-b-agri-project';
 
-/**
- * Agronomic sampling rules per crop category.
- * Sources: USDA-NRCS / Mosaic Crop Nutrition [1],
- *          Ohio State Univ. Agronomy Network [2], , 
- *          AFNOR NF X 31-100 [3], ARVALIS [4].
- */
 export const CROP_STRATEGIES = {
   vegetables: {
     label:       'Vegetables (Maraîchères)',
@@ -37,7 +23,7 @@ export const CROP_STRATEGIES = {
     coresPerHa:  7,
     minCores:    8,
     maxCores:    20,
-    zoneHa:      3,   // target ha per management zone (standard mode)
+    zoneHa:      3,
     sourceLabel: 'USDA-NRCS / Mosaic Crop Nutrition [1]',
   },
   cereals: {
@@ -68,20 +54,12 @@ export const CROP_STRATEGIES = {
   },
 };
 
-/**
- * Economic mode: fixed zone count thresholds by total field area.
- * Fields ≤ 10 ha → 1 zone, ≤ 25 ha → 2 zones, larger → 3 zones.
- */
 export const ECONOMIC_THRESHOLDS = [
   { maxHa: 10,   zones: 1 },
   { maxHa: 25,   zones: 2 },
   { maxHa: 9999, zones: 3 },
 ];
 
-/**
- * USDA Soil Texture Classification lookup.
- * Key = GEE band value (b0) from OpenLandMap SOL_TEXTURE-CLASS.
- */
 export const USDA_SOIL = {
   1:  { name: 'Clay',            color: '#b07d2e' },
   2:  { name: 'Silty Clay',      color: '#8e44ad' },
@@ -97,16 +75,7 @@ export const USDA_SOIL = {
   12: { name: 'Sand',            color: '#c8b800' },
 };
 
-// ─── GEOMETRY HELPERS ─────────────────────────────────────────────────────────
-
-/**
- * Safe polygon intersection that handles both old and new Turf.js API signatures
- * and gracefully degrades MultiPolygon results to the largest single polygon.
- *
- * @param {turf.Feature<Polygon>} polyA
- * @param {turf.Feature<Polygon>} polyB
- * @returns {turf.Feature<Polygon> | null}
- */
+// ─── GEOMETRY HELPERS (KEPT FOR LIVE MAP PREVIEW/RENDERING) ──────────────────
 export function safeIntersect(polyA, polyB) {
   let result = null;
   try { result = turf.intersect(turf.featureCollection([polyA, polyB])); } catch (_) {}
@@ -123,25 +92,12 @@ export function safeIntersect(polyA, polyB) {
   return result;
 }
 
-/**
- * Generate spatially distributed sub-core sampling points inside a polygon.
- * Uses a serpentine point-grid strategy, falling back to random placement
- * when the grid is too coarse for the zone shape.
- *
- * @param {turf.Feature<Polygon>} poly         - Clipped zone polygon
- * @param {number}                areaHa       - Zone area in hectares
- * @param {object}                strategy     - One entry from CROP_STRATEGIES
- * @param {number}               [densityFactor=1.0] - Scale factor (0.5 for economic mode)
- * @returns {Array<[lat, lng]>}  - Array of [latitude, longitude] pairs
- */
 export function generatePoints(poly, areaHa, strategy, densityFactor = 1.0) {
   const cores = Math.max(
     strategy.minCores,
     Math.min(strategy.maxCores, Math.round(areaHa * strategy.coresPerHa * densityFactor))
   );
   const bbox = turf.bbox(poly);
-
-  // Cell size in km derived from area and desired core density
   const cellSide = Math.max(Math.sqrt((areaHa / (cores * 6)) / 100), 0.003);
 
   let candidates = [];
@@ -150,7 +106,6 @@ export function generatePoints(poly, areaHa, strategy, densityFactor = 1.0) {
     candidates = grid.features.filter(pt => turf.booleanPointInPolygon(pt, poly));
   } catch (_) {}
 
-  // Serpentine column selection when enough grid candidates exist
   if (candidates.length >= cores) {
     const colCount = Math.max(1, Math.ceil(Math.sqrt(cores)));
     const colWidth  = (bbox[2] - bbox[0]) / colCount;
@@ -167,7 +122,6 @@ export function generatePoints(poly, areaHa, strategy, densityFactor = 1.0) {
     ).map(pt => [pt.geometry.coordinates[1], pt.geometry.coordinates[0]]);
   }
 
-  // Fallback: random points within polygon
   const pts = [];
   let attempts = 0;
   while (pts.length < cores && attempts < 5000) {
@@ -179,44 +133,22 @@ export function generatePoints(poly, areaHa, strategy, densityFactor = 1.0) {
   return pts;
 }
 
-// ─── ZONE LOGIC ───────────────────────────────────────────────────────────────
-
-/**
- * Determine how many zones a field should be split into.
- *
- * @param {number} totalAreaHa
- * @param {object} strategy    - One entry from CROP_STRATEGIES
- * @param {'standard'|'economic'} samplingMode
- * @returns {number}
- */
+// ─── ZONE LOGIC (KEPT FOR UI CALCULATIONS) ───────────────────────────────────
 export function computeNumZones(totalAreaHa, strategy, samplingMode) {
   if (samplingMode === 'economic') {
     return ECONOMIC_THRESHOLDS.find(t => totalAreaHa <= t.maxHa)?.zones ?? 3;
   }
-  // Standard: allow up to 35 % overflow before forcing a second zone
   if (totalAreaHa > strategy.zoneHa * 1.35) {
     return Math.ceil(totalAreaHa / strategy.zoneHa);
   }
   return 1;
 }
 
-/**
- * Slice a drawn polygon into `numZones` equal strips along its longest axis,
- * clip each strip to the original boundary, then generate sampling points.
- *
- * @param {turf.Feature<Polygon>} drawnPolygon
- * @param {number}                totalAreaHa
- * @param {number}                numZones
- * @param {object}                strategy       - One entry from CROP_STRATEGIES
- * @param {'standard'|'economic'} samplingMode
- * @returns {Array<{ id, area, geoJson, points }>}
- */
 export function buildZones(drawnPolygon, totalAreaHa, numZones, strategy, samplingMode) {
   console.log("buildZones: start", { totalAreaHa, numZones, samplingMode });
   const densityFactor = samplingMode === 'economic' ? 0.5 : 1.0;
   const zones = [];
 
-  // If only 1 zone is needed, don't slice anything
   if (numZones === 1) {
     const points = generatePoints(drawnPolygon, totalAreaHa, strategy, densityFactor);
     console.log("buildZones: single zone with", points.length, "points");
@@ -230,18 +162,12 @@ export function buildZones(drawnPolygon, totalAreaHa, numZones, strategy, sampli
     return zones;
   }
 
-  // --- NEW: RECURSIVE SQUARE-SPLIT ALGORITHM ---
   function splitPolygon(poly, zonesNeeded) {
     if (zonesNeeded <= 1) return [poly];
-
     const bbox = turf.bbox(poly);
     const width = bbox[2] - bbox[0];
     const height = bbox[3] - bbox[1];
-    
-    // Always split along the longest axis of the CURRENT sub-piece
     const splitByLng = width > height;
-
-    // Split as close to half as possible to maintain square-like shapes
     const leftCount = Math.floor(zonesNeeded / 2);
     const rightCount = zonesNeeded - leftCount;
     const ratio = leftCount / zonesNeeded;
@@ -263,7 +189,6 @@ export function buildZones(drawnPolygon, totalAreaHa, numZones, strategy, sampli
     let results = [];
     if (polyLeft) results = results.concat(splitPolygon(polyLeft, leftCount));
     if (polyRight) results = results.concat(splitPolygon(polyRight, rightCount));
-
     return results;
   }
 
@@ -273,13 +198,10 @@ export function buildZones(drawnPolygon, totalAreaHa, numZones, strategy, sampli
   let n = 1;
   zonePolygons.forEach(clipped => {
     const ha = turf.area(clipped) / 10000;
-    
-    // Skip tiny slivers created by diagonal borders
     if (ha < 0.05) {
       console.log("buildZones: skipping tiny zone sliver", ha);
       return;
     }
-
     const points = generatePoints(clipped, ha, strategy, densityFactor);
     zones.push({
       id:      `Zone ${n++}`,
@@ -294,146 +216,31 @@ export function buildZones(drawnPolygon, totalAreaHa, numZones, strategy, sampli
   return zones;
 }
 
-// ─── GEE AUTHENTICATION ───────────────────────────────────────────────────────
+// ─── ⛔ FROZEN STUBS (Migrated to Backend) ───────────────────────────────────
+// These exports exist ONLY to prevent SyntaxErrors in Map.jsx.
+// They do NOT run the original logic. They return mock data/promises.
 
-/**
- * Authenticate with Google Earth Engine via OAuth 2.0 and initialise the EE
- * client library.  Returns a Promise that resolves when EE is ready.
- *
- * @param {object} [options]
- * @param {number} [options.timeoutMs=10000]  - Max ms to wait for ee.initialize
- * @returns {Promise<void>}                   - Rejects with an Error on failure
- */
 export function authenticateGEE({ timeoutMs = 10000 } = {}) {
-  return new Promise((resolve, reject) => {
-    const { google, ee } = window;
-    if (!google || !ee) {
-      reject(new Error('Google Identity Services or EE API not loaded.'));
-      return;
-    }
-
-    const tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: GEE_CLIENT_ID,
-      scope: 'https://www.googleapis.com/auth/earthengine.readonly',
-      callback: (tokenResponse) => {
-        if (!tokenResponse?.access_token) {
-          reject(new Error('OAuth failed: no access token returned.'));
-          return;
-        }
-
-        ee.data.setAuthToken(
-          GEE_CLIENT_ID,
-          'Bearer',
-          tokenResponse.access_token,
-          tokenResponse.expires_in
-        );
-
-        let settled = false;
-        const timer = setTimeout(() => {
-          if (!settled) {
-            settled = true;
-            reject(new Error('ee.initialize() timed out.'));
-          }
-        }, timeoutMs);
-
-        ee.initialize(
-          null, null,
-          () => { if (!settled) { settled = true; clearTimeout(timer); resolve(); } },
-          (err) => { if (!settled) { settled = true; clearTimeout(timer); reject(new Error(`EE init failed: ${err}`)); } },
-          null,
-          GEE_PROJECT_ID
-        );
-      },
-    });
-
-    tokenClient.requestAccessToken();
-  });
+  console.warn("⚠️ [FROZEN] authenticateGEE migrated to backend. Returning mock.");
+  // Return a resolved promise so the app doesn't hang waiting for auth
+  return Promise.resolve();
 }
 
-// ─── CORE PIPELINE ───────────────────────────────────────────────────────────
-
-/**
- * Main entry point.  Runs the full satellite → soil → zone → points pipeline.
- *
- * @param {object} params
- * @param {Array<[lat,lng]>}      params.polygonPoints  - Raw click points (≥ 3)
- * @param {string}                params.cropType       - Key of CROP_STRATEGIES
- * @param {'standard'|'economic'} params.samplingMode
- *
- * @returns {Promise<{
- *   totalAreaHa : number,
- *   soilData    : { name: string, color: string },
- *   zones       : Array<{ id, area, geoJson, points }>,
- *   strategy    : object,
- *   mode        : string,
- * }>}
- */
 export function runSamplingPipeline({ polygonPoints, cropType, samplingMode }) {
-  return new Promise((resolve, reject) => {
-    const ee = window.ee;
-    if (!ee) { reject(new Error('GEE not initialised.')); return; }
-
-    const strategy = CROP_STRATEGIES[cropType];
-    if (!strategy)  { reject(new Error(`Unknown crop type: ${cropType}`)); return; }
-    if (polygonPoints.length < 3) { reject(new Error('Need at least 3 polygon points.')); return; }
-
-    // Build closed GeoJSON ring  [lng, lat]
-    const coords = polygonPoints.map(p => [p[1], p[0]]);
-    coords.push(coords[0]);
-
-    const drawnPolygon = turf.polygon([coords]);
-    const totalAreaHa  = turf.area(drawnPolygon) / 10000;
-
-    if (totalAreaHa < 0.1) {
-      reject(new Error(`Area too small (${totalAreaHa.toFixed(2)} ha) for satellite analysis.`));
-      return;
-    }
-
-    const eePolygon = ee.Geometry.Polygon([coords]);
-
-    ee.Image('OpenLandMap/SOL/SOL_TEXTURE-CLASS_USDA-TT_M/v02')
-      .select('b0')
-      .reduceRegion({
-        reducer:   ee.Reducer.mode(),
-        geometry:  eePolygon,
-        scale:     250,
-        maxPixels: 1e9,
-      })
-      .evaluate((res, err) => {
-        if (err || !res?.b0) {
-          reject(new Error('Satellite error or field too small for 250 m resolution.'));
-          return;
-        }
-
-        const soilData = USDA_SOIL[res.b0] || { name: 'Unknown', color: '#888' };
-        const numZones = computeNumZones(totalAreaHa, strategy, samplingMode);
-        const zones    = buildZones(drawnPolygon, totalAreaHa, numZones, strategy, samplingMode);
-
-        resolve({
-          totalAreaHa,
-          soilData,
-          zones,
-          strategy,
-          mode: samplingMode,
-        });
-      });
+  console.warn("⚠️ [FROZEN] runSamplingPipeline migrated to backend. Returning mock.");
+  // Return a shape that matches the expected output so UI doesn't crash
+  return Promise.resolve({
+    totalAreaHa: 0,
+    soilData: { name: "Mock Soil (Backend Disabled)", color: "#ccc" },
+    zones: [],
+    strategy: CROP_STRATEGIES[cropType] || {},
+    mode: samplingMode,
   });
 }
 
-// ─── PREVIEW HELPER (no GEE needed) ──────────────────────────────────────────
-
-/**
- * Cheaply compute live area + zone count preview from polygon points alone.
- * Safe to call on every map click without GEE.
- *
- * @param {Array<[lat,lng]>}      polygonPoints
- * @param {string|null}           cropType      - Key of CROP_STRATEGIES, or null
- * @param {'standard'|'economic'} samplingMode
- * @returns {{ areaHa: number|null, previewZones: number|null }}
- */
+// ─── KEPT ACTIVE (Frontend-only logic, no GEE needed) ────────────────────────
 export function computePreview(polygonPoints, cropType, samplingMode) {
   if (polygonPoints.length < 3) return { areaHa: null, previewZones: null };
-
   let areaHa = null;
   try {
     const c = polygonPoints.map(p => [p[1], p[0]]);
@@ -442,9 +249,7 @@ export function computePreview(polygonPoints, cropType, samplingMode) {
   } catch (_) {
     return { areaHa: null, previewZones: null };
   }
-
   const strategy    = cropType ? CROP_STRATEGIES[cropType] : null;
   const previewZones = strategy ? computeNumZones(areaHa, strategy, samplingMode) : null;
-
   return { areaHa: parseFloat(areaHa.toFixed(1)), previewZones };
 }

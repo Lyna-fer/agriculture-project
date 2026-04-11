@@ -1,0 +1,49 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AgriTech Backend - Production Dependencies
+# Generated for: FastAPI + Neon PostgreSQL + Google Earth Engine
+# Install: pip install -r requirements.txt
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─── WEB FRAMEWORK ───────────────────────────────────────────────────────────
+fastapi==0.109.2
+uvicorn[standard]==0.27.1          # ASGI server with hot-reload support
+pydantic==2.5.3                     # Data validation (bundled with FastAPI)
+pydantic-settings==2.1.0            # Env var config management
+
+# ─── DATABASE ────────────────────────────────────────────────────────────────
+sqlalchemy==2.0.25                  # ORM
+psycopg2-binary==2.9.9              # PostgreSQL adapter (binary wheels)
+geoalchemy2==0.14.3                 # PostGIS geometry support for SQLAlchemy
+
+# ─── GEOSPATIAL & EARTH ENGINE ───────────────────────────────────────────────
+earthengine-api==0.1.385            # Google Earth Engine Python client
+shapely==2.0.2                      # Geometry operations (Polygon, Point, etc.)
+pyproj==3.6.1                       # Geodesic calculations (area in hectares)
+
+# ─── UTILITIES ───────────────────────────────────────────────────────────────
+python-dotenv==1.0.1                # Load .env files for config
+httpx==0.26.0                       # Async HTTP client (optional, for external APIs)
+cachetools==5.3.2                   # Caching for GEE tokens (optional)
+
+# ─── DEVELOPMENT (optional, uncomment for dev) ───────────────────────────────
+# pytest==7.4.4                      # Testing
+# pytest-asyncio==0.23.3            # Async test support
+# black==24.1.1                      # Code formatter
+# ruff==0.1.11                       # Fast linter
+# httpx==0.26.0                      # For testing API endpoints
+
+# ─── NOTES ───────────────────────────────────────────────────────────────────
+# 1. Install system dependencies first (Windows):
+#    - Microsoft C++ Build Tools: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+#    - Or use WSL2 for easier geopackage compilation
+#
+# 2. For production deployment:
+#    - Set DATABASE_URL via env var (Neon URL with sslmode=require)
+#    - Set GEE service account or OAuth credentials
+#    - Use gunicorn + uvicorn workers for concurrency
+#
+# 3. To freeze exact versions after testing:
+#    pip freeze > requirements.txt
+#
+# 4. Security: Always audit dependencies with `pip-audit` or `safety`
+# ─────────────────────────────────────────────────────────────────────────────

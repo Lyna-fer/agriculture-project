@@ -1,102 +1,228 @@
-from fastapi import FastAPI, HTTPException
+import ee
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from typing import List  # <-- Crucial for lists of points!
-import psycopg2
-import json
-import requests
-app = FastAPI()
+from pydantic import BaseModel
+from Backend.services.sampling import run_sampling_pipeline
+import asyncio
+import os
+from typing import List, Optional
 
+# ─── DATABASE SETUP (Neon PostgreSQL + PostGIS) ─────────────────────────────
+from sqlalchemy import create_engine, Column, Integer, String, Float, Numeric, Date, ForeignKey, select
+from sqlalchemy.orm import sessionmaker, declarative_base, Session, relationship
+from sqlalchemy.sql import func
+from geoalchemy2 import Geometry  # For PostGIS geometry columns
+
+# Your teammate's Neon URL (from their message)
+NEON_URL = os.getenv(
+    "NEON_URL",
+    "postgresql://neondb_owner:npg_aH8xNI0goWJX@ep-jolly-dawn-allib500-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+)
+
+engine = create_engine(NEON_URL, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+
+# ─── MODELS (Mapping to EXISTING tables - DO NOT CREATE NEW ONES) ────────────
+class Farmer(Base):
+    __tablename__ = "farmer"
+    __table_args__ = {'extend_existing': True}  # Map to existing table
+
+    id = Column(Integer, primary_key=True)
+    nom = Column(String)
+    prenom = Column(String)
+    email = Column(String)
+
+    parcelles = relationship("Parcelle", back_populates="farmer", foreign_keys="Parcelle.farmerid")
+
+
+class Parcelle(Base):
+    __tablename__ = "parcelles"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True)
+    farmerid = Column(Integer, ForeignKey("farmer.id"))
+    nom = Column(String)
+    surface = Column(Numeric)  # surface in hectares
+    location = Column(Geometry("POLYGON", srid=4326))  # PostGIS geometry
+
+    farmer = relationship("Farmer", back_populates="parcelles", foreign_keys=[farmerid])
+    soil_samples = relationship("SoilSample", back_populates="parcelle")
+
+
+class SoilSample(Base):
+    __tablename__ = "soil_samples"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True)
+    parcelle_id = Column(Integer, ForeignKey("parcelles.id"))
+    zone_name = Column(String)
+    geometrie = Column(Geometry("POINT", srid=4326))  # PostGIS POINT
+    depth = Column(Numeric)
+    date_echantillon = Column(Date)
+    statut = Column(String)  # "à faire", "fait", etc.
+
+    parcelle = relationship("Parcelle", back_populates="soil_samples")
+
+
+# ─── DATABASE DEPENDENCY ────────────────────────────────────────────────────
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# ─── FASTAPI APP ────────────────────────────────────────────────────────────
+app = FastAPI(title="AgriTech Backend", version="1.0")
+
+# CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"], 
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 1. Define the Zone payload
-class ZonePayload(BaseModel):
-    zone_name: str
-    points: List[List[float]] # Expects [lat, lng] coordinates
 
-# 2. Main Request Model
+# Initialize GEE at startup (DB tables already exist - NO create_all needed)
+@app.on_event("startup")
+def startup_event():
+    ee.Initialize(project="isil-b-agri-project")
+    # ⚠️ DO NOT call Base.metadata.create_all() - tables already exist!
+
+
+# ─── PYDANTIC SCHEMAS ───────────────────────────────────────────────────────
 class SamplingRequest(BaseModel):
-    farmer_id: int
-    parcelle_name: str
-    surface_ha: float
-    polygon_geojson: dict
-    crop_name: str
-    # Add Field(min_length=1) to ensure at least one zone is sent!
-    zones: List[ZonePayload] = Field(min_length=1, description="Must provide at least one zone")
+    polygonPoints: list[list[float]]  # [[lat, lng], ...]
+    cropType: str
+    samplingMode: str  # "standard" | "economic"
 
-# Neon URL
-NEON_URL = "postgresql://neondb_owner:npg_aH8xNI0goWJX@ep-jolly-dawn-allib500-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
-@app.post("/api/generate-samples")
-def generate_samples(req: SamplingRequest):
-    # --- THE TRUE OCEAN TEST ---
-    # Take the first point of the drawn polygon
-    first_point = req.polygon_geojson.get("coordinates", [[]])[0][0]
-    lng = first_point[0]
-    lat = first_point[1]
+class SamplingResponse(BaseModel):
+    totalAreaHa: float
+    soilData: dict
+    zones: list[dict]
+    strategy: dict
+    mode: str
+    savedParcelleId: Optional[int] = None
+    savedSamplesCount: Optional[int] = None
 
+
+# ─── ENDPOINTS ──────────────────────────────────────────────────────────────
+@app.post("/api/sampling/run")
+async def run_sampling(request: SamplingRequest):
+    """Run sampling pipeline (calculations only, no save)"""
     try:
-        # Ask OpenStreetMap what is at these coordinates (zoom=3 checks at the country level)
-        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lng}&format=json&zoom=3"
-        headers = {'User-Agent': 'Agri-DSS-App'}
-        res = requests.get(url, headers=headers, timeout=3).json()
-        
-        # If OSM says "Unable to geocode", it means it's in the middle of the ocean!
-        if "error" in res and "Unable to geocode" in res["error"]:
-            raise HTTPException(
-                status_code=400, 
-                detail="Plouf ! 🌊 Erreur géographique: La parcelle se trouve dans l'océan !"
-            )
-    except requests.exceptions.RequestException:
-        # If the OSM API is temporarily down, we just pass so the app doesn't break
-        pass
-    conn = None
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            run_sampling_pipeline,
+            request.polygonPoints,
+            request.cropType,
+            request.samplingMode
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+
+@app.post("/api/sampling/run-and-save", response_model=SamplingResponse)
+async def run_and_save_sampling(
+        request: SamplingRequest,
+        farmer_id: int = 1,  # Default to test farmer; frontend can pass real ID
+        db: Session = Depends(get_db)
+):
+    """Run sampling pipeline AND save results to Neon DB"""
     try:
-        conn = psycopg2.connect(NEON_URL)
-        cursor = conn.cursor()
+        # 1. Run the calculation pipeline (same as /run endpoint)
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            run_sampling_pipeline,
+            request.polygonPoints,
+            request.cropType,
+            request.samplingMode
+        )
 
-        geojson_str = json.dumps(req.polygon_geojson)
+        # 2. Prepare parcelle data for saving
+        from shapely import wkt
+        from shapely.geometry import Polygon
 
-        # 3. Save the main outer boundary of the farm
-        cursor.execute("""
-            INSERT INTO Parcelles (FarmerID, Nom, Surface, Location)
-            VALUES (%s, %s, %s, ST_GeomFromGeoJSON(%s))
-            RETURNING ID;
-        """, (req.farmer_id, req.parcelle_name, req.surface_ha, geojson_str))
-        
-        new_parcelle_id = cursor.fetchone()[0]
+        # Convert polygon points to WKT for PostGIS
+        coords = [[p[1], p[0]] for p in request.polygonPoints]  # [lng, lat]
+        coords.append(coords[0])  # Close ring
+        poly = Polygon(coords)
+        location_wkt = poly.wkt  # e.g., "POLYGON((lng lat, ...))"
 
-        # 4. Loop through React's zones and save the EXACT zigzag points
-        saved_points_count = 0
-        for zone in req.zones:
-            for pt in zone.points:
-                lat = pt[0]
-                lng = pt[1]
-                # PostGIS strictly uses ST_MakePoint(Longitude, Latitude)
-                cursor.execute("""
-                    INSERT INTO Soil_Samples (Parcelle_ID, Zone_Name, Geometrie, Depth, Date_echantillon, Statut)
-                    VALUES (%s, %s, ST_SetSRID(ST_MakePoint(%s, %s), 4326), 20.0, CURRENT_DATE, 'à faire')
-                """, (new_parcelle_id, zone.zone_name, lng, lat))
-                saved_points_count += 1
-        
-        # 5. Commit all saves to the cloud
-        conn.commit()
-        cursor.close()
-        conn.close()
+        # 3. Insert parcelle into existing table
+        new_parcelle = Parcelle(
+            farmerid=farmer_id,
+            nom=f"Parcelle_{result['totalAreaHa']:.1f}ha_{request.cropType}",
+            surface=result['totalAreaHa'],
+            location=location_wkt  # GeoAlchemy2 auto-converts WKT to PostGIS
+        )
+        db.add(new_parcelle)
+        db.flush()  # Get the new ID without committing yet
 
+        # 4. Insert each sampling point into soil_samples table
+        from datetime import date
+        samples_created = 0
+
+        for zone in result['zones']:
+            for point in zone['points']:
+                # point is [lat, lng] -> convert to PostGIS POINT WKT
+                point_wkt = f"POINT({point[1]} {point[0]})"  # POINT(lng lat)
+
+                sample = SoilSample(
+                    parcelle_id=new_parcelle.id,
+                    zone_name=zone['id'],
+                    geometrie=point_wkt,
+                    depth=20.0,  # Default depth in cm; can be made dynamic
+                    date_echantillon=date.today(),
+                    statut="à faire"  # Default status
+                )
+                db.add(sample)
+                samples_created += 1
+
+        # 5. Commit all changes
+        db.commit()
+        db.refresh(new_parcelle)
+
+        # 6. Return response with saved IDs
         return {
-            "status": "success",
-            "parcelle_id": new_parcelle_id,
-            "message": f"Saved {saved_points_count} points across {len(req.zones)} zones."
+            **result,
+            "savedParcelleId": new_parcelle.id,
+            "savedSamplesCount": samples_created
         }
 
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        if conn: 
-            conn.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"DB error: {str(e)}")
+
+
+# Optional: Test endpoint to verify DB connection
+@app.get("/api/db/test")
+def test_db_connection(db: Session = Depends(get_db)):
+    """Quick test: list farmers and parcelles count"""
+    try:
+        farmers = db.execute(select(Farmer)).scalars().all()
+        parcelles_count = db.execute(select(func.count(Parcelle.id))).scalar()
+        samples_count = db.execute(select(func.count(SoilSample.id))).scalar()
+
+        return {
+            "status": "connected",
+            "farmers": [{"id": f.id, "name": f"{f.prenom} {f.nom}"} for f in farmers[:5]],
+            "parcelles_count": parcelles_count,
+            "soil_samples_count": samples_count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"DB test failed: {str(e)}")
