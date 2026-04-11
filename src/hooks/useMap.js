@@ -294,9 +294,20 @@ export function useMap({ onParcelleChange }) {
     parcelleLayerRef.current = null;
   }, [cancelDraw]);
 
-  const flyToWilaya = useCallback((wilaya) => {
+ const flyToWilaya = useCallback((wilaya) => {
     if (!mapInstanceRef.current) return;
-    mapInstanceRef.current.flyTo([wilaya.lat, wilaya.lng], 10, {
+
+    const zoomByZone = {
+      humide: 12,
+      subhumide: 11,
+      "semi-aride": 11,
+      aride: 10,
+      saharienne: 9,
+    };
+
+    const zoom = zoomByZone[wilaya.zone] ?? 11;
+
+    mapInstanceRef.current.flyTo([wilaya.lat, wilaya.lng], zoom, {
       animate: true,
       duration: 1.2,
     });
