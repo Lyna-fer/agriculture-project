@@ -3,7 +3,7 @@ import "./SoilDiagnostic.css";
 import PortalOverlay from "./PortalOverlay";
 import { getCropsByGroup } from "../../data/cropData";
 
-/* ─── helpers to bridge cropData → SoilDiagnostic scoring ── */
+
 function cropBg(c) {
   const map = {
     "🍅": "#ffd8d0",
@@ -52,7 +52,7 @@ function inferSeasons(c) {
   return ["printemps", "ete", "automne"];
 }
 
-/** Converts a cropData entry to the format used by the scoring logic */
+
 function toCrop(c) {
   return {
     id: c.id,
@@ -70,7 +70,7 @@ function toCrop(c) {
   };
 }
 
-/* ─── zone colors & badges (unchanged) ─── */
+
 const ZC = {
   ph: [
     { c: "#ff8a80", f: 14 },
@@ -229,7 +229,7 @@ function cropAdj(c, st) {
   return adj;
 }
 
-/* ─── small sub-components ─── */
+
 function ZoneBar({ id }) {
   if (!ZC[id]) return null;
   return (
@@ -305,7 +305,7 @@ function SliderCard({
   );
 }
 
-/* ─── ResultsView (unchanged logic, receives CROPS as prop) ─── */
+
 function ResultsView({ st, onReset, crops }) {
   const sc = calcScore(st),
     scC = mc(sc),
@@ -323,7 +323,7 @@ function ResultsView({ st, onReset, crops }) {
 
   return (
     <div className="sd-results">
-      {/* score hero */}
+     
       <div className="sd-score-hero sd-a1">
         <div className="sd-score-hero-top">
           <div>
@@ -360,7 +360,7 @@ function ResultsView({ st, onReset, crops }) {
         </div>
       </div>
 
-      {/* season alert */}
+      
       {sn && (
         <div
           className="sd-sea-alert sd-a2"
@@ -389,7 +389,7 @@ function ResultsView({ st, onReset, crops }) {
         </div>
       )}
 
-      {/* param pills */}
+      
       <div className="sd-param-pills sd-a2">
         {[PARAMS.slice(0, 3), PARAMS.slice(3)].map((row, ri) => (
           <div key={ri} className="sd-param-pill-row">
@@ -435,7 +435,7 @@ function ResultsView({ st, onReset, crops }) {
         ))}
       </div>
 
-      {/* recommended crops */}
+    
       {recs && (
         <div className="sd-a3">
           <div className="sd-sec-head">
@@ -504,7 +504,7 @@ function ResultsView({ st, onReset, crops }) {
         </div>
       )}
 
-      {/* targeted crop analysis */}
+      
       {tgt && (
         <>
           <div className="sd-a3">
@@ -676,9 +676,7 @@ function ResultsView({ st, onReset, crops }) {
   );
 }
 
-/* ══════════════════════════════════════════════════
-   MAIN COMPONENT
-══════════════════════════════════════════════════ */
+
 export default function SoilDiagnostic({
   open,
   onClose,
@@ -706,13 +704,13 @@ export default function SoilDiagnostic({
     [],
   );
 
-  /* ── DYNAMIC CROPS — filtered by the group chosen in LeftPanel ── */
+
   const CROPS = useMemo(
     () => getCropsByGroup(cultureGroupId).map(toCrop),
     [cultureGroupId],
   );
 
-  /* Reset crop selection when the group changes */
+ 
   const prevGroupRef = useState(cultureGroupId);
   if (prevGroupRef[0] !== cultureGroupId) {
     prevGroupRef[0] = cultureGroupId;
@@ -753,7 +751,7 @@ export default function SoilDiagnostic({
         onClick={(e) => e.target === e.currentTarget && onClose()}
       >
         <div className="sd-panel">
-          {/* ── TOPBAR ── */}
+          
           <div className="sd-topbar">
             <div className="sd-tb-logo">
               <div className="sd-tb-icon">
@@ -790,9 +788,9 @@ export default function SoilDiagnostic({
             </div>
           </div>
 
-          {/* ── LAYOUT ── */}
+         
           <div className="sd-layout">
-            {/* FORM */}
+            
             <div className="sd-fc">
               <div className="sd-fh">
                 <div className="sd-eyebrow">
@@ -809,7 +807,6 @@ export default function SoilDiagnostic({
                 </p>
               </div>
 
-              {/* Section 1 */}
               <div className="sd-sec">
                 <div className="sd-sec-lbl">
                   <span className="sd-sec-num">1</span>Chimie du sol
@@ -910,7 +907,7 @@ export default function SoilDiagnostic({
                 />
               </div>
 
-              {/* Section 3 */}
+              
               <div className="sd-sec">
                 <div className="sd-sec-lbl">
                   <span className="sd-sec-num">3</span>Propriétés physiques
@@ -985,7 +982,7 @@ export default function SoilDiagnostic({
                 </div>
               </div>
 
-              {/* Section 4 */}
+              
               <div className="sd-sec">
                 <div className="sd-sec-lbl">
                   <span className="sd-sec-num">4</span>Saison de culture
@@ -1009,7 +1006,7 @@ export default function SoilDiagnostic({
                 </div>
               </div>
 
-              {/* Section 5 — DYNAMIC SELECT */}
+              
               <div className="sd-sec">
                 <div className="sd-sec-lbl">
                   <span className="sd-sec-num">5</span>
@@ -1017,7 +1014,7 @@ export default function SoilDiagnostic({
                   <span className="sd-sec-opt"> — optionnel</span>
                 </div>
 
-                {/* Group label */}
+                
                 <div
                   style={{
                     fontSize: "0.64rem",
@@ -1070,7 +1067,7 @@ export default function SoilDiagnostic({
                 </div>
               </div>
 
-              {/* Submit */}
+              
               <div className="sd-sub-wrap">
                 <button
                   className="sd-sub-btn"
@@ -1124,7 +1121,7 @@ export default function SoilDiagnostic({
               </div>
             </div>
 
-            {/* RESULTS */}
+            
             <div className="sd-rc">
               {!results ? (
                 <div className="sd-idle">
