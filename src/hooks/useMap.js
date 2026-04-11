@@ -21,14 +21,14 @@ export function useMap({ onParcelleChange }) {
       center: [36.5, 3.0],
       zoom: 6,
       zoomControl: false,
-      maxZoom: 17,
+      maxZoom: 18,
     });
 
     L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       {
         attribution: "Esri, USDA, USGS | SolGuide",
-        maxZoom: 17,
+        maxZoom: 18,
         maxNativeZoom: 19,
         errorTileUrl:
           "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
@@ -38,7 +38,7 @@ export function useMap({ onParcelleChange }) {
     L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
       {
-        maxZoom: 17,
+        maxZoom: 18,
         maxNativeZoom: 19,
         opacity: 0.7,
         errorTileUrl:
@@ -294,9 +294,20 @@ export function useMap({ onParcelleChange }) {
     parcelleLayerRef.current = null;
   }, [cancelDraw]);
 
-  const flyToWilaya = useCallback((wilaya) => {
+ const flyToWilaya = useCallback((wilaya) => {
     if (!mapInstanceRef.current) return;
-    mapInstanceRef.current.flyTo([wilaya.lat, wilaya.lng], 10, {
+
+    const zoomByZone = {
+      humide: 12,
+      subhumide: 11,
+      "semi-aride": 11,
+      aride: 10,
+      saharienne: 9,
+    };
+
+    const zoom = zoomByZone[wilaya.zone] ?? 11;
+
+    mapInstanceRef.current.flyTo([wilaya.lat, wilaya.lng], zoom, {
       animate: true,
       duration: 1.2,
     });
