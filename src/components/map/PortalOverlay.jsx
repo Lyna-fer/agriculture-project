@@ -1,8 +1,4 @@
-/**
- * PortalOverlay.jsx
- * Renders children directly into document.body via a React Portal,
- * completely escaping any parent stacking context (ResultsPanel, etc.)
- */
+
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
