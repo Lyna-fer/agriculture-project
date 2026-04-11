@@ -1,32 +1,4 @@
-/**
- * cropData.js
- * ─────────────────────────────────────────────────
- * Source unique de vérité pour toutes les cultures.
- * Données extraites exactement des 3 fichiers Excel.
- *
- * 👉 FRONTEND ONLY — données statiques de référence.
- *    Le backend utilisera ces id pour lier les analyses.
- *
- * Champs par culture :
- *   id        — identifiant slug unique
- *   name      — nom français (affiché)
- *   nameEn    — nom anglais (du fichier Excel)
- *   emoji     — icône affichée dans le select
- *   ph        — [min, max]
- *   ec        — ec_max (dS/m)
- *   tempMin   — temp_min (°C)
- *   tempMax   — temp_max (°C)
- *   nReq      — azote requis (mg/kg)
- *   pReq      — phosphore requis (mg/kg)
- *   kReq      — potassium requis (mg/kg)
- *   soilType  — type de sol optimal
- */
 
-/* ══════════════════════════════════════════════════
-   GROUPE 1 — CULTURES MARAÎCHÈRES  (groupId: 1)
-   20 cultures · légumes et tubercules
-   Source: Excel maraîchère
-══════════════════════════════════════════════════ */
 export const MARAICHERES = [
   {
     id: "tomate",
