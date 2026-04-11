@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import "./ResultsPanel.css";
 import { CULTURES } from "../../data/cultures";
 import epingle from "../../assets/epingle.png";
-
+import SoilDiagnostic from "./SoilDiagnostic";
 const hl = (t = "") =>
   t.replace(
     /(\d+[–\-]\d+|\d+\s*cm|\d+\s*j|\d+\s*sem\.|\d+\s*ans)/g,
@@ -310,8 +310,10 @@ export default function ResultsPanel({
   parcelleHa = 0,
   region = "",
   samplingMode = "standard", // 👈 Accept the new prop here
+  parcelle = null,
 }) {
   const [tab, setTab] = useState("schema");
+  const [diagOpen, setDiagOpen] = useState(false);
   console.log("THE MODE IS CURRENTLY:", samplingMode);
 
   const data = CULTURES.find((c) => c.id === cultureId);
@@ -693,9 +695,38 @@ export default function ResultsPanel({
           <span className="cy-footer-dot" />
           <span>{data.depths.length} horizons</span>
         </div>
+
+        <button className="cy-footer-diag" onClick={() => setDiagOpen(true)}>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <circle
+              cx="6.5"
+              cy="6.5"
+              r="5.5"
+              stroke="white"
+              strokeWidth="1.3"
+            />
+            <path
+              d="M6.5 4v3l2 2"
+              stroke="white"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+            />
+          </svg>
+          Diagnostic Sol
+        </button>
+
         <button className="cy-footer-close" onClick={onClose}>
           Fermer ✕
         </button>
+
+        <SoilDiagnostic
+          open={diagOpen}
+          onClose={() => setDiagOpen(false)}
+          parcelleName={region || "Parcelle A"}
+          parcelleHa={parcelleHa}
+          cultureGroupId={cultureId}
+          parcelle={parcelle}
+        />
       </div>
     </div>
   );
