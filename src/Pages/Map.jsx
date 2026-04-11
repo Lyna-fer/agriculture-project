@@ -196,8 +196,15 @@ export default function Map() {
     [showToast]
   );
 
-  // ✅ MIGRATED: Calls backend API AND saves to Neon DB
+  // ✅ MIGRATED + AUTH: Calls backend API with JWT token AND saves to Neon DB
   const handleAnalyze = useCallback(async () => {
+    // ✅ CHECK 1: Verify user is logged in
+    const token = localStorage.getItem("token");
+    if (!token) {
+      showToast("❌ Veuillez vous connecter d'abord");
+      return;
+    }
+
     if (isAnalyzing) return; // Prevent double-click
     setIsAnalyzing(true);
 
@@ -225,22 +232,38 @@ export default function Map() {
     showToast("⏳ Calcul + sauvegarde en cours...");
 
     try {
-      // ✅ Call the NEW endpoint that calculates AND saves to Neon DB
-      const response = await fetch(`${API_BASE}/api/sampling/run-and-save?farmer_id=1`, {
+      // ✅ CHECK 2: Send JWT token in Authorization header
+      const response = await fetch(`${API_BASE}/api/sampling/run-and-save`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}` // ✅ THIS AUTHENTICATES THE REQUEST
+        },
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         console.error("Backend API failed:", errData);
+
+        // ✅ HANDLE 401: Token expired or invalid
+        if (response.status === 401) {
+          showToast("❌ Session expirée. Veuillez vous reconnecter.");
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          // Optional: auto-redirect to login
+          // window.location.href = "/auth";
+          setIsAnalyzing(false);
+          return;
+        }
+
         showToast(`❌ Erreur: ${errData.detail || response.statusText}`);
+        setIsAnalyzing(false);
         return;
       }
 
       const data = await response.json();
-      // ✅ Backend returns: { ..., savedParcelleId, savedSamplesCount }
+      // ✅ Backend returns: { ..., savedParcelleId, savedSamplesCount, user_id }
 
       if (data.zones?.length > 0) {
         // Use backend-calculated zones & points (same structure as frontend)
@@ -251,7 +274,7 @@ export default function Map() {
         const totalPoints = data.zones.reduce((sum, z) => sum + (z.points?.length || 0), 0);
         const modeLabel = samplingMode === "economic" ? "économique" : "standard";
 
-        // ✅ Show save confirmation
+        // ✅ Show save confirmation with user-linked parcelle
         if (data.savedParcelleId) {
           showToast(
             `🔬 ${totalPoints} points générés + 💾 Parcelle #${data.savedParcelleId} sauvegardée ! (${modeLabel})`
@@ -298,7 +321,7 @@ export default function Map() {
           onDeleteParcelle={handleDeleteParcelle}
           onGroupChange={handleGroupChange}
           onSamplingModeChange={setSamplingMode}
-          onGenerate={handleAnalyze} // ✅ Now calls backend + saves to DB
+          onGenerate={handleAnalyze} // ✅ Now calls backend + saves to DB with auth
           onClearAll={handleClearAll}
           onSaveParcelle={handleSaveParcelle}
           onCancelDraw={handleCancelDraw}
