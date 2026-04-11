@@ -95,6 +95,7 @@ export default function LeftPanel({
   onClearAll,
   onSaveParcelle,
   onCancelDraw,
+  isAnalyzing = false, // ✅ NEW: Loading state prop
 }) {
   const canGenerate = !!selectedParcelle && !!selectedGroup;
   const totalArea = parcelles.reduce((s, p) => s + (p.area || 0), 0);
@@ -267,12 +268,17 @@ export default function LeftPanel({
           </div>
         )}
 
+        {/* ✅ UPDATED: "Générer" button with loading state */}
         <button
-          className={`lp-gen ${canGenerate ? "ready" : ""}`}
-          disabled={!canGenerate}
-          onClick={() => canGenerate && onGenerate()}
+          className={`lp-gen ${canGenerate ? "ready" : ""} ${isAnalyzing ? "loading" : ""}`}
+          disabled={!canGenerate || isAnalyzing}
+          onClick={() => canGenerate && !isAnalyzing && onGenerate()}
         >
-          {canGenerate ? (
+          {isAnalyzing ? (
+            <>
+              <span className="spinner" /> ⏳ Traitement...
+            </>
+          ) : canGenerate ? (
             <>
               <BadgeCheck size={20} />
               Générer le guide d'échantillonnage
