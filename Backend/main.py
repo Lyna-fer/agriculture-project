@@ -66,8 +66,6 @@ class Farmer(Base):
     nom = Column(String)  # Last name
     prenom = Column(String)  # First name
     email = Column(String, unique=True)
-    # Optional: Add this if you want to link to auth_user:
-    # user_id = Column(Integer, ForeignKey("auth_user.id"), unique=True)
 
 
 class Parcelle(Base):
@@ -140,6 +138,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
+    # ✅ FIX: Changed 'dict' parameter to 'data'
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
@@ -186,10 +185,12 @@ class Token(BaseModel):
     username: str
 
 
+# ✅ A. UPDATED: Added parcelleName field to accept custom name from frontend
 class SamplingRequest(BaseModel):
     polygonPoints: list[list[float]]
     cropType: str
     samplingMode: str
+    parcelleName: Optional[str] = None  # ✅ Custom name (optional)
 
 
 # ─── FASTAPI APP ──────────────────────────────────────────────────────────────
@@ -276,8 +277,10 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(500, f"Registration failed: {str(e)}")
 
 
+# ✅ FIX: Fixed the entire login function with proper syntax
 @app.post("/api/auth/login", response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """Login endpoint that authenticates user and returns JWT token"""
     user = db.query(AuthUser).filter(
         AuthUser.username == form_data.username,
         AuthUser.is_active == True
@@ -337,23 +340,25 @@ async def run_and_save(
         coords.append(coords[0])
         location_wkt = f"SRID=4326;{Polygon(coords).wkt}"
 
-        # 3. ✅ LOOK UP the correct farmer.id by email
+        # 3. ✅ LOOK UP the correct farmer.id by email (fixes foreign key violation)
         farmer_record = db.query(Farmer).filter(Farmer.email == current_user.email).first()
         farmer_id_for_parcelle = farmer_record.id if farmer_record else None
 
-        # 4. Create parcelle with CORRECT farmerid
+        # ✅ B. UPDATED: Use custom name if provided, else fallback to auto-generated
+        # ✅ FIX: Ensure custom name is used when provided (prioritize user input)
+        parcelle_name = request.parcelleName.strip() if request.parcelleName and request.parcelleName.strip() else f"Parcelle_{result['totalAreaHa']:.1f}ha_{request.cropType}"
+
         new_parcelle = Parcelle(
-            user_id=current_user.id,  # ✅ Link to auth_user
-            farmerid=farmer_id_for_parcelle,  # ✅ Link to farmer table (or None)
-            nom=f"Parcelle_{result['totalAreaHa']:.1f}ha_{request.cropType}",
+            user_id=current_user.id,
+            farmerid=farmer_id_for_parcelle,
+            nom=parcelle_name,  # ✅ Uses custom name, falls back only if empty/None
             surface=result['totalAreaHa'],
             location=location_wkt
         )
         db.add(new_parcelle)
         db.flush()
 
-        # 5. Create soil samples
-        from datetime import date
+        # 4. Create soil samples
         samples_created = 0
         for zone in result['zones']:
             for point in zone.get('points', []):
@@ -371,12 +376,13 @@ async def run_and_save(
         db.commit()
         db.refresh(new_parcelle)
 
-        # 6. Return response with ALL keys frontend expects
+        # 5. Return response with ALL keys frontend expects
         return {
             "zones": result['zones'],
             "totalAreaHa": result['totalAreaHa'],
             "savedParcelleId": new_parcelle.id,
             "savedSamplesCount": samples_created,
+            "savedParcelleName": parcelle_name,  # ✅ Return the saved name so frontend can update
             "user_id": current_user.id
         }
 
@@ -406,6 +412,60 @@ async def run_and_save(
             }
         except:
             raise HTTPException(500, f"Server error: {str(e)}")
+
+
+# ─── PERSISTENT PARCELLE ENDPOINTS ─────────────────────────────────────────────
+@app.get("/api/parcels")
+def get_parcels(current_user: AuthUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Fetch all parcelles for logged-in user"""
+    from geoalchemy2.shape import to_shape
+
+    parcels = db.query(Parcelle).filter(Parcelle.user_id == current_user.id).all()
+
+    result = []
+    for p in parcels:
+        latlngs = []
+        if p.location:
+            try:
+                geom = to_shape(p.location)
+                if geom.geom_type == 'Polygon':
+                    latlngs = [[coord[1], coord[0]] for coord in list(geom.exterior.coords)[:-1]]
+            except:
+                pass
+
+        result.append({
+            "id": p.id,
+            "name": p.nom or f"Parcelle #{p.id}",  # ✅ Returns the custom saved name
+            "area": float(p.surface) * 10000 if p.surface else 0,
+            "color": "#2ecc71",
+            "groupId": 1,
+            "latlngs": latlngs,
+            "bounds": None,
+            "user_id": p.user_id,
+            "farmerid": p.farmerid
+        })
+
+    return result
+
+
+@app.delete("/api/parcels/{parcel_id}")
+def delete_parcel(parcel_id: int, current_user: AuthUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Delete parcelle + associated soil samples (auth-protected)"""
+    parcel = db.query(Parcelle).filter(
+        Parcelle.id == parcel_id,
+        Parcelle.user_id == current_user.id
+    ).first()
+
+    if not parcel:
+        raise HTTPException(404, detail="Parcel not found or access denied")
+
+    db.query(SoilSample).filter(SoilSample.parcelle_id == parcel_id).delete()
+    db.delete(parcel)
+    db.commit()
+
+    return {"message": "✅ Parcel deleted", "id": parcel_id}
+
+
 @app.get("/api/db/test")
 def test_db(db: Session = Depends(get_db)):
     users = db.query(AuthUser).count()

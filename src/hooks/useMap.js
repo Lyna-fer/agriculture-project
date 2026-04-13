@@ -5,7 +5,7 @@ export function useMap({ onParcelleChange }) {
   const mapInstanceRef = useRef(null);
   const drawnItemsRef = useRef(null);
   const sampleMarkersRef = useRef([]);
-  const zoneLayersRef = useRef([]); // Store zone boundaries
+  const zoneLayersRef = useRef([]);
   const parcelleLayerRef = useRef(null);
   const drawControlRef = useRef(null);
 
@@ -103,12 +103,8 @@ export function useMap({ onParcelleChange }) {
       if (e.layerType === "polygon" || e.layerType === "rectangle") {
         const stats = computeStats(e.layer);
         onParcelleChange({ type: e.layerType, layer: e.layer, ...stats });
-        // map.fitBounds(e.layer.getBounds(), { padding: [40, 40] });
-
         const bounds = e.layer.getBounds();
-
         let zoom = map.getBoundsZoom(bounds);
-
         zoom = Math.min(zoom, 19);
         map.setView(bounds.getCenter(), zoom);
       } else {
@@ -128,7 +124,6 @@ export function useMap({ onParcelleChange }) {
 
   const computeStats = (layer) => {
     const turf = window.turf;
-    // const latlngs = layer.getLatLngs()[0];
     const latlngs = layer.getLatLngs().flat(2);
     const coords = latlngs.map((ll) => [ll.lng, ll.lat]);
     coords.push(coords[0]);
@@ -136,7 +131,6 @@ export function useMap({ onParcelleChange }) {
     const areaM2 = turf.area(polygon);
     const areaHa = areaM2 / 10000;
     const line = turf.lineString(coords);
-    // const perimM = turf.length(line, { units: "meters" });
     const perimM = turf.length(line, { units: "kilometers" }) * 1000;
     const bounds = layer.getBounds();
     return {
@@ -155,9 +149,6 @@ export function useMap({ onParcelleChange }) {
 
   const clearSampleMarkers = () => {
     if (!mapInstanceRef.current) return;
-    // sampleMarkersRef.current.forEach((m) =>
-    //   mapInstanceRef.current.removeLayer(m),
-    // );
     sampleMarkersRef.current.forEach((m) => m.remove());
     sampleMarkersRef.current = [];
   };
@@ -165,7 +156,6 @@ export function useMap({ onParcelleChange }) {
   const cancelDraw = useCallback(() => {
     const drawControl = drawControlRef.current;
     if (!drawControl) return;
-
     try {
       Object.values(drawControl._toolbars).forEach((toolbar) => {
         if (toolbar._activeMode && toolbar._activeMode.handler) {
@@ -187,6 +177,50 @@ export function useMap({ onParcelleChange }) {
     }
   }, []);
 
+  // ✅ NEW: Draw a polygon programmatically from lat/lng coordinates
+  const drawParcelleFromLatLngs = useCallback((latlngs, color = "#4a7c2f") => {
+    const L = window.L;
+    const map = mapInstanceRef.current;
+    const drawnItems = drawnItemsRef.current;
+
+    if (!map || !L || !drawnItems || !latlngs || latlngs.length < 3) {
+      console.warn("drawParcelleFromLatLngs: missing dependencies");
+      return null;
+    }
+
+    try {
+      // Clear existing drawn items
+      drawnItems.clearLayers();
+      clearSampleMarkers();
+
+      // Create polygon from lat/lng array
+      const polygon = L.polygon(latlngs, {
+        color: color,
+        fillColor: color,
+        fillOpacity: 0.22,
+        weight: 2.5,
+      });
+
+      // Add to map and drawnItems (so it behaves like a user-drawn parcelle)
+      drawnItems.addLayer(polygon);
+      parcelleLayerRef.current = polygon;
+
+      // Fit map to parcelle bounds
+      const bounds = polygon.getBounds();
+      const zoom = Math.min(map.getBoundsZoom(bounds), 19);
+      map.setView(bounds.getCenter(), zoom);
+
+      // Compute and return stats (so UI can update)
+      const stats = computeStats(polygon);
+
+      console.log(`✅ Drew parcelle with ${latlngs.length} points`);
+      return stats;
+    } catch (error) {
+      console.error("❌ Error drawing parcelle from latlngs:", error);
+      return null;
+    }
+  }, []);
+
   const placeSamplePoints = useCallback((zones, color) => {
     console.log(
       "placeSamplePoints called with",
@@ -202,14 +236,11 @@ export function useMap({ onParcelleChange }) {
     }
 
     clearSampleMarkers();
-
     let totalMarkers = 0;
 
-    // Iterate through zones and place points with per-zone numbering
     zones.forEach((zone) => {
       const points = zone.points || [];
 
-      // Draw dotted line connecting all points in this zone (the pattern)
       if (points.length > 1) {
         try {
           const polyline = L.polyline(points, {
@@ -218,7 +249,6 @@ export function useMap({ onParcelleChange }) {
             opacity: 0.8,
             dashArray: "3,4",
           }).addTo(map);
-
           sampleMarkersRef.current.push(polyline);
           console.log(
             `Zone ${zone.id}: drew pattern line with ${points.length} points`,
@@ -230,7 +260,7 @@ export function useMap({ onParcelleChange }) {
 
       points.forEach((pt, idx) => {
         try {
-          const pointNum = idx + 1; // Restart from 1 for each zone
+          const pointNum = idx + 1;
           const icon = L.divIcon({
             className: "",
             html: `<div style="
@@ -294,9 +324,8 @@ export function useMap({ onParcelleChange }) {
     parcelleLayerRef.current = null;
   }, [cancelDraw]);
 
- const flyToWilaya = useCallback((wilaya) => {
+  const flyToWilaya = useCallback((wilaya) => {
     if (!mapInstanceRef.current) return;
-
     const zoomByZone = {
       humide: 12,
       subhumide: 11,
@@ -304,9 +333,7 @@ export function useMap({ onParcelleChange }) {
       aride: 10,
       saharienne: 9,
     };
-
     const zoom = zoomByZone[wilaya.zone] ?? 11;
-
     mapInstanceRef.current.flyTo([wilaya.lat, wilaya.lng], zoom, {
       animate: true,
       duration: 1.2,
@@ -369,7 +396,6 @@ export function useMap({ onParcelleChange }) {
 
           const latlngs = coords.map((c) => [c[1], c[0]]);
 
-          // Draw zone boundary
           const polyline = L.polyline(latlngs, {
             color: colors[idx % colors.length],
             weight: 2.5,
@@ -379,7 +405,6 @@ export function useMap({ onParcelleChange }) {
 
           zoneLayersRef.current.push(polyline);
 
-          // Add zone label at center
           const bounds = polyline.getBounds();
           const center = bounds.getCenter();
           const popup = `<b>${zone.id}</b><br>${zone.area} ha<br>${zone.points?.length || 0} pts`;
@@ -427,5 +452,6 @@ export function useMap({ onParcelleChange }) {
     activateDrawTool,
     clearAll,
     flyToWilaya,
+    drawParcelleFromLatLngs, // ✅ NEW: Expose this function
   };
 }

@@ -27,7 +27,7 @@ export default function MapView({
           parcelle
         </div>
       )}
-      {/* 
+      {/*
       {selectedCulture && parcelleInfo && (
         <div
           className="map-culture-badge"

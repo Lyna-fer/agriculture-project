@@ -6,19 +6,17 @@ import ResultsPanel from "../components/map/ResultsPanel";
 import Toast from "../components/map/Toast";
 import { useMap } from "../hooks/useMap";
 import { CULTURES } from "../data/cultures";
-// Import constants/helpers that are still needed for UI (kept active in frozen samplingEngine.js)
 import {
   computePreview,
   computeNumZones,
   CROP_STRATEGIES,
-  authenticateGEE, // Stub: returns resolved promise, no GEE auth needed now
+  authenticateGEE,
 } from "../lib/samplingEngine";
 
-// Mapping from CULTURES.id to CROP_STRATEGIES key
 const CULTURES_TO_STRATEGIES = {
-  1: "vegetables", // Maraîchères
-  2: "cereals", // Céréalières
-  3: "trees", // Arbres
+  1: "vegetables",
+  2: "cereals",
+  3: "trees",
 };
 
 const FIELD_COLORS = [
@@ -27,7 +25,6 @@ const FIELD_COLORS = [
 let colorIdx = 0;
 const nextColor = () => FIELD_COLORS[colorIdx++ % FIELD_COLORS.length];
 
-// Backend API base URL (matches your FastAPI server)
 const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 export default function Map() {
@@ -47,14 +44,36 @@ export default function Map() {
   const [selectedWilaya, setSelectedWilaya] = useState(null);
   const [toast, setToast] = useState({ msg: "", visible: false });
   const [geeReady, setGeeReady] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false); // ✅ Loading state for DB save
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const toastTimer = useRef(null);
 
-  // Initialize GEE stub (non-blocking, just for compatibility)
+  // Fetch parcelles from DB on mount
+  useEffect(() => {
+    const fetchUserParcelles = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      try {
+        const response = await fetch(`${API_BASE}/api/parcels`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.length > 0) {
+            setParcelles(data);
+            console.log(`✅ Loaded ${data.length} parcelles from DB`);
+          }
+        }
+      } catch (error) {
+        console.warn("⚠️ Could not fetch parcelles from DB:", error);
+      }
+    };
+    fetchUserParcelles();
+  }, []);
+
   useEffect(() => {
     (async () => {
       try {
-        await authenticateGEE(); // Stub: resolves immediately
+        await authenticateGEE();
         setGeeReady(true);
       } catch (err) {
         console.log("GEE auth stub:", err?.message || "OK");
@@ -91,6 +110,7 @@ export default function Map() {
     [showToast]
   );
 
+  // ✅ Destructure the new drawParcelleFromLatLngs function
   const {
     mapRef,
     placeSamplePoints,
@@ -99,6 +119,7 @@ export default function Map() {
     flyToWilaya,
     displayZones,
     clearZones,
+    drawParcelleFromLatLngs,
   } = useMap({
     onParcelleChange: handleParcelleChange,
   });
@@ -120,10 +141,14 @@ export default function Map() {
   const handleSaveParcelle = useCallback(
     ({ name, groupId }) => {
       if (!pendingParcelleInfo) return;
+      setPendingParcelleInfo({
+        ...pendingParcelleInfo,
+        name: name
+      });
       const newP = {
         id: Date.now(),
         name,
-        area: (pendingParcelleInfo.area || 0) * 10000, // ha → m²
+        area: (pendingParcelleInfo.area || 0) * 10000,
         color: pendingColor,
         groupId,
         bounds: pendingParcelleInfo.bounds,
@@ -163,25 +188,64 @@ export default function Map() {
     showToast("🗑 Tout effacé");
   }, [clearAll, clearZones, showToast]);
 
+  // ✅ FIX: Click parcelle → Display on map + enable re-generate
   const handleSelectParcelle = useCallback(
     (id) => {
       setSelectedParcelleId(id);
       const p = parcelles.find((x) => x.id === id);
-      if (p) setSelectedGroupId(p.groupId || selectedGroupId);
+
+      if (p && p.latlngs && p.latlngs.length > 0) {
+        setSelectedGroupId(p.groupId || selectedGroupId);
+
+        // ✅ Use the new function to draw the parcelle on map
+        const stats = drawParcelleFromLatLngs(p.latlngs, p.color || pendingColor);
+
+        if (stats) {
+          // Update parcelleInfo so UI components can access the data
+          setParcelleInfo({
+            ...stats,
+            name: p.name,
+            type: "polygon"
+          });
+          console.log(`✅ Displayed parcelle "${p.name}" on map`);
+        }
+      } else {
+        console.warn(`⚠️ Parcelle ${id} has no latlngs to display`);
+      }
       setResultsOpen(false);
     },
-    [parcelles, selectedGroupId]
+    [parcelles, selectedGroupId, drawParcelleFromLatLngs, pendingColor]
   );
 
   const handleDeleteParcelle = useCallback(
-    (id) => {
+    async (id) => {
+      const token = localStorage.getItem("token");
       setParcelles((prev) => prev.filter((p) => p.id !== id));
       if (selectedParcelleId === id) {
         setSelectedParcelleId(null);
         setParcelleInfo(null);
         setResultsOpen(false);
       }
-      showToast("🗑 Parcelle supprimée");
+      if (token) {
+        try {
+          const response = await fetch(`${API_BASE}/api/parcels/${id}`, {
+            method: "DELETE",
+            headers: { "Authorization": `Bearer ${token}` }
+          });
+          if (response.ok) {
+            showToast("🗑 Parcelle supprimée (DB + UI)");
+          } else {
+            const errData = await response.json().catch(() => ({}));
+            console.warn("⚠️ DB delete failed:", errData);
+            showToast("⚠️ UI updated, but DB delete failed");
+          }
+        } catch (error) {
+          console.error("❌ Network error deleting parcelle:", error);
+          showToast("❌ Erreur réseau lors de la suppression");
+        }
+      } else {
+        showToast("🗑 Parcelle supprimée (UI only)");
+      }
     },
     [selectedParcelleId, showToast]
   );
@@ -196,48 +260,104 @@ export default function Map() {
     [showToast]
   );
 
-  // ✅ MIGRATED + AUTH: Calls backend API with JWT token AND saves to Neon DB
+  // ✅ FIXED: Handle re-generate for existing parcelles (fixes 422 error)
   const handleAnalyze = useCallback(async () => {
-    // ✅ CHECK 1: Verify user is logged in
     const token = localStorage.getItem("token");
     if (!token) {
       showToast("❌ Veuillez vous connecter d'abord");
       return;
     }
 
-    if (isAnalyzing) return; // Prevent double-click
+    if (isAnalyzing) return;
     setIsAnalyzing(true);
 
-    console.log("handleAnalyze: started (backend + DB save mode)");
-    if (!parcelleInfo || !selectedGroupId) {
-      showToast("❌ Info manquante");
+    console.log("handleAnalyze: started");
+
+    // Handle both new drawings AND existing parcelles
+    const isExistingParcelle = selectedParcelleId && !pendingParcelleInfo;
+    const targetParcelle = isExistingParcelle
+      ? parcelles.find(p => p.id === selectedParcelleId)
+      : null;
+
+    // Get geometry: from pending (new) or from stored (existing)
+    const geometry = isExistingParcelle && targetParcelle?.latlngs
+      ? { latlngs: targetParcelle.latlngs, area: targetParcelle.area / 10000 }
+      : parcelleInfo;
+
+    // ✅ VALIDATION: Ensure we have valid geometry
+    if (!geometry || !geometry.latlngs || geometry.latlngs.length < 3) {
+      console.error("❌ Invalid geometry:", geometry);
+      showToast("❌ Info manquante - veuillez re-sélectionner la parcelle");
       setIsAnalyzing(false);
       return;
     }
 
-    const culture = CULTURES.find((c) => c.id === selectedGroupId);
-    const cropType = CULTURES_TO_STRATEGIES[selectedGroupId];
+    // ✅ FIX: Normalize latlngs to handle both formats (objects from Leaflet, arrays from DB)
+    const normalizeLatLngs = (latlngs) => {
+      if (!latlngs) return [];
+      return latlngs.map((ll) => {
+        if (Array.isArray(ll)) {
+          return ll; // Already [lat, lng] from DB
+        }
+        if (ll && typeof ll === 'object' && 'lat' in ll && 'lng' in ll) {
+          return [ll.lat, ll.lng]; // Convert from Leaflet object
+        }
+        return ll; // Fallback
+      });
+    };
+
+    // ✅ FIX: Ensure cropGroupId is a NUMBER (DB stores as integer)
+    const cropGroupId = targetParcelle?.groupId
+      ? Number(targetParcelle.groupId)
+      : selectedGroupId;
+
+    // ✅ VALIDATION: Ensure we have a valid crop type mapping
+    if (!cropGroupId || !CULTURES_TO_STRATEGIES[cropGroupId]) {
+      console.error("❌ Invalid cropGroupId:", cropGroupId, "selectedGroupId:", selectedGroupId);
+      showToast("❌ Type de culture non sélectionné");
+      setIsAnalyzing(false);
+      return;
+    }
+
+    const culture = CULTURES.find((c) => c.id === cropGroupId);
+    const cropType = CULTURES_TO_STRATEGIES[cropGroupId];
+
     if (!culture || !cropType) {
+      console.error("❌ Culture not found for groupId:", cropGroupId);
+      showToast("❌ Type de culture invalide");
       setIsAnalyzing(false);
       return;
     }
 
-    // Prepare payload for backend (matches SamplingRequest schema)
-    const payload = {
-      polygonPoints: parcelleInfo.latlngs.map((ll) => [ll.lat, ll.lng]), // [[lat, lng], ...]
+    // Get name
+    const customName = pendingParcelleInfo?.name || targetParcelle?.name || null;
+
+    // ✅ Normalize coordinates for backend (always [lat, lng] arrays)
+    const polygonPoints = normalizeLatLngs(geometry.latlngs);
+
+    console.log(`📝 Sending parcelle name: "${customName}"`);
+    console.log(`📝 Payload:`, {
+      polygonPoints: polygonPoints.slice(0, 3), // Log first 3 points for brevity
       cropType,
-      samplingMode, // "standard" or "economic"
+      samplingMode,
+      parcelleName: customName,
+    });
+
+    const payload = {
+      polygonPoints, // ✅ Now always [[lat, lng], ...] format
+      cropType,
+      samplingMode,
+      parcelleName: customName,
     };
 
     showToast("⏳ Calcul + sauvegarde en cours...");
 
     try {
-      // ✅ CHECK 2: Send JWT token in Authorization header
       const response = await fetch(`${API_BASE}/api/sampling/run-and-save`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}` // ✅ THIS AUTHENTICATES THE REQUEST
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify(payload),
       });
@@ -246,27 +366,27 @@ export default function Map() {
         const errData = await response.json().catch(() => ({}));
         console.error("Backend API failed:", errData);
 
-        // ✅ HANDLE 401: Token expired or invalid
         if (response.status === 401) {
           showToast("❌ Session expirée. Veuillez vous reconnecter.");
           localStorage.removeItem("token");
           localStorage.removeItem("user");
-          // Optional: auto-redirect to login
-          // window.location.href = "/auth";
           setIsAnalyzing(false);
           return;
         }
 
-        showToast(`❌ Erreur: ${errData.detail || response.statusText}`);
+        if (response.status === 422) {
+          console.error("❌ Validation error - payload:", payload);
+          showToast("❌ Données invalides - veuillez re-sélectionner la parcelle");
+        } else {
+          showToast(`❌ Erreur: ${errData.detail || response.statusText}`);
+        }
         setIsAnalyzing(false);
         return;
       }
 
       const data = await response.json();
-      // ✅ Backend returns: { ..., savedParcelleId, savedSamplesCount, user_id }
 
       if (data.zones?.length > 0) {
-        // Use backend-calculated zones & points (same structure as frontend)
         displayZones(data.zones, samplingMode);
         placeSamplePoints(data.zones, culture.color);
         setResultsOpen(true);
@@ -274,7 +394,6 @@ export default function Map() {
         const totalPoints = data.zones.reduce((sum, z) => sum + (z.points?.length || 0), 0);
         const modeLabel = samplingMode === "economic" ? "économique" : "standard";
 
-        // ✅ Show save confirmation with user-linked parcelle
         if (data.savedParcelleId) {
           showToast(
             `🔬 ${totalPoints} points générés + 💾 Parcelle #${data.savedParcelleId} sauvegardée ! (${modeLabel})`
@@ -289,9 +408,13 @@ export default function Map() {
       console.error("Network Error:", error);
       showToast("❌ Erreur réseau. Vérifiez que le backend tourne sur http://127.0.0.1:8000");
     } finally {
-      setIsAnalyzing(false); // Always reset loading state
+      setIsAnalyzing(false);
     }
-  }, [parcelleInfo, selectedGroupId, samplingMode, placeSamplePoints, displayZones, showToast, isAnalyzing]);
+  }, [
+    parcelleInfo, selectedGroupId, samplingMode, pendingParcelleInfo,
+    selectedParcelleId, parcelles, placeSamplePoints, displayZones,
+    showToast, isAnalyzing
+  ]);
 
   const handleSelectWilaya = useCallback(
     (wilaya) => {
@@ -321,11 +444,11 @@ export default function Map() {
           onDeleteParcelle={handleDeleteParcelle}
           onGroupChange={handleGroupChange}
           onSamplingModeChange={setSamplingMode}
-          onGenerate={handleAnalyze} // ✅ Now calls backend + saves to DB with auth
+          onGenerate={handleAnalyze}
           onClearAll={handleClearAll}
           onSaveParcelle={handleSaveParcelle}
           onCancelDraw={handleCancelDraw}
-          isAnalyzing={isAnalyzing} // ✅ Pass loading state to LeftPanel
+          isAnalyzing={isAnalyzing}
         />
 
         <MapView
