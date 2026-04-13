@@ -128,8 +128,7 @@ export default function ResultsPanel({
   const A = data.color, AB = data.colorLight, Icon = data.icon;
   const kpis = buildKpis(data, nSamples, parcelleHa);
 
-  // Pass samplingMode → diagMode in SoilDiagnostic so the default
-  // reflects the same "economic / standard" choice made in phase 1.
+
   const initialDiagMode = samplingMode === "economic" ? "eco" : "standard";
 
   return (
