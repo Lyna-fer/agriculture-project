@@ -1,5 +1,3 @@
-
-
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import "../styles/map.css";
 import LeftPanel from "../components/map/LeftPanel";
@@ -62,8 +60,11 @@ export default function Map() {
         if (response.ok) {
           const data = await response.json();
           if (data.length > 0) {
-            setParcelles(data);
-            console.log(`✅ Loaded ${data.length} parcelles from DB`);
+            const uniqueParcels = data.filter((parcel, index, self) =>
+              index === self.findIndex((p) => p.id === parcel.id)
+            );
+            setParcelles(uniqueParcels);
+            console.log(`✅ Loaded ${uniqueParcels.length} unique parcelles from DB`);
           }
         }
       } catch (error) {
@@ -139,14 +140,107 @@ export default function Map() {
     showToast("✕ Dessin annulé");
   }, [activateDrawTool, clearAll, parcelles.length, showToast]);
 
-  const handleClearAll = useCallback(() => {
-    clearAll(); clearZones();
-    setParcelles([]); setSelectedParcelleId(null); setParcelleInfo(null);
-    setPendingParcelleInfo(null); setSelectedGroupId(null);
-    setActiveTool(null); setResultsOpen(false);
+  // ✅ FIXED: Delete single parcelle immediately (UI + Map + DB)
+  const handleDeleteParcelle = useCallback(
+    async (id) => {
+      if (!id) return;
+      const token = localStorage.getItem("token");
+
+      // 1. Optimistic UI update
+      setParcelles((prev) => prev.filter((p) => p.id !== id));
+
+      // 2. If the deleted parcelle was selected, clear selection AND map drawing
+      if (selectedParcelleId === id) {
+        setSelectedParcelleId(null);
+        setParcelleInfo(null);
+        setResultsOpen(false);
+        clearAll(); // ✅ Removes the polygon from the map immediately
+      }
+
+      // 3. Backend deletion
+      if (token) {
+        try {
+          const response = await fetch(`${API_BASE}/api/parcels/${id}`, {
+            method: "DELETE",
+            headers: {
+               "Authorization": `Bearer ${token}`,
+               "Content-Type": "application/json"
+            },
+          });
+
+          if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.detail || `HTTP ${response.status}`);
+          }
+          console.log(`✅ Parcelle ${id} deleted from DB`);
+          showToast("🗑 Parcelle supprimée");
+        } catch (error) {
+          console.error(`❌ Failed to delete parcelle ${id}:`, error);
+          showToast("❌ Échec suppression - rafraîchissez la page");
+        }
+      } else {
+        showToast("🗑 Parcelle supprimée (local)");
+      }
+    },
+    [selectedParcelleId, showToast, clearAll]
+  );
+
+  // ✅ FIXED: Bulk delete - uses snapshot of IDs to ensure ALL are deleted
+  const handleClearAll = useCallback(async () => {
+    clearAll();
+    clearZones();
+    const token = localStorage.getItem("token");
+
+    // Take a snapshot of IDs to delete to avoid state staleness issues
+    const idsToDelete = parcelles.map(p => p.id);
+
+    if (idsToDelete.length > 0 && token) {
+      showToast("🗑 Suppression en cours...");
+      try {
+        const results = await Promise.allSettled(
+          idsToDelete.map((id) =>
+            fetch(`${API_BASE}/api/parcels/${id}`, {
+              method: "DELETE",
+              headers: {
+                 "Authorization": `Bearer ${token}`,
+                 "Content-Type": "application/json"
+              },
+            }).then(async (res) => {
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || `HTTP ${res.status}`);
+              }
+              return { id, success: true };
+            })
+          )
+        );
+        const failed = results.filter(r => r.status === "rejected");
+        if (failed.length > 0) {
+          console.warn(`⚠️ ${failed.length} deletion(s) failed`);
+          showToast(`⚠️ ${idsToDelete.length - failed.length}/${idsToDelete.length} supprimées`);
+        } else {
+          console.log("✅ All parcelles deleted from DB");
+          showToast("🗑 Tout effacé");
+        }
+      } catch (error) {
+        console.error("❌ Bulk delete error:", error);
+        showToast("❌ Erreur lors de la suppression");
+      }
+    } else if (idsToDelete.length > 0 && !token) {
+      // If no token, just clear UI
+      showToast("🗑 Tout effacé (UI only)");
+    }
+
+    // Always clear frontend state
+    setParcelles([]);
+    setSelectedParcelleId(null);
+    setParcelleInfo(null);
+    setPendingParcelleInfo(null);
+    setSelectedGroupId(null);
+    setActiveTool(null);
+    setResultsOpen(false);
     setNZonesFromBackend(1);
-    showToast("🗑 Tout effacé");
-  }, [clearAll, clearZones, showToast]);
+  }, [parcelles, clearAll, clearZones, showToast, setNZonesFromBackend]);
 
   const handleSelectParcelle = useCallback((id) => {
     setSelectedParcelleId(id);
@@ -158,27 +252,6 @@ export default function Map() {
     }
     setResultsOpen(false);
   }, [parcelles, selectedGroupId, drawParcelleFromLatLngs, pendingColor]);
-
-  const handleDeleteParcelle = useCallback(async (id) => {
-    const token = localStorage.getItem("token");
-    setParcelles(prev => prev.filter(p => p.id !== id));
-    if (selectedParcelleId === id) {
-      setSelectedParcelleId(null); setParcelleInfo(null); setResultsOpen(false);
-    }
-    if (token) {
-      try {
-        const response = await fetch(`${API_BASE}/api/parcels/${id}`, {
-          method: "DELETE",
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-        showToast(response.ok ? "🗑 Parcelle supprimée (DB + UI)" : "⚠️ UI updated, but DB delete failed");
-      } catch {
-        showToast("❌ Erreur réseau lors de la suppression");
-      }
-    } else {
-      showToast("🗑 Parcelle supprimée (UI only)");
-    }
-  }, [selectedParcelleId, showToast]);
 
   const handleGroupChange = useCallback((groupId) => {
     setSelectedGroupId(groupId); setResultsOpen(false);
@@ -250,7 +323,6 @@ export default function Map() {
       const data = await response.json();
 
       if (data.zones?.length > 0) {
-        // Store zone count from backend → drives SoilDiagnostic tabs
         setNZonesFromBackend(data.zones.length);
         displayZones(data.zones, samplingMode);
         placeSamplePoints(data.zones, culture.color);
@@ -263,11 +335,11 @@ export default function Map() {
           : `🔬 ${totalPoints} points générés dans ${data.zones.length} zone(s) ! (${modeLabel})`
         );
       } else {
-        showToast("⚠️ Aucune zone générée — essayez une parcelle plus grande");
+        showToast("⚠️ Aucune zone générée");
       }
     } catch (error) {
       console.error("Network Error:", error);
-      showToast("❌ Erreur réseau. Vérifiez que le backend tourne sur http://127.0.0.1:8000");
+      showToast("❌ Erreur réseau");
     } finally {
       setIsAnalyzing(false);
     }
@@ -287,7 +359,7 @@ export default function Map() {
 
   return (
     <>
-      <div style={{ display:"flex", height:"100vh" }}>
+      <div style={{ display: "flex", height: "100vh" }}>
         <LeftPanel
           parcelles={parcelles}
           selectedParcelle={selectedParcelleId}
@@ -316,7 +388,6 @@ export default function Map() {
           onCloseWilaya={() => setSelectedWilaya(null)}
         />
       </div>
-
       <ResultsPanel
         open={resultsOpen}
         onClose={() => setResultsOpen(false)}
@@ -325,9 +396,8 @@ export default function Map() {
         region={selectedWilaya?.name}
         samplingMode={samplingMode}
         parcelle={selectedParcelle}
-        nZones={nZonesFromBackend}   /*  zones from backend to SoilDiagnostic tabs */
+        nZones={nZonesFromBackend}
       />
-
       <Toast message={toast.msg} visible={toast.visible} />
     </>
   );

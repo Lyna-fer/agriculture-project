@@ -8,12 +8,10 @@ export function useMap({ onParcelleChange }) {
   const zoneLayersRef = useRef([]);
   const parcelleLayerRef = useRef(null);
   const drawControlRef = useRef(null);
-
   const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
-
     const L = window.L;
     if (!L) return;
 
@@ -74,7 +72,7 @@ export function useMap({ onParcelleChange }) {
         },
         marker: {
           icon: L.divIcon({
-            className: "",
+            className: " ",
             html: '<div style="width:18px;height:18px;background:#4a7c2f;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4)"></div>',
             iconSize: [18, 18],
             iconAnchor: [9, 9],
@@ -177,12 +175,11 @@ export function useMap({ onParcelleChange }) {
     }
   }, []);
 
-  // ✅ NEW: Draw a polygon programmatically from lat/lng coordinates
+  // ✅ Draw a polygon programmatically from lat/lng coordinates
   const drawParcelleFromLatLngs = useCallback((latlngs, color = "#4a7c2f") => {
     const L = window.L;
     const map = mapInstanceRef.current;
     const drawnItems = drawnItemsRef.current;
-
     if (!map || !L || !drawnItems || !latlngs || latlngs.length < 3) {
       console.warn("drawParcelleFromLatLngs: missing dependencies");
       return null;
@@ -234,7 +231,6 @@ export function useMap({ onParcelleChange }) {
       console.log("placeSamplePoints: early return - missing map or L");
       return;
     }
-
     clearSampleMarkers();
     let totalMarkers = 0;
 
@@ -264,25 +260,24 @@ export function useMap({ onParcelleChange }) {
           const icon = L.divIcon({
             className: "",
             html: `<div style="
-  width:16px; height:16px;
-  background:rgba(255,255,255,0.9);
-  border:1.5px solid ${color};
-  color:${color};
-  border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  font-size:0.65rem; font-family:'Geist Mono',monospace;
-  box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
-">${pointNum}</div>`,
+width:16px; height:16px;
+background:rgba(255,255,255,0.9);
+border:1.5px solid ${color};
+color:${color};
+border-radius:50%;
+display:flex; align-items:center; justify-content:center;
+font-size:0.65rem; font-family:'Geist Mono',monospace;
+box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
+">${pointNum}`,
             iconSize: [30, 30],
             iconAnchor: [15, 15],
           });
-
           const marker = L.marker(pt, { icon })
             .addTo(map)
             .bindPopup(
               `<b>${zone.id} - Point ${pointNum}</b><br>
-          Prélèvement n°${pointNum} / ${points.length}<br>
-          <span style="color:#7a5230;font-size:0.75rem">Lat: ${pt[0].toFixed(5)}, Lng: ${pt[1].toFixed(5)}</span>`,
+      Prélèvement n°${pointNum} / ${points.length}<br>
+       <span style="color:#7a5230;font-size:0.75rem">Lat: ${pt[0].toFixed(5)}, Lng: ${pt[1].toFixed(5)}</span>`,
             );
 
           sampleMarkersRef.current.push(marker);
@@ -410,18 +405,18 @@ export function useMap({ onParcelleChange }) {
           const popup = `<b>${zone.id}</b><br>${zone.area} ha<br>${zone.points?.length || 0} pts`;
           const marker = L.marker(center, {
             icon: L.divIcon({
-              className: "",
+              className: " ",
               html: `<div style="
-              background: ${colors[idx % colors.length]};
-              color: white;
-              padding: 4px 12px;
-              border-radius: 12px;
-              font-size: 12px;
-              font-weight: 600;
-              font-family: monospace;
-             box-shadow: 0 4px 12px rgba(0,0,0,0.25), 0 0 0 2px rgba(255,255,255,0.3);
-              white-space: nowrap;
-            ">${zone.id}</div>`,
+          background: ${colors[idx % colors.length]};
+          color: white;
+          padding: 4px 12px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 600;
+          font-family: monospace;
+         box-shadow: 0 4px 12px rgba(0,0,0,0.25), 0 0 0 2px rgba(255,255,255,0.3);
+          white-space: nowrap;
+         ">${zone.id}</div>`,
               iconSize: [60, 28],
               iconAnchor: [30, 14],
             }),
@@ -452,6 +447,6 @@ export function useMap({ onParcelleChange }) {
     activateDrawTool,
     clearAll,
     flyToWilaya,
-    drawParcelleFromLatLngs, // ✅ NEW: Expose this function
+    drawParcelleFromLatLngs, // ✅ Exposed for Map.jsx integration
   };
 }

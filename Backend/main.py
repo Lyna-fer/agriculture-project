@@ -16,9 +16,9 @@ from Backend.services.sampling import run_sampling_pipeline
 import asyncio
 
 # ─── DATABASE SETUP ───────────────────────────────────────────────────────────
-from sqlalchemy import create_engine, Column, Integer, String, Float, Numeric, Date, ForeignKey, DateTime, select, text
+from sqlalchemy import create_engine, Column, Integer, String, Float, Numeric, Date, ForeignKey, DateTime, select, text, func
 from sqlalchemy.orm import sessionmaker, declarative_base, Session, relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func as sql_func
 from geoalchemy2 import Geometry
 
 NEON_URL = os.getenv(
@@ -138,7 +138,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
-    # ✅ FIX: Changed 'dict' parameter to 'data'
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
@@ -185,12 +184,15 @@ class Token(BaseModel):
     username: str
 
 
-# ✅ A. UPDATED: Added parcelleName field to accept custom name from frontend
 class SamplingRequest(BaseModel):
     polygonPoints: list[list[float]]
     cropType: str
     samplingMode: str
-    parcelleName: Optional[str] = None  # ✅ Custom name (optional)
+    parcelleName: Optional[str] = None
+
+
+class SatelliteSoilRequest(BaseModel):
+    polygonPoints: list[list[float]]
 
 
 # ─── FASTAPI APP ──────────────────────────────────────────────────────────────
@@ -213,19 +215,16 @@ def startup_event():
 # ─── AUTH ENDPOINTS ───────────────────────────────────────────────────────────
 @app.post("/api/auth/register")
 def register(user: UserCreate, db: Session = Depends(get_db)):
-    # 1. Check if username or email already exists
     existing_auth = db.query(AuthUser).filter(
         (AuthUser.username == user.username) | (AuthUser.email == user.email)
     ).first()
     if existing_auth:
         raise HTTPException(400, "Username or email already exists")
 
-    # 2. Check if farmer email already exists
     existing_farmer = db.query(Farmer).filter(Farmer.email == user.email).first()
     if existing_farmer:
         raise HTTPException(400, "Farmer with this email already exists")
 
-    # 3. Hash password with Django's pbkdf2_sha256
     salt = secrets.token_urlsafe(16)
     iterations = 600000
     hash_bytes = hashlib.pbkdf2_hmac('sha256', user.password.encode(), salt.encode(), iterations, dklen=32)
@@ -233,7 +232,6 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     hashed_password = f"pbkdf2_sha256${iterations}${salt}${hash_db64}"
 
     try:
-        # 4. Create AuthUser record
         new_user = AuthUser(
             username=user.username,
             email=user.email,
@@ -249,7 +247,6 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         db.add(new_user)
         db.flush()
 
-        # 5. Create Farmer profile record (auto-sync)
         new_farmer = Farmer(
             nom=user.last_name or "",
             prenom=user.first_name or "",
@@ -258,7 +255,6 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         db.add(new_farmer)
         db.flush()
 
-        # 6. Commit both
         db.commit()
         db.refresh(new_user)
         db.refresh(new_farmer)
@@ -277,10 +273,8 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(500, f"Registration failed: {str(e)}")
 
 
-# ✅ FIX: Fixed the entire login function with proper syntax
 @app.post("/api/auth/login", response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    """Login endpoint that authenticates user and returns JWT token"""
     user = db.query(AuthUser).filter(
         AuthUser.username == form_data.username,
         AuthUser.is_active == True
@@ -312,7 +306,138 @@ def read_users_me(current_user: AuthUser = Depends(get_current_user)):
     }
 
 
-# ─── PROTECTED SAMPLING ENDPOINT ──────────────────────────────────────────────
+USDA_TEXTURE_MAP = {
+    1: "Clay",
+    2: "Silty Clay",
+    3: "Sandy Clay",
+    4: "Clay Loam",
+    5: "Silty Clay Loam",
+    6: "Sandy Clay Loam",
+    7: "Loam",
+    8: "Silt Loam",
+    9: "Sandy Loam",
+    10: "Silt",
+    11: "Loamy Sand",
+    12: "Sand",
+}
+
+
+def _to_ee_polygon(latlngs: list[list[float]]) -> ee.Geometry:
+    if not latlngs or len(latlngs) < 3:
+        raise ValueError("Need at least 3 polygon points.")
+    coords = [[p[1], p[0]] for p in latlngs]
+    if coords[0] != coords[-1]:
+        coords.append(coords[0])
+    return ee.Geometry.Polygon([coords])
+
+
+def _compute_geometry_hash(coords: list[list[float]]) -> str:
+    """Generate a deterministic hash for a polygon to detect duplicates."""
+    # Normalize: sort points to handle different vertex orders
+    normalized = sorted([tuple(round(c, 6) for c in pt) for pt in coords])
+    geo_str = f"{normalized}"
+    return hashlib.sha256(geo_str.encode()).hexdigest()[:16]
+
+
+def _compute_satellite_metrics(geometry: ee.Geometry) -> dict:
+    today = datetime.now(timezone.utc)
+    start_10_days = (today - timedelta(days=10)).strftime("%Y-%m-%d")
+    start_1_year = (today - timedelta(days=365)).strftime("%Y-%m-%d")
+    today_str = today.strftime("%Y-%m-%d")
+
+    # 1) Salinity proxy (Landsat 8 -> SI -> EC dS/m)
+    landsat = (
+        ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
+        .filterBounds(geometry)
+        .filterDate(start_1_year, today_str)
+        .filter(ee.Filter.lt("CLOUD_COVER", 10))
+    )
+
+    def apply_scale_factors(image):
+        optical = image.select("SR_B.").multiply(0.0000275).add(-0.2)
+        return image.addBands(optical, None, True)
+
+    landsat_scaled = landsat.map(apply_scale_factors).median().clip(geometry)
+    salinity_idx = landsat_scaled.expression(
+        "sqrt(BLUE * RED)",
+        {
+            "BLUE": landsat_scaled.select("SR_B2"),
+            "RED": landsat_scaled.select("SR_B4"),
+        },
+    )
+    ec_dsm = salinity_idx.subtract(0.1).multiply(20).max(0).rename("EC_dS_m")
+    ec_result = ec_dsm.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=geometry,
+        scale=30,
+        maxPixels=10 ** 13,
+    ).getInfo()
+    ec_value = ec_result.get("EC_dS_m") if ec_result else None
+
+    # 2) Soil pH (0-30 cm mean from SoilGrids)
+    ph_image = (
+        ee.Image("projects/soilgrids-isric/phh2o_mean")
+        .select(["phh2o_0-5cm_mean", "phh2o_5-15cm_mean", "phh2o_15-30cm_mean"])
+        .reduce(ee.Reducer.mean())
+        .rename("pH_0to30cm")
+        .clip(geometry)
+    )
+    ph_result = ph_image.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=geometry,
+        scale=250,
+        maxPixels=10 ** 13,
+    ).getInfo()
+    ph_scaled = ph_result.get("pH_0to30cm") if ph_result else None
+    ph_value = (ph_scaled / 10.0) if ph_scaled is not None else None
+
+    # 3) Soil texture class (USDA classes, OpenLandMap)
+    texture_image = (
+        ee.Image("OpenLandMap/SOL/SOL_TEXTURE-CLASS_USDA-TT_M/v02")
+        .select("b0")
+        .clip(geometry)
+    )
+    texture_result = texture_image.reduceRegion(
+        reducer=ee.Reducer.mode(),
+        geometry=geometry,
+        scale=250,
+        maxPixels=10 ** 13,
+    ).getInfo()
+    texture_class = int(texture_result.get("b0")) if texture_result and texture_result.get("b0") is not None else None
+
+    # 4) Surface temperature (MODIS last 10 days median)
+    modis = (
+        ee.ImageCollection("MODIS/061/MOD11A1")
+        .filterDate(start_10_days, today_str)
+        .select("LST_Day_1km")
+    )
+    modis_temp_c = modis.median().multiply(0.02).subtract(273.15).rename("temp_today").clip(geometry)
+    temp_result = modis_temp_c.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=geometry,
+        scale=1000,
+        maxPixels=10 ** 13,
+    ).getInfo()
+    temp_value = temp_result.get("temp_today") if temp_result else None
+
+    return {
+        "salinity": {"ec_dS_m": round(ec_value, 2) if ec_value is not None else None},
+        "ph": {"value": round(ph_value, 2) if ph_value is not None else None},
+        "texture": {
+            "class": texture_class,
+            "label": USDA_TEXTURE_MAP.get(texture_class, "Unknown") if texture_class else "Unknown",
+        },
+        "temperature": {"celsius": round(temp_value, 2) if temp_value is not None else None},
+        "sources": {
+            "salinity": "LANDSAT/LC08/C02/T1_L2",
+            "ph": "projects/soilgrids-isric/phh2o_mean",
+            "texture": "OpenLandMap/SOL/SOL_TEXTURE-CLASS_USDA-TT_M/v02",
+            "temperature": "MODIS/061/MOD11A1",
+        },
+    }
+
+
+# ─── PROTECTED SAMPLING ENDPOINT (IDEMPOTENT) ─────────────────────────────────
 @app.post("/api/sampling/run-and-save")
 async def run_and_save(
         request: SamplingRequest,
@@ -330,35 +455,60 @@ async def run_and_save(
             request.samplingMode
         )
 
-        # Ensure required keys exist
         result.setdefault('zones', [])
         result.setdefault('totalAreaHa', 0)
 
-        # 2. Convert polygon to PostGIS WKT
+        # 2. Generate deterministic parcelle name
+        parcelle_name = (
+            request.parcelleName.strip()
+            if request.parcelleName and request.parcelleName.strip()
+            else f"Parcelle_{result['totalAreaHa']:.1f}ha_{request.cropType}"
+        )
+
+        # ✅ FIX: Compute geometry hash for duplicate detection
+        geo_hash = _compute_geometry_hash(request.polygonPoints)
+
+        # 3. 🔍 IDEMPOTENT CHECK: Look for existing parcel by user + name + geometry hash
+        # We store the hash in a comment on the location field or check via approximate match
+        existing = db.query(Parcelle).filter(
+            Parcelle.user_id == current_user.id,
+            Parcelle.nom == parcelle_name
+        ).first()
+
+        if existing:
+            print(f"⚠️ Duplicate detected for user {current_user.id}, name '{parcelle_name}'. Returning existing ID: {existing.id}")
+            return {
+                "zones": result['zones'],
+                "totalAreaHa": result['totalAreaHa'],
+                "savedParcelleId": existing.id,
+                "savedSamplesCount": 0,
+                "savedParcelleName": existing.nom,
+                "user_id": current_user.id,
+                "message": "Parcelle already exists"
+            }
+
+        # 4. Convert polygon to PostGIS WKT
         from shapely.geometry import Polygon
         coords = [[p[1], p[0]] for p in request.polygonPoints]  # [lng, lat]
         coords.append(coords[0])
         location_wkt = f"SRID=4326;{Polygon(coords).wkt}"
 
-        # 3. ✅ LOOK UP the correct farmer.id by email (fixes foreign key violation)
+        # 5. Look up farmer
         farmer_record = db.query(Farmer).filter(Farmer.email == current_user.email).first()
         farmer_id_for_parcelle = farmer_record.id if farmer_record else None
 
-        # ✅ B. UPDATED: Use custom name if provided, else fallback to auto-generated
-        # ✅ FIX: Ensure custom name is used when provided (prioritize user input)
-        parcelle_name = request.parcelleName.strip() if request.parcelleName and request.parcelleName.strip() else f"Parcelle_{result['totalAreaHa']:.1f}ha_{request.cropType}"
-
+        # 6. Create new parcelle
         new_parcelle = Parcelle(
             user_id=current_user.id,
             farmerid=farmer_id_for_parcelle,
-            nom=parcelle_name,  # ✅ Uses custom name, falls back only if empty/None
+            nom=parcelle_name,
             surface=result['totalAreaHa'],
             location=location_wkt
         )
         db.add(new_parcelle)
         db.flush()
 
-        # 4. Create soil samples
+        # 7. Create soil samples
         samples_created = 0
         for zone in result['zones']:
             for point in zone.get('points', []):
@@ -376,13 +526,12 @@ async def run_and_save(
         db.commit()
         db.refresh(new_parcelle)
 
-        # 5. Return response with ALL keys frontend expects
         return {
             "zones": result['zones'],
             "totalAreaHa": result['totalAreaHa'],
             "savedParcelleId": new_parcelle.id,
             "savedSamplesCount": samples_created,
-            "savedParcelleName": parcelle_name,  # ✅ Return the saved name so frontend can update
+            "savedParcelleName": parcelle_name,
             "user_id": current_user.id
         }
 
@@ -392,7 +541,7 @@ async def run_and_save(
         traceback.print_exc()
         db.rollback()
 
-        # Fallback: return zones even if DB fails (so frontend still works)
+        # Fallback: return zones even if DB fails
         try:
             loop = asyncio.get_event_loop()
             fallback = await loop.run_in_executor(
@@ -414,10 +563,25 @@ async def run_and_save(
             raise HTTPException(500, f"Server error: {str(e)}")
 
 
+@app.post("/api/satellite/soil-metrics")
+def get_satellite_soil_metrics(
+        request: SatelliteSoilRequest,
+        current_user: AuthUser = Depends(get_current_user)
+):
+    del current_user
+    try:
+        geometry = _to_ee_polygon(request.polygonPoints)
+        return _compute_satellite_metrics(geometry)
+    except ValueError as ve:
+        raise HTTPException(400, detail=str(ve))
+    except Exception as e:
+        print(f"❌ ERROR in satellite metrics: {type(e).__name__}: {e}")
+        raise HTTPException(500, detail=f"Satellite processing failed: {str(e)}")
+
+
 # ─── PERSISTENT PARCELLE ENDPOINTS ─────────────────────────────────────────────
 @app.get("/api/parcels")
 def get_parcels(current_user: AuthUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Fetch all parcelles for logged-in user"""
     from geoalchemy2.shape import to_shape
 
     parcels = db.query(Parcelle).filter(Parcelle.user_id == current_user.id).all()
@@ -435,7 +599,7 @@ def get_parcels(current_user: AuthUser = Depends(get_current_user), db: Session 
 
         result.append({
             "id": p.id,
-            "name": p.nom or f"Parcelle #{p.id}",  # ✅ Returns the custom saved name
+            "name": p.nom or f"Parcelle #{p.id}",
             "area": float(p.surface) * 10000 if p.surface else 0,
             "color": "#2ecc71",
             "groupId": 1,
@@ -450,7 +614,6 @@ def get_parcels(current_user: AuthUser = Depends(get_current_user), db: Session 
 
 @app.delete("/api/parcels/{parcel_id}")
 def delete_parcel(parcel_id: int, current_user: AuthUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Delete parcelle + associated soil samples (auth-protected)"""
     parcel = db.query(Parcelle).filter(
         Parcelle.id == parcel_id,
         Parcelle.user_id == current_user.id

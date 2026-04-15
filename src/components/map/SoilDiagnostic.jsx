@@ -1,5 +1,4 @@
-
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import "./SoilDiagnostic.css";
 import PortalOverlay from "./PortalOverlay";
 import { getCropsByGroup } from "../../data/cropData";
@@ -7,6 +6,7 @@ import { getCropsByGroup } from "../../data/cropData";
 /* ─── Satellite defaults ─────────────────────────────────────────────────── */
 const SAT_DEFAULTS = { ce: 1.2, temp: 22, tex: "limon-argileux" };
 const SAT_FIELDS   = { ce: "Sentinel-2", temp: "MODIS", tex: "AlphaEarth" };
+const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 /* ─── Zone colour palette ────────────────────────────────────────────────── */
 const ZONE_COLORS = ["#7F77DD","#1D9E75","#E07850","#C05090","#3090C0","#8060A0","#C0A020"];
@@ -20,6 +20,7 @@ const EMOJI_BG = {
   "🫒":"#d8ecd0","🌴":"#d0e8c0","🍊":"#ffe0c0","🍋":"#fff8c8","🍇":"#e0d0f8",
   "🍑":"#ffdcc8","🍎":"#ffd0d0","🍒":"#ffc8cc","🍐":"#e0f0d0",
 };
+
 function inferSeasons(c) {
   if (c.tempMin >= 18) return ["ete"];
   if (c.tempMin >= 15) return ["printemps","ete"];
@@ -27,6 +28,7 @@ function inferSeasons(c) {
   if (c.tempMin <= 5 && c.tempMax <= 25) return ["hiver","printemps","automne"];
   return ["printemps","ete","automne"];
 }
+
 function toCrop(c) {
   return {
     id: c.id, n: c.name, e: c.emoji,
@@ -47,14 +49,17 @@ const ZC = {
   p:    [{c:"#ff8a80",f:20},{c:"#ffcc80",f:15},{c:"#a5d6a7",f:40},{c:"#ffcc80",f:15},{c:"#ff8a80",f:10}],
   k:    [{c:"#ff8a80",f:20},{c:"#ffcc80",f:15},{c:"#a5d6a7",f:40},{c:"#ffcc80",f:15},{c:"#ff8a80",f:10}],
 };
+
 const BS = {
   ph:   v => v<5.5||v>8 ? ["Hors plage","r"] : v<6||v>7.5 ? ["Limite","a"] : ["Optimal","g"],
   ce:   v => v>4         ? ["Critique","r"]   : v>2         ? ["Limite","a"] : ["Normal","g"],
   temp: v => v<8||v>36  ? ["Hors plage","r"] : v<14||v>30  ? ["Limite","a"] : ["Optimal","g"],
 };
+
 const BC  = { g:["#c8f5e0","#1a7a50"], a:["#fff3c8","#b06010"], r:["#ffc8c8","#c02020"] };
 const mc   = m => m>=80 ? "#1a7a50" : m>=60 ? "#b06010" : "#c02020";
 const mcBg = m => m>=80 ? "#c8f5e0" : m>=60 ? "#fff3c8" : "#ffc8c8";
+
 const PARAMS = [
   {id:"ph",  name:"pH",         u:"",     mn:4, mx:9  },
   {id:"ce",  name:"CE",         u:"dS/m", mn:0, mx:6  },
@@ -63,6 +68,7 @@ const PARAMS = [
   {id:"k",   name:"Potassium K",u:"mg/kg",mn:0, mx:400},
   {id:"temp",name:"Temp. sol",  u:"°C",   mn:0, mx:40 },
 ];
+
 const SN = {
   ete:"☀️ Été algérien : vérifiez l'irrigation. Chaleur intense possible.",
   hiver:"❄️ Hiver : risque de gel dans les hauts plateaux. Paillage recommandé.",
@@ -82,6 +88,7 @@ function calcScore(st) {
   if (mo==="tres-bas") s-=12; else if (mo==="bas") s-=5; else if (mo==="excellent") s+=5;
   return Math.max(0, Math.min(100, Math.round(s)));
 }
+
 function pSt(id, v) {
   const R = { ph:[6,7.5], ce:[0,2], n:[30,65], p:[15,35], k:[130,280], temp:[14,30] };
   const [lo,hi] = R[id] || [0,100];
@@ -89,6 +96,7 @@ function pSt(id, v) {
   if (id==="ce") return "hi";
   return v<lo ? "lo" : "hi";
 }
+
 function cropScore(c, st) {
   let m = 100;
   const { ph, ce, temp, n, seas } = st;
@@ -101,6 +109,7 @@ function cropScore(c, st) {
   if (st.mo==="tres-bas" && c.nHi) m -= 8;
   return Math.max(0, Math.round(m));
 }
+
 function cropAdj(c, st) {
   const adj = [];
   const { ph, ce, temp, seas } = st;
@@ -115,29 +124,28 @@ function cropAdj(c, st) {
 /* ─── Default state factory ──────────────────────────────────────────────── */
 const freshSt = (mode = "eco") => ({
   ph: 6.5,
-  ce:   mode==="eco" ? SAT_DEFAULTS.ce   : 1.2,
-  temp: mode==="eco" ? SAT_DEFAULTS.temp : 18,
+  ce:   mode==="eco" || mode==="standard" ? SAT_DEFAULTS.ce   : 1.2,
+  temp: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.temp : 18,
   n: 45, p: 22, k: 180,
-  tex: mode==="eco" ? SAT_DEFAULTS.tex : "limon-argileux",
+  tex: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.tex : "limon-argileux",
   mo: "moyen", seas: "ete", crop: "",
 });
 
-/* 
-   ATOM COMPONENTS
- */
+/* ATOM COMPONENTS */
 function ZoneBar({ id }) {
   if (!ZC[id]) return null;
   return (
     <div className="sd-zones">
-      {ZC[id].map((z,i) => <div key={i} className="sd-zone" style={{flex:z.f,background:z.c}}/>)}
+      {ZC[id].map((z,i) => <div key={i} className="sd-zone" style={{flex:z.f,background:z.c}} />)}
     </div>
   );
 }
+
 function Badge({ id, value }) {
   if (!BS[id]) return null;
   const [lbl,k] = BS[id](value);
   const [bg,c]  = BC[k];
-  return <div className="sd-badge" style={{background:bg,color:c}}><span className="sd-badge-dot" style={{background:c}}/>{lbl}</div>;
+  return <div className="sd-badge" style={{background:bg,color:c}}><span className="sd-badge-dot" style={{background:c}} />{lbl}</div>;
 }
 
 function Slider({ id, label, unit, min, max, step, value, onChange, zones, badge, l, m, r, locked, src }) {
@@ -152,8 +160,8 @@ function Slider({ id, label, unit, min, max, step, value, onChange, zones, badge
           {locked && (
             <span className="sd-sat-tag">
               <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
-                <circle cx="3.5" cy="3.5" r="2.8" stroke="currentColor" strokeWidth="1.1"/>
-                <circle cx="3.5" cy="3.5" r="1" fill="currentColor"/>
+                <circle cx="3.5" cy="3.5" r="2.8" stroke="currentColor" strokeWidth="1.1" />
+                <circle cx="3.5" cy="3.5" r="1" fill="currentColor" />
               </svg>
               {src}
             </span>
@@ -176,8 +184,8 @@ function Slider({ id, label, unit, min, max, step, value, onChange, zones, badge
       {locked && (
         <div className="sd-sat-lock">
           <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-            <rect x="1.5" y="4" width="6" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.1"/>
-            <path d="M3 4V2.8a1.5 1.5 0 013 0V4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+            <rect x="1.5" y="4" width="6" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.1" />
+            <path d="M3 4V2.8a1.5 1.5 0 013 0V4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
           </svg>
           Importé depuis {src}
         </div>
@@ -186,28 +194,25 @@ function Slider({ id, label, unit, min, max, step, value, onChange, zones, badge
   );
 }
 
-/* 
-   ZONE FORM 
-    
-  */
+/* ZONE FORM */
 function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange, crops, cultureLabel, onAnalyze, analyzing ,hasResult}) {
+  // ✅ LOCK fields ONLY in Eco mode. Standard mode stays fully editable.
   const isSat = id => diagMode === "eco" && id in SAT_FIELDS;
 
   return (
     <div className="sd-fc">
-  
       <div className="sd-zone-strip" style={{background: light, borderLeft: `4px solid ${color}`}}>
-        <div className="sd-zone-strip-dot" style={{background: color}}/>
+        <div className="sd-zone-strip-dot" style={{background: color}} />
         <span className="sd-zone-strip-name" style={{color}}>Zone {zoneIdx + 1}</span>
         <span className="sd-zone-strip-hint">Renseignez les propriétés du sol de cette zone</span>
       </div>
 
-      {/* Satellite notice (eco mode only, inline — not a big banner) */}
+      {/* Satellite notice (Eco mode only) */}
       {diagMode === "eco" && (
         <div className="sd-sat-notice">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2"/>
-            <circle cx="5" cy="5" r="1.5" fill="currentColor"/>
+            <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2" />
+            <circle cx="5" cy="5" r="1.5" fill="currentColor" />
           </svg>
           CE · Température · Texture importés par satellite — non modifiables
         </div>
@@ -216,17 +221,17 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
       {/* 1 — Chimie */}
       <div className="sd-sec">
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>1</span>Chimie du sol</div>
-        <Slider id="ph"   label="pH du sol"          unit="pH"   min={4}  max={9}  step={0.1} value={st.ph}   onChange={onChange} zones badge l="4.0 Acide"  m="6.5 Neutre"      r="9.0 Alcalin"/>
-        <Slider id="ce"   label="Salinité (CE)"      unit="dS/m" min={0}  max={6}  step={0.1} value={st.ce}   onChange={onChange} zones badge l="0 Nul"       m="2.0 Limite"      r="6.0 Critique"   locked={isSat("ce")}   src="Sentinel-2"/>
-        <Slider id="temp" label="Température du sol" unit="°C"   min={0}  max={40} step={1}   value={st.temp} onChange={onChange} zones badge l="0°C Froid"   m="15–25°C Optimal" r="40°C Chaud"     locked={isSat("temp")} src="MODIS"/>
+        <Slider id="ph"   label="pH du sol"          unit="pH"   min={4}  max={9}  step={0.1} value={st.ph}   onChange={onChange} zones badge l="4.0 Acide"  m="6.5 Neutre"      r="9.0 Alcalin" />
+        <Slider id="ce"   label="Salinité (CE)"      unit="dS/m" min={0}  max={6}  step={0.1} value={st.ce}   onChange={onChange} zones badge l="0 Nul"       m="2.0 Limite"      r="6.0 Critique"   locked={isSat("ce")}   src="Sentinel-2" />
+        <Slider id="temp" label="Température du sol" unit="°C"   min={0}  max={40} step={1}   value={st.temp} onChange={onChange} zones badge l="0°C Froid"   m="15–25°C Optimal" r="40°C Chaud"     locked={isSat("temp")} src="MODIS" />
       </div>
 
       {/* 2 — NPK */}
       <div className="sd-sec">
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>2</span>Fertilité NPK</div>
-        <Slider id="n" label="Azote (N)"     unit="mg/kg" min={0}  max={100} step={1} value={st.n} onChange={onChange} zones l="Faible"  m="30–60 Optimal" r="Élevé"/>
-        <Slider id="p" label="Phosphore (P)" unit="mg/kg" min={0}  max={50}  step={1} value={st.p} onChange={onChange} zones l="0"        m="15–30 Optimal" r="50"/>
-        <Slider id="k" label="Potassium (K)" unit="mg/kg" min={0}  max={400} step={5} value={st.k} onChange={onChange} zones l="0"        m="130–250 Opt."  r="400"/>
+        <Slider id="n" label="Azote (N)"     unit="mg/kg" min={0}  max={100} step={1} value={st.n} onChange={onChange} zones l="Faible"  m="30–60 Optimal" r="Élevé" />
+        <Slider id="p" label="Phosphore (P)" unit="mg/kg" min={0}  max={50}  step={1} value={st.p} onChange={onChange} zones l="0"        m="15–30 Optimal" r="50" />
+        <Slider id="k" label="Potassium (K)" unit="mg/kg" min={0}  max={400} step={5} value={st.k} onChange={onChange} zones l="0"        m="130–250 Opt."  r="400" />
       </div>
 
       {/* 3 — Physique */}
@@ -239,8 +244,8 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
               {isSat("tex") && (
                 <span className="sd-sat-tag" style={{marginLeft:5}}>
                   <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
-                    <circle cx="3.5" cy="3.5" r="2.8" stroke="currentColor" strokeWidth="1.1"/>
-                    <circle cx="3.5" cy="3.5" r="1" fill="currentColor"/>
+                    <circle cx="3.5" cy="3.5" r="2.8" stroke="currentColor" strokeWidth="1.1" />
+                    <circle cx="3.5" cy="3.5" r="1" fill="currentColor" />
                   </svg>
                   AlphaEarth
                 </span>
@@ -256,7 +261,7 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
                 <div key={o.val}
                   className={`sd-opt ${st.tex===o.val?"sd-opt--on":""} ${isSat("tex")?"sd-opt--locked":""}`}
                   onClick={() => !isSat("tex") && onChange("tex", o.val)}>
-                  <div className="sd-opt-r"><div className="sd-opt-dot"/></div>
+                  <div className="sd-opt-r"><div className="sd-opt-dot" /></div>
                   <div>
                     <div className="sd-opt-lbl">{o.label}</div>
                     <div className="sd-opt-sub">{o.sub}</div>
@@ -264,8 +269,8 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
                   {isSat("tex") && st.tex===o.val && (
                     <div className="sd-opt-sat-mark">
                       <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-                        <circle cx="4.5" cy="4.5" r="3.5" stroke="#1D9E75" strokeWidth="1.1"/>
-                        <circle cx="4.5" cy="4.5" r="1.2" fill="#1D9E75"/>
+                        <circle cx="4.5" cy="4.5" r="3.5" stroke="#1D9E75" strokeWidth="1.1" />
+                        <circle cx="4.5" cy="4.5" r="1.2" fill="#1D9E75" />
                       </svg>
                     </div>
                   )}
@@ -286,7 +291,7 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
                 <div key={o.val}
                   className={`sd-opt ${st.mo===o.val?"sd-opt--on":""}`}
                   onClick={() => onChange("mo", o.val)}>
-                  <div className="sd-opt-r"><div className="sd-opt-dot"/></div>
+                  <div className="sd-opt-r"><div className="sd-opt-dot" /></div>
                   <div><div className="sd-opt-lbl">{o.label}</div></div>
                 </div>
               ))}
@@ -332,72 +337,69 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
             {crops.map(c => <option key={c.id} value={c.id}>{c.e} {c.n}</option>)}
           </select>
           <svg className="sd-sel-arrow" width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path d="M2 4.5l4.5 4.5 4.5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M2 4.5l4.5 4.5 4.5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
       </div>
 
       {/* Submit */}
-<div className="sd-sub-wrap">
-  {hasResult ? (
-    
-    nZones > 1 && zoneIdx < nZones - 1 ? (
-      <button
-        className="sd-sub-btn"
-        style={{
-          background: `linear-gradient(135deg,${color},${color}cc)`,
-          boxShadow: `0 6px 0 ${color}44,0 10px 24px ${color}28`
-        }}
-        onClick={onNext}
-      >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M5 2l6 5-6 5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        Analyser Zone {zoneIdx + 2}
-      </button>
-    ) : (
-      <div className="sd-all-done-btn">
-        <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-          <path d="M2.5 7.5l3.5 3.5 6.5-7" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        Toutes les zones analysées ✓
+      <div className="sd-sub-wrap">
+        {hasResult ? (
+          nZones > 1 && zoneIdx < nZones - 1 ? (
+            <button
+              className="sd-sub-btn"
+              style={{
+                background: `linear-gradient(135deg,${color},${color}cc)`,
+                boxShadow: `0 6px 0 ${color}44,0 10px 24px ${color}28`
+              }}
+              onClick={onNext}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M5 2l6 5-6 5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Analyser Zone {zoneIdx + 2}
+            </button>
+          ) : (
+            <div className="sd-all-done-btn">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                <path d="M2.5 7.5l3.5 3.5 6.5-7" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Toutes les zones analysées ✓
+            </div>
+          )
+        ) : (
+          <button
+            className="sd-sub-btn"
+            style={{
+              background: `linear-gradient(135deg,${color},${color}cc)`,
+              boxShadow: `0 6px 0 ${color}44,0 10px 24px ${color}28`
+            }}
+            disabled={analyzing}
+            onClick={onAnalyze}
+          >
+            {analyzing ? (
+              <>
+                <svg width="16" height="16" viewBox="0 0 16 16" style={{animation:"sd-spin .7s linear infinite"}}>
+                  <path d="M14 8a6 6 0 11-6-6" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none" />
+                </svg>
+                Analyse en cours…
+              </>
+            ) : (
+              <>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M3 8.5L6.5 12l6.5-8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                Analyser la Zone {zoneIdx + 1}
+              </>
+            )}
+          </button>
+        )}
       </div>
-    )
-  ) : (
-    <button
-      className="sd-sub-btn"
-      style={{
-        background: `linear-gradient(135deg,${color},${color}cc)`,
-        boxShadow: `0 6px 0 ${color}44,0 10px 24px ${color}28`
-      }}
-      disabled={analyzing}
-      onClick={onAnalyze}
-    >
-      {analyzing ? (
-        <>
-          <svg width="16" height="16" viewBox="0 0 16 16" style={{animation:"sd-spin .7s linear infinite"}}>
-            <path d="M14 8a6 6 0 11-6-6" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none"/>
-          </svg>
-          Analyse en cours…
-        </>
-      ) : (
-        <>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 8.5L6.5 12l6.5-8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Analyser la Zone {zoneIdx + 1}
-        </>
-      )}
-    </button>
-  )}
-</div>
     </div>
   );
 }
 
-/* 
-   RESULTS VIEW 
- */
+/* RESULTS VIEW */
 function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNext }) {
   const sc = calcScore(st), scC = mc(sc), scBg = mcBg(sc);
   const scLbl = sc>=80 ? "Excellent 🎉" : sc>=60 ? "À améliorer" : "Difficile";
@@ -415,7 +417,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
           <div>
             <div className="sd-score-eyebrow">Rapport de sol</div>
             <div className="sd-score-title">
-              Votre sol est<br/>
+              Votre sol est<br />
               <em style={{color:scC}}>{sc>=80?"prêt à cultiver":sc>=60?"à optimiser":"à améliorer"}</em>
             </div>
           </div>
@@ -428,11 +430,11 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
         <div className="sd-score-desc">
           {sc>=80?"Conditions favorables. Vous pouvez démarrer votre campagne dès maintenant.":"Des ajustements sont recommandés pour optimiser vos rendements."}
         </div>
-        {diagMode==="eco" && (
+        {(diagMode==="eco" || diagMode==="standard") && (
           <div className="sd-eco-tag">
             <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-              <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.1"/>
-              <circle cx="4.5" cy="4.5" r="1.2" fill="currentColor"/>
+              <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.1" />
+              <circle cx="4.5" cy="4.5" r="1.2" fill="currentColor" />
             </svg>
             Données satellite incluses
           </div>
@@ -444,9 +446,9 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
         <div className="sd-sea-alert sd-a2"
           style={{background:iw?"rgba(160,200,255,.18)":"rgba(255,220,120,.18)",borderColor:iw?"rgba(100,160,240,.3)":"rgba(220,160,40,.3)",color:iw?"#1e40af":"#92400e"}}>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <path d="M8 2L1 14h14L8 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-            <path d="M8 6.5v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-            <circle cx="8" cy="12" r=".7" fill="currentColor"/>
+            <path d="M8 2L1 14h14L8 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+            <path d="M8 6.5v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            <circle cx="8" cy="12" r=".7" fill="currentColor" />
           </svg>
           {sn}
         </div>
@@ -461,19 +463,19 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
               const pct = (((v-p.mn)/(p.mx-p.mn))*100).toFixed(1);
               const [bg2,c2] = {ok:["#c8f5e0","#1a7a50"],lo:["#fff3c8","#b06010"],hi:["#ffc8c8","#c02020"]}[sta];
               const pill = {ok:"✓ OK",lo:"↓ Bas",hi:"↑ Élevé"}[sta];
-              const isSatPill = diagMode==="eco" && SAT_FIELDS[p.id];
+              const isSatPill = (diagMode==="eco" || diagMode==="standard") && SAT_FIELDS[p.id];
               return (
                 <div key={p.id} className={`sd-param-pill ${isSatPill?"sd-param-pill--sat":""}`} style={{borderBottom:`3px solid ${c2}40`}}>
                   <div className="sd-param-pill-top">
                     <span className="sd-param-pill-name">
                       {p.name}
-                      {isSatPill && <span className="sd-param-sat-dot"/>}
+                      {isSatPill && <span className="sd-param-sat-dot" />}
                     </span>
                     <span className="sd-param-pill-badge" style={{background:bg2,color:c2}}>{pill}</span>
                   </div>
                   <div className="sd-param-pill-val">{Number.isInteger(v)?v:v.toFixed(1)}<small>{p.u}</small></div>
                   <div className="sd-param-bar" style={{background:bg2}}>
-                    <div className="sd-param-bar-inner" style={{width:`${pct}%`,background:c2}}/>
+                    <div className="sd-param-bar-inner" style={{width:`${pct}%`,background:c2}} />
                   </div>
                 </div>
               );
@@ -515,7 +517,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
                         <div key={bid} className="sd-rec-mbar">
                           <div className="sd-rec-mbar-lbl">{["pH","CE","Temp"][j]}</div>
                           <div className="sd-rec-mbar-track">
-                            <div className="sd-rec-mbar-fill" style={{width:`${bp}%`,background:bc}}/>
+                            <div className="sd-rec-mbar-fill" style={{width:`${bp}%`,background:bc}} />
                           </div>
                         </div>
                       );
@@ -605,44 +607,41 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
       <div className="sd-act-row sd-a5">
         <button className="sd-act sd-act-s" onClick={onReset}>
           <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
-            <path d="M2 6.5a4.5 4.5 0 118 2.8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            <path d="M10.2 9.5l.6 2.2 2-1.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M2 6.5a4.5 4.5 0 118 2.8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M10.2 9.5l.6 2.2 2-1.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           Modifier
         </button>
         {nZones > 1 && zoneIdx < nZones - 1 ? (
-    <button
-      className="sd-act sd-act-next"
-      style={{
-        flex: 1,
-        justifyContent: 'center',
-        background: `linear-gradient(135deg,${color},${color}cc)`,
-        boxShadow: `0 4px 0 ${color}44`
-      }}
-      onClick={onNext}
-    >
-      Analyser Zone {zoneIdx + 2}
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-        <path d="M4.5 2L9 6l-4.5 4" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    </button>
-  ) : (
-
-        <button className="sd-act sd-act-p">
-          <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
-            <path d="M6.5 1v8M3 7l3.5 3.5L10 7M1 12h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Télécharger le rapport
-        </button>
-  )}
+          <button
+            className="sd-act sd-act-next"
+            style={{
+              flex: 1,
+              justifyContent: 'center',
+              background: `linear-gradient(135deg,${color},${color}cc)`,
+              boxShadow: `0 4px 0 ${color}44`
+            }}
+            onClick={onNext}
+          >
+            Analyser Zone {zoneIdx + 2}
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M4.5 2L9 6l-4.5 4" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        ) : (
+          <button className="sd-act sd-act-p">
+            <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+              <path d="M6.5 1v8M3 7l3.5 3.5L10 7M1 12h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Télécharger le rapport
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-/* 
-   MAIN 
-*/
+/* MAIN COMPONENT */
 export default function SoilDiagnostic({
   open, onClose,
   parcelleName   = "Parcelle A",
@@ -673,7 +672,67 @@ export default function SoilDiagnostic({
     }
   }, [open]);
 
-  /* Mode toggle  */
+  /* ✅ FIXED: Fetch satellite data in BOTH eco AND standard mode */
+  useEffect(() => {
+    const fetchSatelliteData = async () => {
+      // ✅ FIX: Removed `!parcelle?.id` check.
+      // New parcels don't have an ID yet, but the satellite API only needs coordinates.
+      if (!open || (diagMode !== "eco" && diagMode !== "standard") || !parcelle?.latlngs?.length) return;
+
+      // Only fetch if values are still defaults (avoids overwriting user edits)
+      const currentSt = zoneStates[activeZone];
+      if (currentSt.ce !== SAT_DEFAULTS.ce || currentSt.temp !== SAT_DEFAULTS.temp) return;
+
+      const token = localStorage.getItem("token");
+
+      try {
+        // ✅ FIX: Normalize coordinates to prevent 422 errors.
+        // Backend expects [[lat, lng], ...]. New parcels often have [{lat, lng}, ...].
+        const safeCoords = parcelle.latlngs.map(pt => {
+          if (Array.isArray(pt)) return pt; // Already [lat, lng]
+          return [pt.lat, pt.lng];          // Convert {lat, lng} to [lat, lng]
+        });
+
+        const response = await fetch(
+          `${API_BASE}/api/satellite/soil-metrics`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { "Authorization": `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({
+              polygonPoints: safeCoords
+            })
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log("🛰️ Satellite data fetched:", data);
+
+          setZoneStates(prev => {
+            const next = [...prev];
+            next[activeZone] = {
+              ...next[activeZone],
+              ce: data.salinity?.ec_dS_m ?? next[activeZone].ce,
+              temp: data.temperature?.celsius ?? next[activeZone].temp,
+              tex: mapSoilTypeToTexture(data.texture?.label) ?? next[activeZone].tex,
+            };
+            return next;
+          });
+        }
+      } catch (error) {
+        console.warn("⚠️ Satellite fetch failed:", error);
+      }
+    };
+
+    if (open) {
+      fetchSatelliteData();
+    }
+  }, [open, parcelle, diagMode, activeZone, zoneStates]);
+
+  /* Mode toggle */
   const canToggleMode = zoneResults.every(r => !r);
   const handleModeChange = useCallback(newMode => {
     if (!canToggleMode) return;
@@ -716,8 +775,9 @@ export default function SoilDiagnostic({
   const doneCount = zoneResults.filter(Boolean).length;
 
   console.log("zoneResults:", zoneResults);
-console.log("activeZone:", activeZone);
-console.log("current result:", zoneResults[activeZone]);
+  console.log("activeZone:", activeZone);
+  console.log("current result:", zoneResults[activeZone]);
+
   return (
     <PortalOverlay zIndex={2500}>
       <div className="sd-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
@@ -728,19 +788,19 @@ console.log("current result:", zoneResults[activeZone]);
             <div className="sd-tb-logo">
               <div className="sd-tb-icon">
                 <svg viewBox="0 0 16 16" fill="none">
-                  <path d="M8 1L1 4.5l7 3.5 7-3.5L8 1zM1 10l7 3.5L15 10M1 7l7 3.5L15 7" stroke="white" strokeWidth="1.4" strokeLinejoin="round"/>
+                  <path d="M8 1L1 4.5l7 3.5 7-3.5L8 1zM1 10l7 3.5L15 10M1 7l7 3.5L15 7" stroke="white" strokeWidth="1.4" strokeLinejoin="round" />
                 </svg>
               </div>
               <span className="sd-tb-name">Analyse<span>Soil</span></span>
             </div>
 
             <div className="sd-tb-chip">
-              <div className="sd-tb-dot"/>
+              <div className="sd-tb-dot" />
               <span className="sd-tb-cname">{parcelleName}</span>
               <span className="sd-tb-csub">· {cultureLabel}</span>
             </div>
 
-            {/* MODE TOGGLE  */}
+            {/* MODE TOGGLE */}
             <div className="sd-mode-toggle" title={!canToggleMode ? "Le mode ne peut plus être changé après analyse" : ""}>
               <button
                 className={`sd-mode-toggle-btn ${diagMode==="eco" ? "sd-mode-toggle-btn--on" : ""}`}
@@ -748,8 +808,8 @@ console.log("current result:", zoneResults[activeZone]);
                 onClick={() => handleModeChange("eco")}
               >
                 <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-                  <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.2"/>
-                  <circle cx="4.5" cy="4.5" r="1.3" fill="currentColor"/>
+                  <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.2" />
+                  <circle cx="4.5" cy="4.5" r="1.3" fill="currentColor" />
                 </svg>
                 Éco
               </button>
@@ -759,7 +819,7 @@ console.log("current result:", zoneResults[activeZone]);
                 onClick={() => handleModeChange("standard")}
               >
                 <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-                  <path d="M1.5 4.5h6M4.5 1.5v6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                  <path d="M1.5 4.5h6M4.5 1.5v6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                 </svg>
                 Standard
               </button>
@@ -773,13 +833,13 @@ console.log("current result:", zoneResults[activeZone]);
               )}
               <button className="sd-tb-close" onClick={onClose}>
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                  <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                 </svg>
               </button>
             </div>
           </div>
 
-          {/*  ZONE TABS  */}
+          {/* ZONE TABS */}
           {n > 1 && (
             <div className="sd-zone-tabs">
               {Array.from({length: n}, (_,i) => {
@@ -795,10 +855,10 @@ console.log("current result:", zoneResults[activeZone]);
                   >
                     {done && !on ? (
                       <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                        <path d="M2 5l2.5 2.5 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M2 5l2.5 2.5 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     ) : (
-                      <span className="sd-zone-tab-dot" style={on?{background:"rgba(255,255,255,.3)"}:{background:zc}}/>
+                      <span className="sd-zone-tab-dot" style={on?{background:"rgba(255,255,255,.3)"}:{background:zc}} />
                     )}
                     Zone {i+1}
                     {done && !on && (
@@ -810,7 +870,7 @@ console.log("current result:", zoneResults[activeZone]);
             </div>
           )}
 
-          {/*  TWO-COLUMN LAYOUT  */}
+          {/* TWO-COLUMN LAYOUT */}
           <div className="sd-layout">
             <ZoneForm
               key={`${activeZone}-${diagMode}`}
@@ -835,14 +895,14 @@ console.log("current result:", zoneResults[activeZone]);
                   <div className="sd-idle-blob" style={{background:`linear-gradient(135deg,${light},#d0f4e8)`}}>
                     <svg width="40" height="40" viewBox="0 0 44 44" fill="none">
                       <path d="M22 6L6 15l16 9 16-9L22 6zM6 29l16 9 16-9M6 22l16 9 16-9"
-                        stroke={color} strokeWidth="2.2" strokeLinejoin="round" opacity=".6"/>
+                        stroke={color} strokeWidth="2.2" strokeLinejoin="round" opacity=".6" />
                     </svg>
                   </div>
                   <div className="sd-idle-zone-pill" style={{background:color}}>Zone {activeZone + 1}</div>
                   <div className="sd-idle-t">Résultats ici</div>
                   <div className="sd-idle-s">
-                    {diagMode==="eco"
-                      ? "Mode Éco actif. CE, Temp et Texture sont pré-chargés. Renseignez NPK et lancez l'analyse."
+                    {(diagMode==="eco" || diagMode==="standard")
+                      ? "Mode actif. CE, Temp et Texture sont pré-chargés par satellite. Renseignez NPK et lancez l'analyse."
                       : "Renseignez les paramètres du sol et lancez l'analyse pour obtenir vos recommandations."}
                   </div>
                 </div>
@@ -865,4 +925,19 @@ console.log("current result:", zoneResults[activeZone]);
       </div>
     </PortalOverlay>
   );
+}
+
+/* Helper to map soil type to texture options */
+function mapSoilTypeToTexture(soilType) {
+  const map = {
+    "Clay": "argileux",
+    "Silty Clay": "limon-argileux",
+    "Sandy Clay": "limon-argileux",
+    "Clay Loam": "limon-argileux",
+    "Loam": "limoneux",
+    "Silt Loam": "limoneux",
+    "Sandy Loam": "sableux",
+    "Sand": "sableux",
+  };
+  return map[soilType] || "limon-argileux";
 }
