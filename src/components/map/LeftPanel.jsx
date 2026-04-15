@@ -19,6 +19,7 @@ function fmtArea(sqm) {
   return `${Math.round(sqm).toLocaleString("fr-FR")} m²`;
 }
 
+// ✅ FIXED: FieldThumb now handles both [[lat, lng], ...] and [{lat, lng}, ...] formats
 function FieldThumb({ color, latlngs, index = 0 }) {
   const shapes = [
     "30,5 55,8 58,30 35,38 8,28",
@@ -26,6 +27,8 @@ function FieldThumb({ color, latlngs, index = 0 }) {
     "5,18 38,5 58,14 56,38 28,44 7,32",
     "14,6 52,10 58,32 36,44 8,36",
   ];
+
+  // Show placeholder if not enough points
   if (!latlngs || latlngs.length < 3) {
     return (
       <svg width="46" height="42" viewBox="0 0 64 48" style={{ flexShrink: 0 }}>
@@ -40,25 +43,36 @@ function FieldThumb({ color, latlngs, index = 0 }) {
       </svg>
     );
   }
-  const W = 64,
-    H = 48,
-    PAD = 5;
-  const lats = latlngs.map((p) => p.lat);
-  const lngs = latlngs.map((p) => p.lng);
-  const minLat = Math.min(...lats),
-    maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs),
-    maxLng = Math.max(...lngs);
+
+  const W = 64, H = 48, PAD = 5;
+
+  // ✅ Normalize latlngs: convert arrays to objects if needed
+  const normalizedLatLngs = latlngs.map(p => {
+    if (Array.isArray(p)) {
+      return { lat: p[0], lng: p[1] };
+    }
+    return p; // Already in {lat, lng} format
+  });
+
+  // Calculate bounds for scaling
+  const lats = normalizedLatLngs.map((p) => p.lat);
+  const lngs = normalizedLatLngs.map((p) => p.lng);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+
   const rangeX = maxLng - minLng || 0.0001;
   const rangeY = maxLat - minLat || 0.0001;
   const scale = Math.min((W - PAD * 2) / rangeX, (H - PAD * 2) / rangeY);
-  const pts = latlngs
+
+  // Generate SVG polygon points
+  const pts = normalizedLatLngs
     .map((p) => {
       const x = PAD + (p.lng - minLng) * scale;
       const y = H - PAD - (p.lat - minLat) * scale;
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
+
   return (
     <svg
       width="46"
@@ -95,7 +109,7 @@ export default function LeftPanel({
   onClearAll,
   onSaveParcelle,
   onCancelDraw,
-  isAnalyzing = false, // ✅ NEW: Loading state prop
+  isAnalyzing = false,
 }) {
   const canGenerate = !!selectedParcelle && !!selectedGroup;
   const totalArea = parcelles.reduce((s, p) => s + (p.area || 0), 0);
@@ -179,7 +193,7 @@ export default function LeftPanel({
             </div>
             {parcelles.map((p, i) => {
               const cg = CULTURES.find((g) => g.id === p.groupId);
-              const Icon = cg.icon;
+              const Icon = cg?.icon;
               return (
                 <div
                   key={p.id}
@@ -192,6 +206,7 @@ export default function LeftPanel({
                       style={{ background: p.color }}
                     />
                   )}
+                  {/* ✅ FieldThumb now handles backend's [[lat, lng]] format */}
                   <FieldThumb color={p.color} latlngs={p.latlngs} index={i} />
                   <div className="lp-field-info">
                     <div className="lp-field-name">{p.name}</div>
@@ -202,7 +217,7 @@ export default function LeftPanel({
                           className="lp-field-culture-tag"
                           style={{ color: cg.color, background: cg.colorLight }}
                         >
-                          <Icon size={14} color={cg.iconColor} />
+                          {Icon && <Icon size={14} color={cg.iconColor} />}
                           {cg.nameShort}
                         </span>
                       )}
@@ -268,7 +283,6 @@ export default function LeftPanel({
           </div>
         )}
 
-        {/* ✅ UPDATED: "Générer" button with loading state */}
         <button
           className={`lp-gen ${canGenerate ? "ready" : ""} ${isAnalyzing ? "loading" : ""}`}
           disabled={!canGenerate || isAnalyzing}
