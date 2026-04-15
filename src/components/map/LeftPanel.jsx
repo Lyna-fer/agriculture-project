@@ -129,6 +129,7 @@ export default function LeftPanel({
           <div className="lp-brand-name">Agric</div>
           <div className="lp-brand-sub">Soil Sampling · Algeria</div>
         </div>
+        <div className="lp-brand-badge">Field Lab</div>
       </div>
 
       <div className="lp-drawtoolbar">
@@ -190,6 +191,9 @@ export default function LeftPanel({
                 {parcelles.length} parcel{parcelles.length > 1 ? "s" : ""}
               </span>
               <span className="lp-list-total">{fmtArea(totalArea)}</span>
+            </div>
+            <div className="lp-list-caption">
+              Select a parcel to continue the sampling workflow and generate its guide.
             </div>
             {parcelles.map((p, i) => {
               const cg = CULTURES.find((g) => g.id === p.groupId);

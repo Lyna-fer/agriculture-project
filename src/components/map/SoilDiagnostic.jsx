@@ -50,13 +50,6 @@ const ZC = {
   k:    [{c:"#ff8a80",f:20},{c:"#ffcc80",f:15},{c:"#a5d6a7",f:40},{c:"#ffcc80",f:15},{c:"#ff8a80",f:10}],
 };
 
-const BS = {
-  ph:   v => v<5.5||v>8 ? ["Hors plage","r"] : v<6||v>7.5 ? ["Limite","a"] : ["Optimal","g"],
-  ce:   v => v>4         ? ["Critique","r"]   : v>2         ? ["Limite","a"] : ["Normal","g"],
-  temp: v => v<8||v>36  ? ["Hors plage","r"] : v<14||v>30  ? ["Limite","a"] : ["Optimal","g"],
-};
-
-const BC  = { g:["#c8f5e0","#1a7a50"], a:["#fff3c8","#b06010"], r:["#ffc8c8","#c02020"] };
 const mc   = m => m>=80 ? "#1a7a50" : m>=60 ? "#b06010" : "#c02020";
 const mcBg = m => m>=80 ? "#c8f5e0" : m>=60 ? "#fff3c8" : "#ffc8c8";
 
@@ -141,13 +134,6 @@ function ZoneBar({ id }) {
   );
 }
 
-function Badge({ id, value }) {
-  if (!BS[id]) return null;
-  const [lbl,k] = BS[id](value);
-  const [bg,c]  = BC[k];
-  return <div className="sd-badge" style={{background:bg,color:c}}><span className="sd-badge-dot" style={{background:c}} />{lbl}</div>;
-}
-
 function Slider({ id, label, unit, min, max, step, value, onChange, zones, badge, l, m, r, locked, src }) {
   const pct = ((value - min) / (max - min)) * 100;
   const fill = locked ? "#5DCAA5" : "#5ed4a0";
@@ -180,7 +166,6 @@ function Slider({ id, label, unit, min, max, step, value, onChange, zones, badge
       />
       {zones && <ZoneBar id={id}/>}
       <div className="sd-slider-scale"><span>{l}</span>{m && <span>{m}</span>}<span>{r}</span></div>
-      {badge && !locked && <Badge id={id} value={value}/>}
       {locked && (
         <div className="sd-sat-lock">
           <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
@@ -430,6 +415,13 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
         <div className="sd-score-desc">
           {sc>=80?"Conditions are favorable. You can start your season now.":"Adjustments are recommended to optimize yields."}
         </div>
+        <div className="sd-score-meta">
+          <span className="sd-score-meta-chip">Season: {st.seas}</span>
+          <span className="sd-score-meta-chip">Texture: {st.tex}</span>
+          <span className="sd-score-meta-chip">
+            {diagMode==="eco" || diagMode==="standard" ? "Satellite-assisted" : "Manual inputs"}
+          </span>
+        </div>
         {(diagMode==="eco" || diagMode==="standard") && (
           <div className="sd-eco-tag">
             <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
@@ -495,6 +487,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
             {recs.map((c,i) => (
               <div key={c.id} className={`sd-rec-card ${i===0?"sd-rec-card--top":""}`}>
                 <div className="sd-rec-top">
+                  <div className="sd-rec-rank">#{i + 1}</div>
                   <div className="sd-rec-emoji" style={{background:c.bg}}>{c.e}</div>
                   <div className="sd-rec-info">
                     <div className="sd-rec-name">{c.n}</div>
@@ -507,6 +500,10 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
                   </div>
                 </div>
                 <div className="sd-rec-bottom">
+                  <div className="sd-rec-chip-row">
+                    <span className="sd-rec-chip">Season match</span>
+                    <span className="sd-rec-chip">Field-ready</span>
+                  </div>
                   <div className="sd-rec-mini-bars">
                     {["ph","ce","temp"].map((bid,j) => {
                       const sv = pSt(bid,st[bid]);
@@ -545,6 +542,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
               <div className="sd-sec-head"><span className="sd-sec-head-t">🔎 Analysis - {tgt.n}</span></div>
               <div className="sd-verd-card">
                 <div className="sd-verd-top">
+                  <div className="sd-verd-chip">Selected crop</div>
                   <div className="sd-verd-emoji" style={{background:tgt.bg}}>{tgt.e}</div>
                   <div className="sd-verd-info">
                     <div className="sd-verd-name">{tgt.n}</div>
@@ -584,6 +582,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
                   {alts.map(c => (
                     <div key={c.id} className="sd-rec-card">
                       <div className="sd-rec-top">
+                        <div className="sd-rec-rank">Alt</div>
                         <div className="sd-rec-emoji" style={{background:c.bg}}>{c.e}</div>
                         <div className="sd-rec-info">
                           <div className="sd-rec-name">{c.n}</div>
@@ -594,7 +593,12 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
                           <div className="sd-rec-pct-lbl">compatibility</div>
                         </div>
                       </div>
-                      <div className="sd-rec-bottom"><div className="sd-rec-note">{c.note}</div></div>
+                      <div className="sd-rec-bottom">
+                        <div className="sd-rec-chip-row">
+                          <span className="sd-rec-chip">Alternative</span>
+                        </div>
+                        <div className="sd-rec-note">{c.note}</div>
+                      </div>
                     </div>
                   ))}
                 </div>
