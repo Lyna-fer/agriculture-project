@@ -13,6 +13,12 @@ import {
   authenticateGEE,
 } from "../lib/samplingEngine";
 import { ZONE_COLORS } from "../data/wilayas";
+import {
+  initializeSamplingState,
+  getCurrentBatchPoints,
+  markPointDone,
+  advanceSamplingBatch,
+} from "../services/samplingLogic";
 
 const CULTURES_TO_STRATEGIES = {
   1: "vegetables",
@@ -46,6 +52,11 @@ export default function Map() {
   const [isAnalyzing,        setIsAnalyzing]         = useState(false);
   //  number of zones returned by the backend after analysis
   const [nZonesFromBackend,  setNZonesFromBackend]   = useState(1);
+  const [analyzedZones,      setAnalyzedZones]       = useState([]);
+  const [samplingColor,      setSamplingColor]       = useState("#2ecc71");
+  // Sampling state
+  const [isSampling,         setIsSampling]          = useState(false);
+  const [samplingState,      setSamplingState]       = useState(null);
 
   const toastTimer = useRef(null);
 
@@ -101,14 +112,19 @@ export default function Map() {
     setPendingParcelleInfo(info);
     setPendingColor(color);
     setParcelleInfo(info);
+    setAnalyzedZones([]);
+    setSamplingColor(color);
+    setIsSampling(false);
+    setSamplingState(null);
     setResultsOpen(false);
     const ha = info.area || 0;
     showToast(`✅ Parcel drawn - ${ha < 0.1 ? info.areaM2?.toFixed(0) + " m²" : ha.toFixed(2) + " ha"} · Give it a name`);
   }, [showToast]);
 
   const {
-    mapRef, placeSamplePoints, activateDrawTool, clearAll,
+    mapRef, placeSamplePoints, clearSampleMarkers, activateDrawTool, clearAll,
     flyToWilaya, displayZones, clearZones, drawParcelleFromLatLngs,
+    setSamplingMarkers, clearSamplingMarkers,
   } = useMap({ onParcelleChange: handleParcelleChange });
 
   const handleActivateTool = useCallback((tool) => {
@@ -241,6 +257,10 @@ export default function Map() {
     setActiveTool(null);
     setResultsOpen(false);
     setNZonesFromBackend(1);
+    setAnalyzedZones([]);
+    setSamplingColor("#2ecc71");
+    setIsSampling(false);
+    setSamplingState(null);
   }, [parcelles, clearAll, clearZones, showToast, setNZonesFromBackend]);
 
   const handleSelectParcelle = useCallback((id) => {
@@ -325,6 +345,11 @@ export default function Map() {
 
       if (data.zones?.length > 0) {
         setNZonesFromBackend(data.zones.length);
+        setAnalyzedZones(data.zones);
+        setSamplingColor(culture.color);
+        setIsSampling(false);
+        setSamplingState(null);
+        clearSamplingMarkers();
         displayZones(data.zones, samplingMode);
         placeSamplePoints(data.zones, culture.color);
         setResultsOpen(true);
@@ -337,6 +362,12 @@ export default function Map() {
         );
       } else {
         showToast("⚠️ No zone generated");
+        setAnalyzedZones([]);
+        setIsSampling(false);
+        setSamplingState(null);
+        clearSamplingMarkers();
+        clearSampleMarkers();
+        showToast("⚠️ No zone generated");
       }
     } catch (error) {
       console.error("Network Error:", error);
@@ -346,9 +377,116 @@ export default function Map() {
     }
   }, [
     parcelleInfo, selectedGroupId, samplingMode, pendingParcelleInfo,
-    selectedParcelleId, parcelles, placeSamplePoints, displayZones,
-    showToast, isAnalyzing,
+    selectedParcelleId, parcelles, displayZones, placeSamplePoints,
+    showToast, isAnalyzing, clearSampleMarkers, clearSamplingMarkers,
   ]);
+
+  const openGoogleMapsForBatch = useCallback((state) => {
+    const points = getCurrentBatchPoints(analyzedZones, state);
+    if (!points || points.length === 0) return;
+
+    const fmt = ([lat, lng]) => `${lat},${lng}`;
+    let url = "";
+
+    if (points.length === 1) {
+      url = `https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=${fmt(points[0])}`;
+    } else {
+      const origin = fmt(points[0]);
+      const destination = fmt(points[points.length - 1]);
+      const waypoints = points.slice(1, -1).map(fmt).join("|");
+      url = `https://www.google.com/maps/dir/?api=1&travelmode=walking&origin=${origin}&destination=${destination}`;
+      if (waypoints) {
+        url += `&waypoints=${encodeURIComponent(waypoints)}`;
+      }
+    }
+
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, [analyzedZones]);
+
+  const buildPointKey = useCallback((zoneIdx, pointIdx) => `${zoneIdx}:${pointIdx}`, []);
+
+  const renderSamplingPoints = useCallback((state) => {
+    if (!analyzedZones || analyzedZones.length === 0) return;
+
+    if (!state) {
+      placeSamplePoints(analyzedZones, samplingColor);
+      return;
+    }
+
+    const donePointKeys = new Set((state.done || []).map((i) => buildPointKey(state.zone, i)));
+    const currentBatch = state.unmarked.slice(0, 10);
+    const clickablePointKeys = new Set(currentBatch.map((i) => buildPointKey(state.zone, i)));
+
+    placeSamplePoints(analyzedZones, samplingColor, {
+      donePointKeys,
+      clickablePointKeys,
+      onPointClick: ({ zoneIdx, pointIdx }) => {
+        setSamplingState((prev) => {
+          if (!prev || prev.zone !== zoneIdx) return prev;
+          const batch = prev.unmarked.slice(0, 10);
+          const batchIndex = batch.indexOf(pointIdx);
+          if (batchIndex === -1) return prev;
+          return markPointDone(prev, batchIndex);
+        });
+      },
+    });
+  }, [analyzedZones, buildPointKey, placeSamplePoints, samplingColor]);
+
+  const handleStartSampling = useCallback(() => {
+    if (!analyzedZones || analyzedZones.length === 0) {
+      showToast("❌ Aucune parcelle analysée");
+      return;
+    }
+
+    if (isSampling && samplingState) {
+      const remainingCurrent = getCurrentBatchPoints(analyzedZones, samplingState);
+      if (remainingCurrent.length > 0) {
+        openGoogleMapsForBatch(samplingState);
+        return;
+      }
+
+      const next = advanceSamplingBatch(analyzedZones, samplingState);
+      if (!next || getCurrentBatchPoints(analyzedZones, next).length === 0) {
+        setIsSampling(false);
+        setSamplingState(null);
+        placeSamplePoints(analyzedZones, samplingColor);
+        clearSamplingMarkers();
+        showToast("✅ Échantillonnage terminé pour toutes les zones !");
+        return;
+      }
+
+      setSamplingState(next);
+      openGoogleMapsForBatch(next);
+      return;
+    }
+
+    const initialState = initializeSamplingState(analyzedZones);
+    if (!initialState) {
+      showToast("❌ Erreur d'initialisation de l'échantillonnage");
+      return;
+    }
+    setSamplingState(initialState);
+    setIsSampling(true);
+    clearSampleMarkers();
+    openGoogleMapsForBatch(initialState);
+    showToast("🚀 Points numérotés affichés. Cliquez pour les passer en vert.");
+  }, [
+    analyzedZones,
+    isSampling,
+    samplingState,
+    clearSampleMarkers,
+    clearSamplingMarkers,
+    placeSamplePoints,
+    samplingColor,
+    openGoogleMapsForBatch,
+    showToast,
+  ]);
+
+  useEffect(() => {
+    if (!analyzedZones || analyzedZones.length === 0) return;
+    if (!isSampling || !samplingState) return;
+    renderSamplingPoints(samplingState);
+  }, [analyzedZones, isSampling, samplingState, renderSamplingPoints]);
 
   const handleSelectWilaya = useCallback((wilaya) => {
     setSelectedWilaya(wilaya); flyToWilaya(wilaya);
@@ -398,7 +536,8 @@ export default function Map() {
         region={selectedWilaya?.name}
         samplingMode={samplingMode}
         parcelle={selectedParcelle}
-        nZones={nZonesFromBackend}
+        nZones={nZonesFromBackend}   /*  zones from backend to SoilDiagnostic tabs */
+        onStartSampling={handleStartSampling}
       />
       <Toast message={toast.msg} visible={toast.visible} />
     </>

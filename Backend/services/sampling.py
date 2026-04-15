@@ -4,9 +4,12 @@ import ee
 from functools import cmp_to_key
 from shapely.geometry import Polygon, Point, box
 from pyproj import Geod
-from Backend.constants import CROP_STRATEGIES, ECONOMIC_THRESHOLDS, USDA_SOIL
-from Backend.utils.geometry import safe_intersect
-
+try:
+    from Backend.constants import CROP_STRATEGIES, ECONOMIC_THRESHOLDS, USDA_SOIL
+    from Backend.utils.geometry import safe_intersect
+except ModuleNotFoundError:
+    from constants import CROP_STRATEGIES, ECONOMIC_THRESHOLDS, USDA_SOIL
+    from utils.geometry import safe_intersect
 
 # ─── GEODESIC AREA HELPER (matches Turf.js exactly) ──────────────────────────────
 def calculate_area_hectares(coords: list[list[float]]) -> float:

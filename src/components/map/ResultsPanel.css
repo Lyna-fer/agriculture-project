@@ -831,3 +831,27 @@
   transform: translateY(-1px);
   box-shadow: 0 6px 18px rgba(42, 170, 130, 0.5);
 }
+
+.cy-footer-sampling {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "Nunito", inherit;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 8px 16px;
+  border-radius: 50px;
+  border: none;
+  background: linear-gradient(135deg, #3498db, #2c6fbe);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s;
+  box-shadow: 0 4px 14px rgba(44, 111, 190, 0.4);
+  white-space: nowrap;
+}
+
+.cy-footer-sampling:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(44, 111, 190, 0.5);
+}

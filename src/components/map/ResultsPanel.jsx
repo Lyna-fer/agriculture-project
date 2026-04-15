@@ -46,7 +46,8 @@ export default function ResultsPanel({
   region     = "",
   samplingMode = "standard",
   parcelle   = null,
-  nZones     = 1,
+  nZones     = 1,   // received from map.jsx (data.zones.length from backend)
+  onStartSampling,
 }) {
   const [tab,      setTab]      = useState("schema");
   const [diagOpen, setDiagOpen] = useState(false);
@@ -261,7 +262,13 @@ export default function ResultsPanel({
           </svg>
           Soil Diagnostic
         </button>
-        <button className="cy-footer-close" onClick={onClose}>Close ✕</button>
+        <button className="cy-footer-sampling" onClick={onStartSampling}>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M6.5 1v8M3 7l3.5 3.5L10 7M1 12h11" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Commencer l'échantillonnage
+        </button>
+        <button className="cy-footer-close" onClick={onClose}>Fermer ✕</button>
 
         <SoilDiagnostic
           open={diagOpen}

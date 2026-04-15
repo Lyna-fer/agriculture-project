@@ -151,6 +151,41 @@ export function useMap({ onParcelleChange }) {
     sampleMarkersRef.current = [];
   };
 
+  const samplingMarkersRef = useRef([]);
+
+  const clearSamplingMarkers = useCallback(() => {
+    if (!mapInstanceRef.current) return;
+    samplingMarkersRef.current.forEach((m) => mapInstanceRef.current.removeLayer(m));
+    samplingMarkersRef.current = [];
+  }, []);
+
+  const setSamplingMarkers = useCallback((points, onMark) => {
+    clearSamplingMarkers();
+    const L = window.L;
+    const map = mapInstanceRef.current;
+    if (!map || !L) return;
+    points.forEach((point, index) => {
+      const marker = L.marker([point[0], point[1]], {
+        icon: L.divIcon({
+          className: 'sampling-marker',
+          html: `<div style="background: red; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">${index + 1}</div>`,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10]
+        })
+      }).addTo(map);
+      marker.on('click', () => {
+        marker.setIcon(L.divIcon({
+          className: 'sampling-marker',
+          html: `<div style="background: green; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">${index + 1}</div>`,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10]
+        }));
+        onMark(index);
+      });
+      samplingMarkersRef.current.push(marker);
+    });
+  }, []);
+
   const cancelDraw = useCallback(() => {
     const drawControl = drawControlRef.current;
     if (!drawControl) return;
@@ -218,13 +253,18 @@ export function useMap({ onParcelleChange }) {
     }
   }, []);
 
-  const placeSamplePoints = useCallback((zones, color) => {
+  const placeSamplePoints = useCallback((zones, color, options = {}) => {
     console.log(
       "placeSamplePoints called with",
       zones.length,
       "zones and color",
       color,
     );
+    const {
+      donePointKeys = new Set(),
+      clickablePointKeys = new Set(),
+      onPointClick,
+    } = options;
     const L = window.L;
     const map = mapInstanceRef.current;
     if (!map || !L) {
@@ -234,7 +274,7 @@ export function useMap({ onParcelleChange }) {
     clearSampleMarkers();
     let totalMarkers = 0;
 
-    zones.forEach((zone) => {
+    zones.forEach((zone, zoneIdx) => {
       const points = zone.points || [];
 
       if (points.length > 1) {
@@ -257,18 +297,30 @@ export function useMap({ onParcelleChange }) {
       points.forEach((pt, idx) => {
         try {
           const pointNum = idx + 1;
+          const pointKey = `${zoneIdx}:${idx}`;
+          const isDone = donePointKeys.has(pointKey);
+          const isClickable = clickablePointKeys.has(pointKey);
+
+          const markerBg = isDone ? "#22c55e" : "rgba(255,255,255,0.9)";
+          const markerBorder = isDone ? "#16a34a" : color;
+          const markerTextColor = isDone ? "#ffffff" : color;
+          const markerCursor = isClickable ? "pointer" : "default";
+          const markerOpacity = !isDone && clickablePointKeys.size > 0 && !isClickable ? 0.45 : 1;
+
           const icon = L.divIcon({
             className: "",
             html: `<div style="
-width:16px; height:16px;
-background:rgba(255,255,255,0.9);
-border:1.5px solid ${color};
-color:${color};
-border-radius:50%;
-display:flex; align-items:center; justify-content:center;
-font-size:0.65rem; font-family:'Geist Mono',monospace;
-box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
-">${pointNum}`,
+  width:16px; height:16px;
+  background:${markerBg};
+  border:1.5px solid ${markerBorder};
+  color:${markerTextColor};
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:0.65rem; font-family:'Geist Mono',monospace;
+  cursor:${markerCursor};
+  opacity:${markerOpacity};
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
+">${pointNum}</div>`,
             iconSize: [30, 30],
             iconAnchor: [15, 15],
           });
@@ -279,6 +331,10 @@ box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
       Sample #${pointNum} / ${points.length}<br>
        <span style="color:#7a5230;font-size:0.75rem">Lat: ${pt[0].toFixed(5)}, Lng: ${pt[1].toFixed(5)}</span>`,
             );
+
+          if (isClickable && typeof onPointClick === "function") {
+            marker.on("click", () => onPointClick({ zoneIdx, pointIdx: idx }));
+          }
 
           sampleMarkersRef.current.push(marker);
           totalMarkers++;
@@ -316,6 +372,7 @@ box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
     cancelDraw();
     if (drawnItemsRef.current) drawnItemsRef.current.clearLayers();
     clearSampleMarkers();
+    clearSamplingMarkers();
     parcelleLayerRef.current = null;
   }, [cancelDraw]);
 
@@ -442,11 +499,14 @@ box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
     mapRef,
     mapReady,
     placeSamplePoints,
+    clearSampleMarkers,
     displayZones,
     clearZones,
     activateDrawTool,
     clearAll,
     flyToWilaya,
-    drawParcelleFromLatLngs, // ✅ Exposed for Map.jsx integration
+    drawParcelleFromLatLngs, // ✅ NEW: Expose this function
+    setSamplingMarkers,
+    clearSamplingMarkers,
   };
 }

@@ -12,7 +12,10 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from jose import JWTError, jwt
 
-from Backend.services.sampling import run_sampling_pipeline
+try:
+    from Backend.services.sampling import run_sampling_pipeline
+except ModuleNotFoundError:
+    from services.sampling import run_sampling_pipeline
 import asyncio
 
 # ─── DATABASE SETUP ───────────────────────────────────────────────────────────
