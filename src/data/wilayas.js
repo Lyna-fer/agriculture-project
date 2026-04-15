@@ -174,42 +174,42 @@ export const WILAYAS = [
 ];
 
 export const ZONE_COLORS = {
-  humide: { bg: "#1a5276", text: "#d6eaf8", label: "Humide (> 700mm)" },
-  subhumide: { bg: "#1e8449", text: "#d5f5e3", label: "Subhumide (400–700mm)" },
+  humide: { bg: "#1a5276", text: "#d6eaf8", label: "Humid (> 700mm)" },
+  subhumide: { bg: "#1e8449", text: "#d5f5e3", label: "Sub-humid (400–700mm)" },
   "semi-aride": {
     bg: "#d4ac0d",
     text: "#fef9e7",
-    label: "Semi-aride (200–400mm)",
+    label: "Semi-arid (200–400mm)",
   },
-  aride: { bg: "#ca6f1e", text: "#fdebd0", label: "Aride (100–200mm)" },
-  saharienne: { bg: "#c0392b", text: "#fadbd8", label: "Saharienne (< 100mm)" },
+  aride: { bg: "#ca6f1e", text: "#fdebd0", label: "Arid (100–200mm)" },
+  saharienne: { bg: "#c0392b", text: "#fadbd8", label: "Saharan (< 100mm)" },
 };
 
-// Recommandations climatiques par zone pour chaque culture
+// Climate recommendations by zone for each crop
 export const ZONE_RECS = {
   humide: {
-    1: "Zone favorable — risque de lessivage élevé. Analyser azote et potassium après chaque pluie importante.",
-    2: "Drainage à surveiller. Préférer semis direct. Analyser pH (risque acidification).",
-    3: "Excellente pour cultures permanentes. Surveiller maladies fongiques du sol.",
+    1: "Favorable zone - high leaching risk. Analyze nitrogen and potassium after heavy rain.",
+    2: "Monitor drainage. Prefer direct seeding. Analyze pH (acidification risk).",
+    3: "Excellent for permanent crops. Watch for fungal soil diseases.",
   },
   subhumide: {
-    1: "Zone idéale maraîchage. Analyser matière organique et phosphore en priorité.",
-    2: "Bonne zone céréalière. Analyser azote total et structure du sol.",
-    3: "Zone favorable oliviers et agrumes. Analyser pH et calcaire actif.",
+    1: "Ideal vegetable-growing zone. Prioritize organic matter and phosphorus analysis.",
+    2: "Good cereal zone. Analyze total nitrogen and soil structure.",
+    3: "Favorable for olives and citrus. Analyze pH and active lime.",
   },
   "semi-aride": {
-    1: "Stress hydrique à prévoir. Analyser calcium et salinité. Prévoir irrigation.",
-    2: "Zone céréalière principale d'Algérie. Analyser potassium et matière organique.",
-    3: "Favoris oliviers et figuiers. Analyser calcaire et fer assimilable.",
+    1: "Expect water stress. Analyze calcium and salinity. Plan irrigation.",
+    2: "Main cereal zone of Algeria. Analyze potassium and organic matter.",
+    3: "Best suited for olives and figs. Analyze lime and available iron.",
   },
   aride: {
-    1: "Irrigation obligatoire. Analyser salinité et sodicité. Risque alcalinisation.",
-    2: "Cultures céréalières limitées. Préférer variétés résistantes sécheresse.",
-    3: "Palmiers dattiers adaptés. Analyser sel et bore en profondeur.",
+    1: "Irrigation is mandatory. Analyze salinity and sodicity. Alkalinization risk.",
+    2: "Cereal crops are limited. Prefer drought-resistant varieties.",
+    3: "Date palms are suitable. Analyze salt and boron at depth.",
   },
   saharienne: {
-    1: "Cultures sous serre ou oasis uniquement. Analyser salinité et qualité eau.",
-    2: "Non recommandé sans infrastructure d'irrigation avancée.",
-    3: "Palmiers dattiers uniquement. Analyser pH, sel et texture sableuse.",
+    1: "Greenhouse or oasis crops only. Analyze salinity and water quality.",
+    2: "Not recommended without advanced irrigation infrastructure.",
+    3: "Date palms only. Analyze pH, salt, and sandy texture.",
   },
 };

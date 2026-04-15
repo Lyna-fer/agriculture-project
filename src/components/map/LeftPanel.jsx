@@ -16,7 +16,7 @@ import { CULTURES } from "../../data/cultures";
 function fmtArea(sqm) {
   if (!sqm || sqm <= 0) return "—";
   if (sqm >= 10000) return `${(sqm / 10000).toFixed(2)} ha`;
-  return `${Math.round(sqm).toLocaleString("fr-FR")} m²`;
+  return `${Math.round(sqm).toLocaleString("en-US")} m²`;
 }
 
 // ✅ FIXED: FieldThumb now handles both [[lat, lng], ...] and [{lat, lng}, ...] formats
@@ -127,7 +127,7 @@ export default function LeftPanel({
         </div>
         <div>
           <div className="lp-brand-name">Agric</div>
-          <div className="lp-brand-sub">Échantillonnage des sols · Algérie</div>
+          <div className="lp-brand-sub">Soil Sampling · Algeria</div>
         </div>
       </div>
 
@@ -139,7 +139,7 @@ export default function LeftPanel({
           }
         >
           <VectorSquare size={22} />
-          Polygone
+          Polygon
         </button>
 
         <button
@@ -176,18 +176,18 @@ export default function LeftPanel({
                 />
               </svg>
             </div>
-            <div className="lp-empty-title">Aucune parcelle tracée</div>
+            <div className="lp-empty-title">No parcel drawn</div>
             <div className="lp-empty-text">
-              Choisissez <b>Polygone</b> ou <b>Rectangle</b> ci-dessus,
+              Choose <b>Polygon</b> or <b>Rectangle</b> above,
               <br />
-              puis dessinez sur la carte.
+              then draw on the map.
             </div>
           </div>
         ) : (
           <>
             <div className="lp-list-meta">
               <span>
-                {parcelles.length} parcelle{parcelles.length > 1 ? "s" : ""}
+                {parcelles.length} parcel{parcelles.length > 1 ? "s" : ""}
               </span>
               <span className="lp-list-total">{fmtArea(totalArea)}</span>
             </div>
@@ -229,7 +229,7 @@ export default function LeftPanel({
                       e.stopPropagation();
                       onDeleteParcelle(p.id);
                     }}
-                    title="Supprimer"
+                    title="Delete"
                   >
                     <X size={18} />
                   </button>
@@ -244,29 +244,29 @@ export default function LeftPanel({
         <div className="lp-status">
           <div className={`lp-status-pill ${step1done ? "ok" : ""}`}>
             <div className="lp-status-circle" />
-            Parcelle
+            Parcel
           </div>
           <div className={`lp-status-pill ${step2done ? "ok" : ""}`}>
             <div className="lp-status-circle" />
-            Culture
+            Crop
           </div>
         </div>
 
         {parcelles.length > 0 && (
           <button className="lp-clear" onClick={onClearAll}>
             <Trash2 size={13} />
-            Effacer tout
+            Clear all
           </button>
         )}
 
         {canGenerate && (
           <div className="lp-mode-selector">
-            <div className="lp-mode-label">Mode d'échantillonnage</div>
+            <div className="lp-mode-label">Sampling mode</div>
             <div className="lp-mode-buttons">
               <button
                 className={`lp-mode-btn ${samplingMode === "standard" ? "active" : ""}`}
                 onClick={() => onSamplingModeChange("standard")}
-                title="Maximise la précision avec plus de zones"
+                title="Maximizes precision with more zones"
               >
                 <span className="lp-mode-icon">📊</span>
                 Standard
@@ -274,10 +274,10 @@ export default function LeftPanel({
               <button
                 className={`lp-mode-btn ${samplingMode === "economic" ? "active" : ""}`}
                 onClick={() => onSamplingModeChange("economic")}
-                title="Optimise le budget avec moins de zones"
+                title="Optimizes budget with fewer zones"
               >
                 <span className="lp-mode-icon">💰</span>
-                Économique
+                Economic
               </button>
             </div>
           </div>
@@ -290,15 +290,15 @@ export default function LeftPanel({
         >
           {isAnalyzing ? (
             <>
-              <span className="spinner" /> ⏳ Traitement...
+              <span className="spinner" /> ⏳ Processing...
             </>
           ) : canGenerate ? (
             <>
               <BadgeCheck size={20} />
-              Générer le guide d'échantillonnage
+              Generate Sampling Guide
             </>
           ) : (
-            <>Dessinez une parcelle et choisissez un type</>
+            <>Draw a parcel and choose a type</>
           )}
         </button>
       </div>

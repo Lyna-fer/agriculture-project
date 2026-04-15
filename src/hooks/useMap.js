@@ -276,7 +276,7 @@ box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
             .addTo(map)
             .bindPopup(
               `<b>${zone.id} - Point ${pointNum}</b><br>
-      Prélèvement n°${pointNum} / ${points.length}<br>
+      Sample #${pointNum} / ${points.length}<br>
        <span style="color:#7a5230;font-size:0.75rem">Lat: ${pt[0].toFixed(5)}, Lng: ${pt[1].toFixed(5)}</span>`,
             );
 

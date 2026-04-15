@@ -17,7 +17,7 @@ import { CULTURES } from "../../data/cultures";
 function fmtArea(sqm) {
   if (!sqm || sqm <= 0) return "—";
   if (sqm >= 10000) return `${(sqm / 10000).toFixed(2)} ha`;
-  return `${Math.round(sqm).toLocaleString("fr-FR")} m²`;
+  return `${Math.round(sqm).toLocaleString("en-US")} m²`;
 }
 
 function ParcellePreview({ latlngs, color, type }) {
@@ -44,7 +44,7 @@ function ParcellePreview({ latlngs, color, type }) {
             opacity=".4"
           />
         </svg>
-        <span>Dessinez sur la carte…</span>
+        <span>Draw on the map...</span>
       </div>
     );
   }
@@ -164,9 +164,9 @@ export default function DrawPanel({
               <PencilLine size={22} color="#1a7a3f" />
             </div>
             <div>
-              <div className="dp-drawing-title">Dessin en cours</div>
+              <div className="dp-drawing-title">Drawing in Progress</div>
               <div className="dp-drawing-sub">
-                Tracez votre parcelle sur la carte
+                Draw your parcel on the map
               </div>
             </div>
           </div>
@@ -175,15 +175,15 @@ export default function DrawPanel({
             {[
               {
                 icon: <MousePointerClick size={20} />,
-                text: "Cliquez pour placer des points",
+                text: "Click to place points",
               },
               {
                 icon: <SquareDashedMousePointer size={20} />,
-                text: "Continuez le long du périmètre",
+                text: "Continue along the perimeter",
               },
               {
                 icon: <Pointer size={20} />,
-                text: "Double-clic pour terminer",
+                text: "Double-click to finish",
               },
             ].map((s, i) => (
               <div key={i} className="dp-drawing-step">
@@ -195,7 +195,7 @@ export default function DrawPanel({
 
           <button className="dp-cancel-btn" onClick={onCancel}>
             <X size={15} />
-            Annuler le dessin
+            Cancel drawing
           </button>
         </div>
       )}
@@ -204,7 +204,7 @@ export default function DrawPanel({
         <div className="dp-confirm">
           {/* Header */}
           <div className="dp-confirm-header">
-            <div className="dp-confirm-title">Nouvelle parcelle</div>
+            <div className="dp-confirm-title">New Parcel</div>
             <div className="dp-confirm-area">
               <Expand size={16} />
               {fmtArea(parcelleInfo.areaM2 || parcelleInfo.area * 10000)}
@@ -226,11 +226,11 @@ export default function DrawPanel({
           </div>
 
           <div className="dp-field">
-            <label className="dp-field-label">Nom de la parcelle</label>
+            <label className="dp-field-label">Parcel Name</label>
             <input
               ref={nameRef}
               className="dp-field-input"
-              placeholder="Ex: Parcelle Nord, Champ A…"
+              placeholder="Ex: North Parcel, Field A..."
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) =>
@@ -243,7 +243,7 @@ export default function DrawPanel({
           </div>
 
           <div className="dp-field">
-            <label className="dp-field-label">Type de culture</label>
+            <label className="dp-field-label">Crop Type</label>
             <div className="dp-culture-grid">
               {CULTURES.map((g) => {
                 const isSel = groupId === g.id;
@@ -266,7 +266,7 @@ export default function DrawPanel({
                       className="dp-culture-btn-label"
                       style={isSel ? { color: g.color } : {}}
                     >
-                      {g.name.replace("Cultures ", "")}
+                      {g.nameShort}
                     </span>
                     {isSel && (
                       <span
@@ -284,7 +284,7 @@ export default function DrawPanel({
 
           <div className="dp-actions">
             <button className="dp-btn-cancel" onClick={onCancel}>
-              Annuler
+              Cancel
             </button>
             <button
               className={`dp-btn-save ${canSave ? "ready" : ""}`}
@@ -292,7 +292,7 @@ export default function DrawPanel({
               onClick={() => canSave && onSave({ name: name.trim(), groupId })}
             >
               <Check size={18} />
-              Enregistrer
+              Save
             </button>
           </div>
         </div>

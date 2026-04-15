@@ -70,17 +70,17 @@ export default function WilayaInfoPanel({ wilaya, selectedCultureId, onClose }) 
         <div>
           <div className="wilaya-name">{wilaya.name}</div>
           <div className="wilaya-code" style={{ color: zone.text, opacity: 0.75 }}>
-            Wilaya {wilaya.code} · {wilaya.lat.toFixed(3)}°N, {wilaya.lng.toFixed(3)}°E
+            Province {wilaya.code} · {wilaya.lat.toFixed(3)}°N, {wilaya.lng.toFixed(3)}°E
           </div>
         </div>
         <div className="wilaya-zone-badge" style={{ background: zone.text, color: zone.bg }}>
-          {wilaya.zone}
+          {zone.label}
         </div>
       </div>
 
       <div className="wilaya-body">
         <div className="wilaya-row">
-          <span className="wilaya-row-label">Zone agro-climatique</span>
+          <span className="wilaya-row-label">Agro-climatic zone</span>
           <span className="wilaya-row-val" style={{ color: zone.bg, fontWeight: 700 }}>
             {zone.label}
           </span>
@@ -88,14 +88,14 @@ export default function WilayaInfoPanel({ wilaya, selectedCultureId, onClose }) 
 
         {rec && (
           <div className="wilaya-rec">
-            <div className="wilaya-rec-label">💡 Conseil pour cette zone</div>
+            <div className="wilaya-rec-label">💡 Advice for this zone</div>
             <p>{rec}</p>
           </div>
         )}
 
         {!rec && (
           <div className="wilaya-rec muted">
-            <p>Sélectionnez un type de culture pour obtenir des recommandations spécifiques à cette zone.</p>
+            <p>Select a crop type to get recommendations specific to this zone.</p>
           </div>
         )}
       </div>

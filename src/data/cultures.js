@@ -4,9 +4,9 @@ export const CULTURES = [
   {
     id: 1,
 
-    // ───────────── IDENTITÉ ─────────────
-    name: "Cultures Maraîchères",
-    nameShort: "Maraîchères",
+    // ───────────── IDENTITY ─────────────
+    name: "Vegetable Crops",
+    nameShort: "Vegetables",
 
     icon: Carrot,
     iconColor: "#e68a00",
@@ -16,76 +16,76 @@ export const CULTURES = [
     color: "#4a7c2f",
     colorLight: "rgba(74,124,47,0.1)",
 
-    // ───────────── INFOS ─────────────
-    examples: "Tomates, carottes, pommes de terre, légumes...",
-    desc: "Tomates · Carottes · Courgettes · Pommes de terre",
+    // ───────────── INFO ─────────────
+    examples: "Tomatoes, carrots, potatoes, vegetables...",
+    desc: "Tomatoes · Carrots · Zucchini · Potatoes",
 
-    // ───────────── PROFONDEURS ─────────────
+    // ───────────── DEPTHS ─────────────
     depths: [
       {
         label: "0 – 20 cm",
         color: "#5C3D1E",
-        desc: "Horizon A — Zone racinaire principale",
+        desc: "Horizon A - Main root zone",
         priority: true,
       },
       {
         label: "20 – 40 cm",
         color: "#8B6045",
-        desc: "Horizon B — Réservoirs nutritifs",
+        desc: "Horizon B - Nutrient reserves",
         priority: false,
       },
     ],
 
-    // ───────────── MÉTHODOLOGIE ─────────────
-    timing: "2–4 semaines avant plantation",
-    freq: "Chaque saison",
+    // ───────────── METHODOLOGY ─────────────
+    timing: "2-4 weeks before planting",
+    freq: "Each season",
 
     gear: [
-      "Tarière ou sonde pédologique",
-      "Sacs kraft numérotés",
-      "Étiquettes et marqueur",
+      "Soil auger or soil probe",
+      "Numbered kraft bags",
+      "Labels and marker",
       "GPS (Smartphone)",
-      "Gants de protection",
+      "Protective gloves",
     ],
 
     steps: [
       {
-        title: "Matériel requis",
-        text: "Tarière ou sonde pédologique, sacs kraft, étiquettes, GPS.",
+        title: "Required equipment",
+        text: "Soil auger or soil probe, kraft bags, labels, GPS.",
       },
       {
-        title: "Nombre d'échantillons",
-        text: "Minimum 8 prélèvements par hectare.",
+        title: "Number of samples",
+        text: "Minimum 8 samples per hectare.",
       },
       {
-        title: "Profondeur",
-        text: "0–20 cm (principal), 20–40 cm si nécessaire.",
+        title: "Depth",
+        text: "0-20 cm (primary), 20-40 cm if needed.",
       },
       {
         title: "Timing",
-        text: "2–4 semaines avant plantation.",
+        text: "2-4 weeks before planting.",
       },
       {
         title: "Composition",
-        text: "Mélanger 20–25 sous-prélèvements.",
+        text: "Mix 20-25 subsamples.",
       },
       {
-        title: "Envoi",
-        text: "Sécher 24h et envoyer sous 5 jours.",
+        title: "Shipping",
+        text: "Air-dry for 24h and send within 5 days.",
       },
     ],
 
     alerts: [
-      "Évitez après fertilisation récente (<3 semaines)",
-      "Ne pas prélever dans zones atypiques",
+      "Avoid sampling after recent fertilization (<3 weeks)",
+      "Do not sample in atypical zones",
     ],
   },
 
   {
     id: 2,
 
-    name: "Cultures Céréalières",
-    nameShort: "Céréalières",
+    name: "Cereal Crops",
+    nameShort: "Cereals",
 
     icon: Wheat,
     iconColor: "#a39e00",
@@ -94,52 +94,52 @@ export const CULTURES = [
     color: "#c8a84b",
     colorLight: "rgba(200,168,75,0.12)",
 
-    examples: "Blé, orge, maïs, sorgho...",
-    desc: "Blé dur · Orge · Maïs · Avoine",
+    examples: "Wheat, barley, maize, sorghum...",
+    desc: "Durum wheat · Barley · Maize · Oat",
 
     depths: [
       {
         label: "0 – 30 cm",
         color: "#5C3A1E",
-        desc: "Horizon labouré",
+        desc: "Tilled layer",
         priority: true,
       },
       {
         label: "30 – 60 cm",
         color: "#8B5E3A",
-        desc: "Sous-sol",
+        desc: "Subsoil",
         priority: false,
       },
     ],
 
-    timing: "Après récolte",
-    freq: "Annuel",
+    timing: "After harvest",
+    freq: "Yearly",
 
-    gear: ["Tarière ou sonde pédologique", "Sacs kraft", "GPS", "Marqueur"],
+    gear: ["Soil auger or soil probe", "Kraft bags", "GPS", "Marker"],
 
     steps: [
       {
-        title: "Nombre d'échantillons",
-        text: "3–5 points par hectare.",
+        title: "Number of samples",
+        text: "3-5 points per hectare.",
       },
       {
         title: "Pattern",
-        text: "Parcours en X ou W.",
+        text: "Walk in an X or W pattern.",
       },
       {
         title: "Timing",
-        text: "Après récolte ou avant semis.",
+        text: "After harvest or before sowing.",
       },
     ],
 
-    alerts: ["Éviter zones de stockage", "Noter fertilisation récente"],
+    alerts: ["Avoid storage zones", "Record recent fertilization"],
   },
 
   {
     id: 3,
 
-    name: "Cultures Permanentes",
-    nameShort: "Permanentes",
+    name: "Permanent Crops",
+    nameShort: "Permanent",
 
     icon: Apple,
     iconColor: "#db3700",
@@ -148,8 +148,8 @@ export const CULTURES = [
     color: "#2d5a8e",
     colorLight: "rgba(45,90,142,0.1)",
 
-    examples: "Oliviers, agrumes, vignes...",
-    desc: "Oliviers · Agrumes · Vignes · Figuiers",
+    examples: "Olives, citrus, vines...",
+    desc: "Olive trees · Citrus · Vines · Fig trees",
 
     depths: [
       {
@@ -161,38 +161,38 @@ export const CULTURES = [
       {
         label: "20 – 40 cm",
         color: "#7A5230",
-        desc: "Racines",
+        desc: "Roots",
         priority: true,
       },
       {
         label: "40 – 80 cm",
         color: "#9E6A42",
-        desc: "Racines profondes",
+        desc: "Deep roots",
         priority: false,
       },
     ],
 
-    timing: "Tous les 3–5 ans",
-    freq: "Pluriannuel",
+    timing: "Every 3-5 years",
+    freq: "Multi-year",
 
-    gear: ["Tarière profonde", "Sacs séparés", "GPS", "Fiche terrain"],
+    gear: ["Deep auger", "Separate bags", "GPS", "Field sheet"],
 
     steps: [
       {
         title: "Position",
-        text: "Sous la projection du feuillage.",
+        text: "Under the tree canopy projection.",
       },
       {
-        title: "Profondeur",
-        text: "0–20, 20–40, 40–80 cm séparés.",
+        title: "Depth",
+        text: "0-20, 20-40, 40-80 cm separated.",
       },
       {
-        title: "Fréquence",
-        text: "Tous les 3–5 ans.",
+        title: "Frequency",
+        text: "Every 3-5 years.",
       },
     ],
 
-    alerts: ["Ne pas mélanger les horizons", "Éviter irrigation localisée"],
+    alerts: ["Do not mix layers", "Avoid localized irrigation zones"],
   },
 ];
 

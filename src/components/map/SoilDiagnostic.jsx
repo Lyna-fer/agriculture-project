@@ -31,12 +31,12 @@ function inferSeasons(c) {
 
 function toCrop(c) {
   return {
-    id: c.id, n: c.name, e: c.emoji,
+    id: c.id, n: c.nameEn, e: c.emoji,
     bg: EMOJI_BG[c.emoji] || "#f0f0f0",
     lat: c.nameEn, ph: c.ph, ce: c.ec,
     tMn: c.tempMin, tMx: c.tempMax, nHi: c.nReq > 100,
     ss: inferSeasons(c),
-    note: `Sol ${c.soilType}. N: ${c.nReq} · P: ${c.pReq} · K: ${c.kReq} mg/kg`,
+    note: `Soil ${c.soilType}. N: ${c.nReq} · P: ${c.pReq} · K: ${c.kReq} mg/kg`,
   };
 }
 
@@ -70,10 +70,10 @@ const PARAMS = [
 ];
 
 const SN = {
-  ete:"☀️ Été algérien : vérifiez l'irrigation. Chaleur intense possible.",
-  hiver:"❄️ Hiver : risque de gel dans les hauts plateaux. Paillage recommandé.",
-  printemps:"🌱 Printemps : excellente fenêtre pour les cultures estivales.",
-  automne:"🍂 Automne : favorable aux cultures méditerranéennes.",
+  ete:"☀️ Algerian summer: verify irrigation. Intense heat is possible.",
+  hiver:"❄️ Winter: frost risk in high plateaus. Mulching is recommended.",
+  printemps:"🌱 Spring: excellent window for summer crops.",
+  automne:"🍂 Autumn: favorable for Mediterranean crops.",
 };
 
 function calcScore(st) {
@@ -113,11 +113,11 @@ function cropScore(c, st) {
 function cropAdj(c, st) {
   const adj = [];
   const { ph, ce, temp, seas } = st;
-  if (ph<c.ph[0]) adj.push({t:`Corriger acidité — chaux (pH cible ${c.ph[0]}–${c.ph[1]})`,bg:"#fff3c0"});
-  if (ph>c.ph[1]) adj.push({t:"Réduire alcalinité — soufre agricole",bg:"#fff3c0"});
-  if (ce>c.ce)    adj.push({t:"Salinité élevée — lessivage avant plantation",bg:"#ffc0c0"});
-  if (temp<c.tMn) adj.push({t:`Sol trop froid — attendre ≥ ${c.tMn}°C`,bg:"#c0d8ff"});
-  if (!c.ss.includes(seas)) adj.push({t:`Saison non optimale — préférer ${c.ss.join(" ou ")}`,bg:"#fff3c0"});
+  if (ph<c.ph[0]) adj.push({t:`Correct acidity - lime application (target pH ${c.ph[0]}-${c.ph[1]})`,bg:"#fff3c0"});
+  if (ph>c.ph[1]) adj.push({t:"Reduce alkalinity - agricultural sulfur",bg:"#fff3c0"});
+  if (ce>c.ce)    adj.push({t:"High salinity - leach soil before planting",bg:"#ffc0c0"});
+  if (temp<c.tMn) adj.push({t:`Soil too cold - wait for >= ${c.tMn}°C`,bg:"#c0d8ff"});
+  if (!c.ss.includes(seas)) adj.push({t:`Non-optimal season - prefer ${c.ss.join(" or ")}`,bg:"#fff3c0"});
   return adj;
 }
 
@@ -187,7 +187,7 @@ function Slider({ id, label, unit, min, max, step, value, onChange, zones, badge
             <rect x="1.5" y="4" width="6" height="4.5" rx="1" stroke="currentColor" strokeWidth="1.1" />
             <path d="M3 4V2.8a1.5 1.5 0 013 0V4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
           </svg>
-          Importé depuis {src}
+          Imported from {src}
         </div>
       )}
     </div>
@@ -204,7 +204,7 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
       <div className="sd-zone-strip" style={{background: light, borderLeft: `4px solid ${color}`}}>
         <div className="sd-zone-strip-dot" style={{background: color}} />
         <span className="sd-zone-strip-name" style={{color}}>Zone {zoneIdx + 1}</span>
-        <span className="sd-zone-strip-hint">Renseignez les propriétés du sol de cette zone</span>
+        <span className="sd-zone-strip-hint">Enter the soil properties for this zone</span>
       </div>
 
       {/* Satellite notice (Eco mode only) */}
@@ -214,33 +214,33 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
             <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2" />
             <circle cx="5" cy="5" r="1.5" fill="currentColor" />
           </svg>
-          CE · Température · Texture importés par satellite — non modifiables
+          EC · Temperature · Texture imported from satellite - not editable
         </div>
       )}
 
-      {/* 1 — Chimie */}
+      {/* 1 - Chemistry */}
       <div className="sd-sec">
-        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>1</span>Chimie du sol</div>
-        <Slider id="ph"   label="pH du sol"          unit="pH"   min={4}  max={9}  step={0.1} value={st.ph}   onChange={onChange} zones badge l="4.0 Acide"  m="6.5 Neutre"      r="9.0 Alcalin" />
-        <Slider id="ce"   label="Salinité (CE)"      unit="dS/m" min={0}  max={6}  step={0.1} value={st.ce}   onChange={onChange} zones badge l="0 Nul"       m="2.0 Limite"      r="6.0 Critique"   locked={isSat("ce")}   src="Sentinel-2" />
-        <Slider id="temp" label="Température du sol" unit="°C"   min={0}  max={40} step={1}   value={st.temp} onChange={onChange} zones badge l="0°C Froid"   m="15–25°C Optimal" r="40°C Chaud"     locked={isSat("temp")} src="MODIS" />
+        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>1</span>Soil Chemistry</div>
+        <Slider id="ph"   label="Soil pH"          unit="pH"   min={4}  max={9}  step={0.1} value={st.ph}   onChange={onChange} zones badge l="4.0 Acidic"  m="6.5 Neutral"      r="9.0 Alkaline" />
+        <Slider id="ce"   label="Salinity (EC)"    unit="dS/m" min={0}  max={6}  step={0.1} value={st.ce}   onChange={onChange} zones badge l="0 None"      m="2.0 Limit"        r="6.0 Critical"   locked={isSat("ce")}   src="Sentinel-2" />
+        <Slider id="temp" label="Soil Temperature" unit="°C"   min={0}  max={40} step={1}   value={st.temp} onChange={onChange} zones badge l="0°C Cold"   m="15–25°C Optimal" r="40°C Hot"      locked={isSat("temp")} src="MODIS" />
       </div>
 
-      {/* 2 — NPK */}
+      {/* 2 - NPK */}
       <div className="sd-sec">
-        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>2</span>Fertilité NPK</div>
-        <Slider id="n" label="Azote (N)"     unit="mg/kg" min={0}  max={100} step={1} value={st.n} onChange={onChange} zones l="Faible"  m="30–60 Optimal" r="Élevé" />
-        <Slider id="p" label="Phosphore (P)" unit="mg/kg" min={0}  max={50}  step={1} value={st.p} onChange={onChange} zones l="0"        m="15–30 Optimal" r="50" />
-        <Slider id="k" label="Potassium (K)" unit="mg/kg" min={0}  max={400} step={5} value={st.k} onChange={onChange} zones l="0"        m="130–250 Opt."  r="400" />
+        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>2</span>NPK Fertility</div>
+        <Slider id="n" label="Nitrogen (N)"   unit="mg/kg" min={0}  max={100} step={1} value={st.n} onChange={onChange} zones l="Low"    m="30–60 Optimal" r="High" />
+        <Slider id="p" label="Phosphorus (P)" unit="mg/kg" min={0}  max={50}  step={1} value={st.p} onChange={onChange} zones l="0"      m="15–30 Optimal" r="50" />
+        <Slider id="k" label="Potassium (K)"  unit="mg/kg" min={0}  max={400} step={5} value={st.k} onChange={onChange} zones l="0"      m="130–250 Opt."  r="400" />
       </div>
 
-      {/* 3 — Physique */}
+      {/* 3 - Physical */}
       <div className="sd-sec">
-        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>3</span>Propriétés physiques</div>
+        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>3</span>Physical Properties</div>
         <div className="sd-two">
           <div>
             <div className="sd-col-lbl">
-              Texture du sol
+              Soil Texture
               {isSat("tex") && (
                 <span className="sd-sat-tag" style={{marginLeft:5}}>
                   <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
@@ -253,10 +253,10 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
             </div>
             <div className="sd-opts">
               {[
-                {val:"limon-argileux",label:"Argilo-limoneuse",sub:"Idéale pour les légumes"},
-                {val:"limoneux",      label:"Limoneuse",        sub:"Très fertile"},
-                {val:"sableux",       label:"Sableuse",         sub:"Drainage rapide"},
-                {val:"argileux",      label:"Argileuse",        sub:"Forte rétention"},
+                {val:"limon-argileux",label:"Clay loam", sub:"Ideal for vegetables"},
+                {val:"limoneux",      label:"Loam",      sub:"Very fertile"},
+                {val:"sableux",       label:"Sandy",     sub:"Fast drainage"},
+                {val:"argileux",      label:"Clay",      sub:"High retention"},
               ].map(o => (
                 <div key={o.val}
                   className={`sd-opt ${st.tex===o.val?"sd-opt--on":""} ${isSat("tex")?"sd-opt--locked":""}`}
@@ -279,13 +279,13 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
             </div>
           </div>
           <div>
-            <div className="sd-col-lbl">Matière organique</div>
+            <div className="sd-col-lbl">Organic Matter</div>
             <div className="sd-opts">
               {[
-                {val:"tres-bas",label:"Très bas <1%"},
-                {val:"bas",     label:"Bas 1–2%"},
-                {val:"moyen",   label:"Moyen 2–4%"},
-                {val:"bon",     label:"Bon 4–6%"},
+                {val:"tres-bas",label:"Very low <1%"},
+                {val:"bas",     label:"Low 1–2%"},
+                {val:"moyen",   label:"Medium 2–4%"},
+                {val:"bon",     label:"Good 4–6%"},
                 {val:"excellent",label:"Excellent >6%"},
               ].map(o => (
                 <div key={o.val}
@@ -300,15 +300,15 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
         </div>
       </div>
 
-      {/* 4 — Saison */}
+      {/* 4 - Season */}
       <div className="sd-sec">
-        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>4</span>Saison de culture</div>
+        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>4</span>Growing Season</div>
         <div className="sd-seas-row">
           {[
-            {val:"printemps",em:"🌱",label:"Printemps"},
-            {val:"ete",      em:"☀️",label:"Été"},
-            {val:"automne",  em:"🍂",label:"Automne"},
-            {val:"hiver",    em:"❄️",label:"Hiver"},
+            {val:"printemps",em:"🌱",label:"Spring"},
+            {val:"ete",      em:"☀️",label:"Summer"},
+            {val:"automne",  em:"🍂",label:"Autumn"},
+            {val:"hiver",    em:"❄️",label:"Winter"},
           ].map(s => (
             <div key={s.val}
               className={`sd-seas ${st.seas===s.val?"sd-seas--on":""}`}
@@ -321,19 +321,19 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
         </div>
       </div>
 
-      {/* 5 — Culture */}
+      {/* 5 - Crop */}
       <div className="sd-sec">
         <div className="sd-sec-lbl">
           <span className="sd-sec-num" style={{background:color}}>5</span>
-          Culture ciblée
-          <span className="sd-sec-opt"> — optionnel</span>
+          Target Crop
+          <span className="sd-sec-opt"> - optional</span>
         </div>
         <div className="sd-crops-count">
-          <span>{crops.length} cultures · {cultureLabel}</span>
+          <span>{crops.length} crops · {cultureLabel}</span>
         </div>
         <div className="sd-select-wrap">
           <select className="sd-sel" value={st.crop} onChange={e => onChange("crop", e.target.value)}>
-            <option value="">🔀 Recommandez-moi</option>
+            <option value="">🔀 Recommend for me</option>
             {crops.map(c => <option key={c.id} value={c.id}>{c.e} {c.n}</option>)}
           </select>
           <svg className="sd-sel-arrow" width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -357,14 +357,14 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M5 2l6 5-6 5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Analyser Zone {zoneIdx + 2}
+              Analyze Zone {zoneIdx + 2}
             </button>
           ) : (
             <div className="sd-all-done-btn">
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                 <path d="M2.5 7.5l3.5 3.5 6.5-7" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Toutes les zones analysées ✓
+              All zones analyzed ✓
             </div>
           )
         ) : (
@@ -382,14 +382,14 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
                 <svg width="16" height="16" viewBox="0 0 16 16" style={{animation:"sd-spin .7s linear infinite"}}>
                   <path d="M14 8a6 6 0 11-6-6" stroke="white" strokeWidth="2" strokeLinecap="round" fill="none" />
                 </svg>
-                Analyse en cours…
+                Analyzing...
               </>
             ) : (
               <>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M3 8.5L6.5 12l6.5-8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                Analyser la Zone {zoneIdx + 1}
+                  Analyze Zone {zoneIdx + 1}
               </>
             )}
           </button>
@@ -402,7 +402,7 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
 /* RESULTS VIEW */
 function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNext }) {
   const sc = calcScore(st), scC = mc(sc), scBg = mcBg(sc);
-  const scLbl = sc>=80 ? "Excellent 🎉" : sc>=60 ? "À améliorer" : "Difficile";
+  const scLbl = sc>=80 ? "Excellent 🎉" : sc>=60 ? "Needs improvement" : "Difficult";
   const scored = crops.map(c => ({...c, sc: cropScore(c,st), adj: cropAdj(c,st)})).sort((a,b)=>b.sc-a.sc);
   const tgt  = st.crop ? scored.find(c => c.id===st.crop) : null;
   const recs = tgt ? null : scored.slice(0,4);
@@ -415,20 +415,20 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
       <div className="sd-score-hero sd-a1" style={{borderTop:`3px solid ${color}`}}>
         <div className="sd-score-hero-top">
           <div>
-            <div className="sd-score-eyebrow">Rapport de sol</div>
+            <div className="sd-score-eyebrow">Soil Report</div>
             <div className="sd-score-title">
-              Votre sol est<br />
-              <em style={{color:scC}}>{sc>=80?"prêt à cultiver":sc>=60?"à optimiser":"à améliorer"}</em>
+              Your soil is<br />
+              <em style={{color:scC}}>{sc>=80?"ready to cultivate":sc>=60?"to optimize":"to improve"}</em>
             </div>
           </div>
           <div className="sd-score-right">
             <div className="sd-score-number" style={{color:scC}}>{sc}</div>
-            <div className="sd-score-sub">Score qualité</div>
+            <div className="sd-score-sub">Quality Score</div>
             <div className="sd-score-pill" style={{background:scBg,color:scC}}>{scLbl}</div>
           </div>
         </div>
         <div className="sd-score-desc">
-          {sc>=80?"Conditions favorables. Vous pouvez démarrer votre campagne dès maintenant.":"Des ajustements sont recommandés pour optimiser vos rendements."}
+          {sc>=80?"Conditions are favorable. You can start your season now.":"Adjustments are recommended to optimize yields."}
         </div>
         {(diagMode==="eco" || diagMode==="standard") && (
           <div className="sd-eco-tag">
@@ -436,7 +436,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
               <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.1" />
               <circle cx="4.5" cy="4.5" r="1.2" fill="currentColor" />
             </svg>
-            Données satellite incluses
+            Satellite data included
           </div>
         )}
       </div>
@@ -462,7 +462,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
               const v = st[p.id], sta = pSt(p.id,v);
               const pct = (((v-p.mn)/(p.mx-p.mn))*100).toFixed(1);
               const [bg2,c2] = {ok:["#c8f5e0","#1a7a50"],lo:["#fff3c8","#b06010"],hi:["#ffc8c8","#c02020"]}[sta];
-              const pill = {ok:"✓ OK",lo:"↓ Bas",hi:"↑ Élevé"}[sta];
+              const pill = {ok:"✓ OK",lo:"↓ Low",hi:"↑ High"}[sta];
               const isSatPill = (diagMode==="eco" || diagMode==="standard") && SAT_FIELDS[p.id];
               return (
                 <div key={p.id} className={`sd-param-pill ${isSatPill?"sd-param-pill--sat":""}`} style={{borderBottom:`3px solid ${c2}40`}}>
@@ -488,7 +488,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
       {recs && (
         <div className="sd-a3">
           <div className="sd-sec-head">
-            <span className="sd-sec-head-t">🌱 Cultures recommandées</span>
+            <span className="sd-sec-head-t">🌱 Recommended Crops</span>
             <span className="sd-sec-head-m">{st.seas} · top 4</span>
           </div>
           <div className="sd-rec-cards">
@@ -502,8 +502,8 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
                   </div>
                   <div className="sd-rec-score">
                     <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}%</div>
-                    <div className="sd-rec-pct-lbl">compatibilité</div>
-                    {i===0 && <div className="sd-rec-best-tag">★ Meilleur choix</div>}
+                    <div className="sd-rec-pct-lbl">compatibility</div>
+                    {i===0 && <div className="sd-rec-best-tag">★ Best choice</div>}
                   </div>
                 </div>
                 <div className="sd-rec-bottom">
@@ -534,15 +534,15 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
       {/* Verdict */}
       {tgt && (() => {
         const vrd = tgt.sc>=80
-          ? {e:"✅",bg:mcBg(tgt.sc),bc:"rgba(30,130,80,.2)",c:mc(tgt.sc),t:"Culture compatible",s:`Votre sol est bien adapté. Vous pouvez planter ${tgt.n} sans corrections majeures.`}
+          ? {e:"✅",bg:mcBg(tgt.sc),bc:"rgba(30,130,80,.2)",c:mc(tgt.sc),t:"Crop compatible",s:`Your soil is well suited. You can plant ${tgt.n} without major corrections.`}
           : tgt.sc>=55
-          ? {e:"⚠️",bg:"rgba(255,220,100,.18)",bc:"rgba(220,160,40,.3)",c:"#92400e",t:"Compatible avec corrections",s:`La culture de ${tgt.n} est possible mais des ajustements sont recommandés.`}
-          : {e:"❌",bg:"rgba(255,150,140,.18)",bc:"rgba(200,60,60,.25)",c:"#991b1b",t:"Culture déconseillée",s:`Les conditions actuelles ne sont pas favorables pour ${tgt.n}.`};
+          ? {e:"⚠️",bg:"rgba(255,220,100,.18)",bc:"rgba(220,160,40,.3)",c:"#92400e",t:"Compatible with corrections",s:`${tgt.n} can be grown, but adjustments are recommended.`}
+          : {e:"❌",bg:"rgba(255,150,140,.18)",bc:"rgba(200,60,60,.25)",c:"#991b1b",t:"Crop not recommended",s:`Current conditions are not favorable for ${tgt.n}.`};
         const altsSection = alts.length > 0;
         return (
           <>
             <div className="sd-a3">
-              <div className="sd-sec-head"><span className="sd-sec-head-t">🔎 Analyse — {tgt.n}</span></div>
+              <div className="sd-sec-head"><span className="sd-sec-head-t">🔎 Analysis - {tgt.n}</span></div>
               <div className="sd-verd-card">
                 <div className="sd-verd-top">
                   <div className="sd-verd-emoji" style={{background:tgt.bg}}>{tgt.e}</div>
@@ -552,7 +552,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
                   </div>
                   <div className="sd-verd-pct-blk">
                     <div className="sd-verd-pct" style={{color:mc(tgt.sc)}}>{tgt.sc}%</div>
-                    <div className="sd-verd-pct-lbl">compatibilité</div>
+                    <div className="sd-verd-pct-lbl">compatibility</div>
                   </div>
                 </div>
                 <div className="sd-verd-status" style={{background:vrd.bg,borderColor:vrd.bc}}>
@@ -564,7 +564,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
                 </div>
                 {tgt.adj.length > 0 ? (
                   <div className="sd-verd-adjs">
-                    <div className="sd-verd-adj-lbl">Ajustements requis</div>
+                    <div className="sd-verd-adj-lbl">Required adjustments</div>
                     {tgt.adj.map((a,i) => (
                       <div key={i} className="sd-verd-adj">
                         <div className="sd-verd-adj-pill" style={{background:a.bg}}>⚙</div>
@@ -573,13 +573,13 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
                     ))}
                   </div>
                 ) : (
-                  <div className="sd-verd-ok">✓ Aucun ajustement majeur requis — vous pouvez planter !</div>
+                  <div className="sd-verd-ok">✓ No major adjustment required - you can plant!</div>
                 )}
               </div>
             </div>
             {altsSection && (
               <div className="sd-a4">
-                <div className="sd-sec-head" style={{marginTop:4}}><span className="sd-sec-head-t">💡 Alternatives suggérées</span></div>
+                <div className="sd-sec-head" style={{marginTop:4}}><span className="sd-sec-head-t">💡 Suggested Alternatives</span></div>
                 <div className="sd-rec-cards">
                   {alts.map(c => (
                     <div key={c.id} className="sd-rec-card">
@@ -591,7 +591,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
                         </div>
                         <div className="sd-rec-score">
                           <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}%</div>
-                          <div className="sd-rec-pct-lbl">compatibilité</div>
+                          <div className="sd-rec-pct-lbl">compatibility</div>
                         </div>
                       </div>
                       <div className="sd-rec-bottom"><div className="sd-rec-note">{c.note}</div></div>
@@ -610,7 +610,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
             <path d="M2 6.5a4.5 4.5 0 118 2.8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             <path d="M10.2 9.5l.6 2.2 2-1.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Modifier
+          Edit
         </button>
         {nZones > 1 && zoneIdx < nZones - 1 ? (
           <button
@@ -623,7 +623,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
             }}
             onClick={onNext}
           >
-            Analyser Zone {zoneIdx + 2}
+            Analyze Zone {zoneIdx + 2}
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path d="M4.5 2L9 6l-4.5 4" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -633,7 +633,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
             <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
               <path d="M6.5 1v8M3 7l3.5 3.5L10 7M1 12h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            Télécharger le rapport
+            Download Report
           </button>
         )}
       </div>
@@ -644,7 +644,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
 /* MAIN COMPONENT */
 export default function SoilDiagnostic({
   open, onClose,
-  parcelleName   = "Parcelle A",
+  parcelleName   = "Parcel A",
   parcelleHa     = 0,
   cultureGroupId = 1,
   parcelle       = null,
@@ -659,7 +659,7 @@ export default function SoilDiagnostic({
   const n = Math.max(1, nZones);
 
   const CROPS = useMemo(() => getCropsByGroup(cultureGroupId).map(toCrop), [cultureGroupId]);
-  const cultureLabel = cultureGroupId===1?"Maraîchères":cultureGroupId===2?"Céréalières":"Permanentes";
+  const cultureLabel = cultureGroupId===1?"Vegetables":cultureGroupId===2?"Cereals":"Permanent";
 
   /* Reset on open */
   useEffect(() => {
@@ -801,7 +801,7 @@ export default function SoilDiagnostic({
             </div>
 
             {/* MODE TOGGLE */}
-            <div className="sd-mode-toggle" title={!canToggleMode ? "Le mode ne peut plus être changé après analyse" : ""}>
+            <div className="sd-mode-toggle" title={!canToggleMode ? "Mode cannot be changed after analysis" : ""}>
               <button
                 className={`sd-mode-toggle-btn ${diagMode==="eco" ? "sd-mode-toggle-btn--on" : ""}`}
                 disabled={!canToggleMode}
@@ -811,7 +811,7 @@ export default function SoilDiagnostic({
                   <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.2" />
                   <circle cx="4.5" cy="4.5" r="1.3" fill="currentColor" />
                 </svg>
-                Éco
+                Eco
               </button>
               <button
                 className={`sd-mode-toggle-btn ${diagMode==="standard" ? "sd-mode-toggle-btn--on sd-mode-toggle-btn--std" : ""}`}
@@ -899,11 +899,11 @@ export default function SoilDiagnostic({
                     </svg>
                   </div>
                   <div className="sd-idle-zone-pill" style={{background:color}}>Zone {activeZone + 1}</div>
-                  <div className="sd-idle-t">Résultats ici</div>
+                  <div className="sd-idle-t">Results here</div>
                   <div className="sd-idle-s">
                     {(diagMode==="eco" || diagMode==="standard")
-                      ? "Mode actif. CE, Temp et Texture sont pré-chargés par satellite. Renseignez NPK et lancez l'analyse."
-                      : "Renseignez les paramètres du sol et lancez l'analyse pour obtenir vos recommandations."}
+                      ? "Mode active. EC, Temp, and Texture are preloaded from satellite. Enter NPK and start analysis."
+                      : "Enter soil parameters and start analysis to get recommendations."}
                   </div>
                 </div>
               ) : (

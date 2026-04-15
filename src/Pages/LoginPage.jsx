@@ -68,7 +68,7 @@ export default function LoginPage() {
         navigate("/map");
       } else {
         // ✅ Registration successful → switch to login
-        alert("✅ Compte créé avec succès! Connectez-vous maintenant.");
+        alert("✅ Account created successfully! Sign in now.");
         setMode("login");
         setPassword("");
       }
@@ -101,7 +101,7 @@ export default function LoginPage() {
               type="button"
               disabled={loading}
             >
-              Se connecter
+              Sign In
             </button>
             <button
               className={`toggle-btn ${mode === "register" ? "active" : ""}`}
@@ -109,7 +109,7 @@ export default function LoginPage() {
               type="button"
               disabled={loading}
             >
-              S'inscrire
+              Sign Up
             </button>
           </div>
 
@@ -133,14 +133,14 @@ export default function LoginPage() {
             {mode === "register" && (
               <div className="field">
                 <label className="field-label" htmlFor="lp-email">
-                  Adresse électronique *
+                  Email Address *
                 </label>
                 <div className="input-wrap">
                   <input
                     id="lp-email"
                     className="input"
                     type="email"
-                    placeholder="votre@email.com"
+                    placeholder="your@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     autoComplete="email"
@@ -152,7 +152,7 @@ export default function LoginPage() {
                     className={`input-clear ${email ? "" : "hidden"}`}
                     onClick={() => setEmail("")}
                     tabIndex={-1}
-                    aria-label="Effacer"
+                    aria-label="Clear"
                   >
                     ×
                   </button>
@@ -163,14 +163,14 @@ export default function LoginPage() {
             {/* ✅ Username field (used for both login & register) */}
             <div className="field">
               <label className="field-label" htmlFor="lp-username">
-                {mode === "login" ? "Nom d'utilisateur" : "Nom d'utilisateur *"}
+                {mode === "login" ? "Username" : "Username *"}
               </label>
               <div className="input-wrap">
                 <input
                   id="lp-username"
                   className="input"
                   type="text"
-                  placeholder={mode === "login" ? "Entrer votre nom d'utilisateur" : "farmer123"}
+                  placeholder={mode === "login" ? "Enter your username" : "farmer123"}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   autoComplete="username"
@@ -182,7 +182,7 @@ export default function LoginPage() {
                   className={`input-clear ${username ? "" : "hidden"}`}
                   onClick={() => setUsername("")}
                   tabIndex={-1}
-                  aria-label="Effacer"
+                  aria-label="Clear"
                 >
                   ×
                 </button>
@@ -192,11 +192,11 @@ export default function LoginPage() {
             <div className="field">
               <div className="field-header">
                 <label className="field-label" htmlFor="lp-password" style={{ margin: 0 }}>
-                  Mot de passe {mode === "register" && "*"}
+                  Password {mode === "register" && "*"}
                 </label>
                 {mode === "login" && (
                   <a className="field-label-forgot" href="/auth/forgot" tabIndex={-1}>
-                    Mot de passe oublié ?
+                    Forgot password?
                   </a>
                 )}
               </div>
@@ -205,7 +205,7 @@ export default function LoginPage() {
                   id="lp-password"
                   className="input"
                   type={showPass ? "text" : "password"}
-                  placeholder={mode === "login" ? "Entrer le mot de passe" : "Minimum 6 caractères"}
+                  placeholder={mode === "login" ? "Enter password" : "Minimum 6 characters"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
@@ -233,11 +233,11 @@ export default function LoginPage() {
               disabled={!canSubmit || loading}
               tabIndex={1}
             >
-              {loading ? "⏳ Traitement..." : (mode === "login" ? "Se connecter" : "Créer un compte")}
+              {loading ? "⏳ Processing..." : (mode === "login" ? "Sign In" : "Create Account")}
             </button>
           </form>
 
-          <div className="divider"><span>ou avec</span></div>
+          <div className="divider"><span>or continue with</span></div>
 
           <div className="socials">
             <button type="button" className="btn-social" disabled={loading}>

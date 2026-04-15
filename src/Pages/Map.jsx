@@ -12,6 +12,7 @@ import {
   CROP_STRATEGIES,
   authenticateGEE,
 } from "../lib/samplingEngine";
+import { ZONE_COLORS } from "../data/wilayas";
 
 const CULTURES_TO_STRATEGIES = {
   1: "vegetables",
@@ -92,7 +93,7 @@ export default function Map() {
 
   const handleParcelleChange = useCallback((info) => {
     if (info.type === "marker") {
-      showToast("📍 Marqueur posé — dessinez un polygone pour calculer la surface");
+      showToast("📍 Marker placed - draw a polygon to calculate area");
       return;
     }
     const color = nextColor();
@@ -102,7 +103,7 @@ export default function Map() {
     setParcelleInfo(info);
     setResultsOpen(false);
     const ha = info.area || 0;
-    showToast(`✅ Parcelle tracée — ${ha < 0.1 ? info.areaM2?.toFixed(0) + " m²" : ha.toFixed(2) + " ha"} · Donnez-lui un nom`);
+    showToast(`✅ Parcel drawn - ${ha < 0.1 ? info.areaM2?.toFixed(0) + " m²" : ha.toFixed(2) + " ha"} · Give it a name`);
   }, [showToast]);
 
   const {
@@ -131,13 +132,13 @@ export default function Map() {
     setSelectedGroupId(groupId);
     setPendingParcelleInfo(null);
     setResultsOpen(false);
-    showToast(`✅ ${name} enregistrée`);
+    showToast(`✅ ${name} saved`);
   }, [pendingParcelleInfo, pendingColor, showToast]);
 
   const handleCancelDraw = useCallback(() => {
     setActiveTool(null); activateDrawTool(null); setPendingParcelleInfo(null);
     if (!parcelles.length) { clearAll(); setParcelleInfo(null); }
-    showToast("✕ Dessin annulé");
+    showToast("✕ Drawing canceled");
   }, [activateDrawTool, clearAll, parcelles.length, showToast]);
 
   // ✅ FIXED: Delete single parcelle immediately (UI + Map + DB)
@@ -173,13 +174,13 @@ export default function Map() {
             throw new Error(errData.detail || `HTTP ${response.status}`);
           }
           console.log(`✅ Parcelle ${id} deleted from DB`);
-          showToast("🗑 Parcelle supprimée");
+          showToast("🗑 Parcel deleted");
         } catch (error) {
           console.error(`❌ Failed to delete parcelle ${id}:`, error);
-          showToast("❌ Échec suppression - rafraîchissez la page");
+          showToast("❌ Delete failed - refresh the page");
         }
       } else {
-        showToast("🗑 Parcelle supprimée (local)");
+        showToast("🗑 Parcel deleted (local)");
       }
     },
     [selectedParcelleId, showToast, clearAll]
@@ -195,7 +196,7 @@ export default function Map() {
     const idsToDelete = parcelles.map(p => p.id);
 
     if (idsToDelete.length > 0 && token) {
-      showToast("🗑 Suppression en cours...");
+      showToast("🗑 Deleting in progress...");
       try {
         const results = await Promise.allSettled(
           idsToDelete.map((id) =>
@@ -217,18 +218,18 @@ export default function Map() {
         const failed = results.filter(r => r.status === "rejected");
         if (failed.length > 0) {
           console.warn(`⚠️ ${failed.length} deletion(s) failed`);
-          showToast(`⚠️ ${idsToDelete.length - failed.length}/${idsToDelete.length} supprimées`);
+          showToast(`⚠️ ${idsToDelete.length - failed.length}/${idsToDelete.length} deleted`);
         } else {
           console.log("✅ All parcelles deleted from DB");
-          showToast("🗑 Tout effacé");
+          showToast("🗑 Everything cleared");
         }
       } catch (error) {
         console.error("❌ Bulk delete error:", error);
-        showToast("❌ Erreur lors de la suppression");
+        showToast("❌ Error during deletion");
       }
     } else if (idsToDelete.length > 0 && !token) {
       // If no token, just clear UI
-      showToast("🗑 Tout effacé (UI only)");
+      showToast("🗑 Everything cleared (UI only)");
     }
 
     // Always clear frontend state
@@ -256,12 +257,12 @@ export default function Map() {
   const handleGroupChange = useCallback((groupId) => {
     setSelectedGroupId(groupId); setResultsOpen(false);
     const c = CULTURES.find(c => c.id === groupId);
-    if (c) showToast(`${c.iconEmoji} ${c.nameShort} sélectionné`);
+    if (c) showToast(`${c.iconEmoji} ${c.nameShort} selected`);
   }, [showToast]);
 
   const handleAnalyze = useCallback(async () => {
     const token = localStorage.getItem("token");
-    if (!token) { showToast("❌ Veuillez vous connecter d'abord"); return; }
+    if (!token) { showToast("❌ Please sign in first"); return; }
     if (isAnalyzing) return;
     setIsAnalyzing(true);
 
@@ -272,7 +273,7 @@ export default function Map() {
       : parcelleInfo;
 
     if (!geometry || !geometry.latlngs || geometry.latlngs.length < 3) {
-      showToast("❌ Info manquante - veuillez re-sélectionner la parcelle");
+      showToast("❌ Missing info - please reselect the parcel");
       setIsAnalyzing(false); return;
     }
 
@@ -287,20 +288,20 @@ export default function Map() {
 
     const cropGroupId = targetParcelle?.groupId ? Number(targetParcelle.groupId) : selectedGroupId;
     if (!cropGroupId || !CULTURES_TO_STRATEGIES[cropGroupId]) {
-      showToast("❌ Type de culture non sélectionné"); setIsAnalyzing(false); return;
+      showToast("❌ Crop type not selected"); setIsAnalyzing(false); return;
     }
 
     const culture = CULTURES.find(c => c.id === cropGroupId);
     const cropType = CULTURES_TO_STRATEGIES[cropGroupId];
     if (!culture || !cropType) {
-      showToast("❌ Type de culture invalide"); setIsAnalyzing(false); return;
+      showToast("❌ Invalid crop type"); setIsAnalyzing(false); return;
     }
 
     const customName = pendingParcelleInfo?.name || targetParcelle?.name || null;
     const polygonPoints = normalizeLatLngs(geometry.latlngs);
 
     const payload = { polygonPoints, cropType, samplingMode, parcelleName: customName };
-    showToast("⏳ Calcul + sauvegarde en cours...");
+    showToast("⏳ Calculating + saving...");
 
     try {
       const response = await fetch(`${API_BASE}/api/sampling/run-and-save`, {
@@ -312,7 +313,7 @@ export default function Map() {
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         if (response.status === 401) {
-          showToast("❌ Session expirée. Veuillez vous reconnecter.");
+          showToast("❌ Session expired. Please sign in again.");
           localStorage.removeItem("token"); localStorage.removeItem("user");
         } else {
           showToast(`❌ Erreur: ${errData.detail || response.statusText}`);
@@ -329,17 +330,17 @@ export default function Map() {
         setResultsOpen(true);
 
         const totalPoints = data.zones.reduce((sum, z) => sum + (z.points?.length || 0), 0);
-        const modeLabel = samplingMode === "economic" ? "économique" : "standard";
+        const modeLabel = samplingMode === "economic" ? "economic" : "standard";
         showToast(data.savedParcelleId
-          ? `🔬 ${totalPoints} pts · ${data.zones.length} zone(s) + 💾 Parcelle #${data.savedParcelleId} sauvegardée ! (${modeLabel})`
-          : `🔬 ${totalPoints} points générés dans ${data.zones.length} zone(s) ! (${modeLabel})`
+          ? `🔬 ${totalPoints} pts · ${data.zones.length} zone(s) + 💾 Parcel #${data.savedParcelleId} saved! (${modeLabel})`
+          : `🔬 ${totalPoints} points generated in ${data.zones.length} zone(s)! (${modeLabel})`
         );
       } else {
-        showToast("⚠️ Aucune zone générée");
+        showToast("⚠️ No zone generated");
       }
     } catch (error) {
       console.error("Network Error:", error);
-      showToast("❌ Erreur réseau");
+      showToast("❌ Network error");
     } finally {
       setIsAnalyzing(false);
     }
@@ -351,7 +352,8 @@ export default function Map() {
 
   const handleSelectWilaya = useCallback((wilaya) => {
     setSelectedWilaya(wilaya); flyToWilaya(wilaya);
-    showToast(`📍 Wilaya de ${wilaya.name} · Zone ${wilaya.zone}`);
+    const zoneLabel = ZONE_COLORS[wilaya.zone]?.label || wilaya.zone;
+    showToast(`📍 ${wilaya.name} Province · Zone ${zoneLabel}`);
   }, [flyToWilaya, showToast]);
 
   const selectedCulture = CULTURES.find(c => c.id === selectedGroupId);

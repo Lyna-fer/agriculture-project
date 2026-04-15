@@ -42,7 +42,7 @@ export default function SearchBar({ onSelectWilaya }) {
         <input
           type="text"
           className="search-input"
-          placeholder="Rechercher une wilaya "
+          placeholder="Search a province"
           value={query}
           onChange={handleInput}
           onFocus={() => results.length > 0 && setOpen(true)}
@@ -62,20 +62,20 @@ export default function SearchBar({ onSelectWilaya }) {
                   <span className="result-flag">🇩🇿</span>
                   <div>
                     <div className="result-name">{w.name}</div>
-                    <div className="result-code">Wilaya {w.code}</div>
+                    <div className="result-code">Province {w.code}</div>
                   </div>
                 </div>
                 <span
                   className="result-zone"
                   style={{ background: zone.bg, color: zone.text }}
                 >
-                  {w.zone}
+                  {zone.label}
                 </span>
               </button>
             );
           })}
           <div className="search-footer">
-            Données · 58 wilayas d'Algérie
+            Data · 58 Algerian provinces
           </div>
         </div>
       )}

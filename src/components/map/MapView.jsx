@@ -23,8 +23,7 @@ export default function MapView({
       {showHint && (
         <div className="map-hint">
           <span>🖱</span>
-          Choisissez un outil et cliquez sur la carte pour dessiner votre
-          parcelle
+          Choose a tool and click on the map to draw your parcel
         </div>
       )}
       {/*
