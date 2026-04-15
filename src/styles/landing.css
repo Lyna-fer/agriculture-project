@@ -20,7 +20,7 @@ body.page-landing {
   background: var(--green-primary);
   color: var(--white);
   padding: 14px 28px;
-  border-radius: var(--radius-md);
+  border-radius: 999px;
   font-size: 15px;
   font-weight: 600;
   font-family: var(--font-body);
@@ -42,7 +42,7 @@ body.page-landing {
   background: transparent;
   color: var(--white);
   padding: 13px 27px;
-  border-radius: var(--radius-md);
+  border-radius: 999px;
   font-size: 15px;
   font-weight: 600;
   font-family: var(--font-body);
@@ -62,7 +62,7 @@ body.page-landing {
   background: transparent;
   color: var(--green-primary);
   padding: 13px 27px;
-  border-radius: var(--radius-md);
+  border-radius: 999px;
   font-size: 15px;
   font-weight: 600;
   font-family: var(--font-body);
@@ -73,6 +73,10 @@ body.page-landing {
 .btn-outline-green:hover {
   background: var(--green-primary);
   color: white;
+}
+
+body.page-landing button {
+  border-radius: 999px;
 }
 
 .section-label {

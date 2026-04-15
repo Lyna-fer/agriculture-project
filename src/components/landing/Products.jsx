@@ -3,210 +3,216 @@ import "./Products.css";
 
 const products = [
   {
-    id: "ai-engage",
-    badge: "PHASE 1",
+    id: "sampling-guide",
+    badge: "Phase 1",
+    step: "01",
     name: "Sampling Guide",
+    kicker: "Map your field and generate the right collection plan.",
     description:
-      "The farmer draws their plot on the map or selects their wilaya and commune. The system automatically calculates the number of sampling points, recommended depth and optimal pattern (zigzag, W, grid) based on area, crop and climate zone.",
+      "The farmer draws a plot on the map or selects the wilaya and commune. The system calculates sampling points, target depth, and the best collection pattern based on area, crop, and climate zone.",
     features: [
-      "Interactive map — draw or select the plot",
-      "Automatic calculation of sampling points by hectare",
-      "Zigzag / W / grid pattern recommended",
-      "Depth tailored to crop and soil type",
+      "Interactive map to draw or select the plot",
+      "Automatic number of sampling points per hectare",
+      "Recommended zigzag, W, or grid collection path",
+      "Depth adjusted to crop and local soil conditions",
     ],
-    color: "#1a6b2e",
-    accent: "#4caf50",
+    metrics: [
+      { value: "12", label: "Sampling points" },
+      { value: "0-40 cm", label: "Depth range" },
+      { value: "W/Grid", label: "Pattern logic" },
+    ],
+    accent: "#5bbf6b",
+    surface: "#edf8ef",
+    ink: "#14311a",
     image:
-      "https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=700&q=80",
-    bgColor: "linear-gradient(135deg, #0d2e14 0%, #1a4d22 100%)",
+      "https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=900&q=85",
+    imagePosition: "center center",
+    spotlightTitle: "Field setup",
+    spotlightText: "Build a plot-specific protocol before anyone enters the field.",
+    panelTitle: "Protocol Preview",
+    panelRows: ["3.0 ha plot", "12 points needed", "20 cm top layer"],
   },
   {
-    id: "farm-enterprise",
-    badge: "SATELLITE",
+    id: "vegetation-indices",
+    badge: "Satellite",
+    step: "02",
     name: "Vegetation Indices",
+    kicker: "Read crop vigor and moisture directly from imagery.",
     description:
-      "After selecting the plot, the system retrieves real satellite indices via AlphaEarth (Sentinel-2). NDVI for vegetation health, NDMI for soil moisture, NDRE for chlorophyll — with 12-month history and automatic alerts.",
+      "After plot selection, the platform retrieves satellite indicators from Sentinel-2. NDVI, NDMI, and NDRE reveal vegetation health, moisture stress, and chlorophyll behavior with a rolling history.",
     features: [
-      "NDVI — real-time vegetation health",
-      "NDMI — soil moisture and water stress",
-      "NDRE — chlorophyll content",
-      "12-month history + field alerts",
+      "NDVI for vegetation performance",
+      "NDMI for moisture and water-stress monitoring",
+      "NDRE for chlorophyll insight",
+      "Historical trends and alert-friendly readings",
     ],
-    color: "#2d6a4f",
-    accent: "#52b788",
+    metrics: [
+      { value: "6", label: "Indices tracked" },
+      { value: "12 mo", label: "History window" },
+      { value: "Live", label: "Signal refresh" },
+    ],
+    accent: "#69c7b2",
+    surface: "#eaf8f4",
+    ink: "#10302a",
     image:
-      "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&q=80",
-    bgColor: "linear-gradient(135deg, #0a2318 0%, #1a3d2e 100%)",
+      "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=900&q=85",
+    imagePosition: "center bottom",
+    spotlightTitle: "Remote sensing",
+    spotlightText: "See vegetation changes before they become expensive field issues.",
+    panelTitle: "Index Snapshot",
+    panelRows: ["NDVI 0.72", "NDMI moderate", "Stress low"],
   },
   {
-    id: "traceability",
-    badge: "PHASE 2",
+    id: "crop-recommendation",
+    badge: "Phase 2",
+    step: "03",
     name: "Crop Recommendation",
+    kicker: "Turn soil results into practical crop decisions.",
     description:
-      "The farmer enters soil properties: pH, organic matter, texture, salinity, temperature. The system calculates a compatibility score for each vegetable crop and displays personalized recommendations with diagnostics and alerts.",
+      "The farmer enters soil properties such as pH, organic matter, texture, salinity, and temperature. The system scores crop compatibility and presents tailored recommendations with reasoning and alerts.",
     features: [
-      "Enter pH, OM, texture, salinity, nitrogen",
-      "Compatibility score per crop",
-      "Alerts for pH too acid / alkaline / salinity",
-      "Top 6 recommended crops with explanation",
+      "Input pH, organic matter, texture, salinity, and nutrients",
+      "Compatibility score for each crop option",
+      "Warnings for acidity, alkalinity, and salinity issues",
+      "Top recommendations with plain-language explanations",
     ],
-    color: "#1b4332",
-    accent: "#74c69d",
+    metrics: [
+      { value: "Top 6", label: "Suggested crops" },
+      { value: "Score", label: "Compatibility model" },
+      { value: "Alerts", label: "Risk flags" },
+    ],
+    accent: "#e3a54d",
+    surface: "#fcf4e6",
+    ink: "#37240d",
     image:
-      "https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&q=80",
-    bgColor: "linear-gradient(135deg, #081c12 0%, #163327 100%)",
+      "https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=900&q=85",
+    imagePosition: "center center",
+    spotlightTitle: "Decision layer",
+    spotlightText: "Move from raw test values to crops that fit the land better.",
+    panelTitle: "Recommendation View",
+    panelRows: ["Pepper 91%", "Tomato 86%", "Zucchini 82%"],
   },
 ];
 
-const Products = () => {
+export default function Products() {
   const [activeProduct, setActiveProduct] = useState(0);
   const product = products[activeProduct];
 
   return (
     <section className="products">
       <div className="container">
-
         <div className="products__header">
-          <span className="section-label">Our Features</span>
-          <h2 className="section-title">How Does AGRIC Work?</h2>
+          <span className="section-label">How It Works</span>
+          <h2 className="section-title">A clearer path from field selection to crop decision</h2>
           <p className="section-subtitle">
-            A two-phase decision support system — first a personalized sampling
-            guide based on your plot, then crop recommendations based on your
-            soil properties.
+            The experience is designed like a guided workflow: define the plot, read the field
+            conditions, then convert results into recommendations that are actually usable.
           </p>
         </div>
 
-
-        <div className="products__tabs">
-          {products.map((p, i) => (
-            <button
-              key={p.id}
-              className={`products__tab ${i === activeProduct ? "products__tab--active" : ""}`}
-              onClick={() => setActiveProduct(i)}
-              style={
-                i === activeProduct
-                  ? { borderColor: p.accent, color: p.accent }
-                  : {}
-              }
-            >
-              <span className="products__tab-badge">{p.badge}</span>
-              <span className="products__tab-name">{p.name}</span>
-            </button>
-          ))}
-        </div>
-
-      
-        <div
-          className="products__showcase"
-          style={{ background: product.bgColor }}
-        >
-          <div className="products__showcase-content">
-            <div className="products__showcase-text">
-              <span
-                className="products__showcase-badge"
-                style={{
-                  background: `${product.accent}20`,
-                  color: product.accent,
-                }}
+        <div className="products__layout">
+          <div className="products__rail" role="tablist" aria-label="How AGRIC works">
+            {products.map((item, index) => (
+              <button
+                key={item.id}
+                className={`products__step ${index === activeProduct ? "products__step--active" : ""}`}
+                onClick={() => setActiveProduct(index)}
+                style={
+                  index === activeProduct
+                    ? {
+                        "--products-accent": item.accent,
+                        "--products-surface": item.surface,
+                        "--products-ink": item.ink,
+                      }
+                    : undefined
+                }
               >
-                {product.badge} — {product.name}
+                <span className="products__step-num">{item.step}</span>
+                <span className="products__step-copy">
+                  <span className="products__step-badge">{item.badge}</span>
+                  <span className="products__step-name">{item.name}</span>
+                  <span className="products__step-kicker">{item.kicker}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <article
+            className="products__spotlight"
+            style={{
+              "--products-accent": product.accent,
+              "--products-surface": product.surface,
+              "--products-ink": product.ink,
+            }}
+          >
+            <div className="products__spotlight-copy">
+              <span className="products__spotlight-badge">
+                {product.badge} / Step {product.step}
               </span>
-              <h3 className="products__showcase-title">{product.name}</h3>
-              <p className="products__showcase-desc">{product.description}</p>
+              <h3 className="products__spotlight-title">{product.name}</h3>
+              <p className="products__spotlight-desc">{product.description}</p>
+
+              <div className="products__metric-row">
+                {product.metrics.map((metric) => (
+                  <div key={metric.label} className="products__metric-card">
+                    <span className="products__metric-value">{metric.value}</span>
+                    <span className="products__metric-label">{metric.label}</span>
+                  </div>
+                ))}
+              </div>
 
               <ul className="products__features">
-                {product.features.map((f) => (
-                  <li key={f} className="products__feature">
-                    <span
-                      className="products__feature-check"
-                      style={{ background: product.accent }}
-                    >
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
-                        fill="none"
-                      >
+                {product.features.map((feature) => (
+                  <li key={feature} className="products__feature">
+                    <span className="products__feature-check">
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                         <path
                           d="M2.5 6L5 8.5L9.5 3.5"
-                          stroke="white"
+                          stroke="currentColor"
                           strokeWidth="1.5"
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         />
                       </svg>
                     </span>
-                    {f}
+                    <span>{feature}</span>
                   </li>
                 ))}
               </ul>
-
-              <div className="products__showcase-actions">
-                <a
-                  href="#"
-                  className="btn-primary"
-                  style={{ background: product.accent, color: "#0d2e14" }}
-                >
-                  Book a Meeting
-                </a>
-                <a
-                  href="#"
-                  className="products__learn-more"
-                  style={{ color: product.accent }}
-                >
-                  Learn More
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <path
-                      d="M3 8H13M13 8L9 4M13 8L9 12"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </a>
-              </div>
             </div>
 
-            <div className="products__showcase-image">
-              <div className="products__image-wrapper">
-                <img src={product.image} alt={product.name} />
+            <div className="products__visual">
+              <div className="products__visual-glow" />
+              <div className="products__image-shell">
+                <img
+                  src={product.image}
+                  alt={product.name}
+                  className="products__image"
+                  style={{ objectPosition: product.imagePosition }}
+                />
                 <div className="products__image-overlay" />
-            
-                <div className="products__dashboard-card">
-                  <div className="products__dashboard-header">
-                    <div
-                      className="products__dashboard-dot"
-                      style={{ background: product.accent }}
-                    />
-                    <span>Live Dashboard</span>
-                  </div>
-                  <div className="products__dashboard-stats">
-                    <div>
-                      <span className="products__dashboard-val">0.72</span>
-                      <span className="products__dashboard-lbl">
-                        NVDI actuel
-                      </span>
-                    </div>
-                    <div>
-                      <span className="products__dashboard-val">12</span>
-                      <span className="products__dashboard-lbl">
-                        Points sol
-                      </span>
-                    </div>
-                    <div>
-                      <span className="products__dashboard-val">3 ha</span>
-                      <span className="products__dashboard-lbl">Surface</span>
-                    </div>
-                  </div>
+              </div>
+
+              <div className="products__floating-card products__floating-card--summary">
+                <span className="products__floating-label">{product.spotlightTitle}</span>
+                <p>{product.spotlightText}</p>
+              </div>
+
+              <div className="products__floating-card products__floating-card--panel">
+                <div className="products__floating-header">
+                  <span className="products__floating-dot" />
+                  <span>{product.panelTitle}</span>
+                </div>
+                <div className="products__floating-list">
+                  {product.panelRows.map((row) => (
+                    <span key={row}>{row}</span>
+                  ))}
                 </div>
               </div>
             </div>
-          </div>
+          </article>
         </div>
       </div>
     </section>
   );
-};
-
-export default Products;
+}

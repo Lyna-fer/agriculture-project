@@ -84,9 +84,7 @@ export default function Hero({ onEnter }) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
 
- 
   const textRef = useRef(null);
-  const linesRef = useRef([]);
 
   const timerRef = useRef(null);
   const rafRef = useRef(null);
@@ -239,22 +237,6 @@ export default function Hero({ onEnter }) {
                     strokeWidth="1.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                  />
-                </svg>
-              </a>
-              <a href="#" className="btn-outline hero__btn-outline">
-                Watch Demo
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <circle
-                    cx="9"
-                    cy="9"
-                    r="7.5"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  />
-                  <path
-                    d="M7.5 6.75L11.25 9L7.5 11.25V6.75Z"
-                    fill="currentColor"
                   />
                 </svg>
               </a>

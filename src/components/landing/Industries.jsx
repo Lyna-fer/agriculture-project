@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./Industries.css";
 
 const zones = [
@@ -57,6 +57,7 @@ const zones = [
 export default function Industries() {
   const textRefs = useRef([]);
   const imgRefs = useRef([]);
+  const [activeZone, setActiveZone] = useState(0);
 
   useEffect(() => {
     let raf = null;
@@ -72,16 +73,29 @@ export default function Industries() {
         return Math.sin(progress * Math.PI);
       });
 
+      let maxIdx = 0;
+      let maxValue = -1;
+      bells.forEach((bell, idx) => {
+        if (bell > maxValue) {
+          maxValue = bell;
+          maxIdx = idx;
+        }
+      });
+      setActiveZone(maxIdx);
+
       textRefs.current.forEach((el, i) => {
         if (!el) return;
         const bell = bells[i];
-        el.style.opacity = bell.toFixed(3);
-        el.style.transform = `scale(${(0.8 + 0.2 * bell).toFixed(4)})`;
+        const opacity = Math.max(0.45, bell);
+        const translateY = 18 - bell * 18;
+        const scale = 0.97 + 0.03 * bell;
+
+        el.style.opacity = opacity.toFixed(3);
+        el.style.transform = `translateY(${translateY.toFixed(2)}px) scale(${scale.toFixed(4)})`;
       });
 
       imgRefs.current.forEach((img, i) => {
         if (!img) return;
-
         img.style.opacity = bells[i].toFixed(3);
       });
     };
@@ -117,6 +131,11 @@ export default function Industries() {
             The number of sampling points, depth, and required analyses vary
             according to the climate zone of your wilaya.
           </p>
+          <div className="ind__highlights">
+            <span>58 Wilayas Covered</span>
+            <span>4 Climate Families</span>
+            <span>Custom Protocol per Plot</span>
+          </div>
         </div>
 
         <div className="ind__cols">
@@ -124,13 +143,10 @@ export default function Industries() {
             {zones.map((z, i) => (
               <div
                 key={z.id}
-                className="ind__item"
+                className={`ind__item ${activeZone === i ? "ind__item--active" : ""}`}
                 ref={(el) => (textRefs.current[i] = el)}
-                style={{ opacity: 0, transform: "scale(0.8)" }}
+                style={{ opacity: 0, transform: "translateY(18px) scale(0.97)" }}
               >
-                <span className="ind__item-num" style={{ color: z.accent }}>
-                  {z.label}
-                </span>
                 <span className="ind__item-tag">{z.tag}</span>
                 <h3 className="ind__item-title">{z.title}</h3>
                 <p className="ind__item-desc">{z.desc}</p>

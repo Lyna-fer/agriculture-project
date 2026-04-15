@@ -5,7 +5,6 @@ import Products from "../components/landing/Products";
 import Industries from "../components/landing/Industries";
 import Stats from "../components/landing/Stats";
 import Testimonials from "../components/landing/Testimonials";
-import CTA from "../components/landing/CTA";
 import Footer from "../components/landing/Footer";
 import "../styles/landing.css";
 import { useNavigate } from "react-router-dom";
@@ -19,12 +18,21 @@ function Landing() {
     <>
       <Navbar onEnter={onEnter} />
       <main>
-        <Hero onEnter={onEnter} />
-        <Products />
-        <Industries />
-        <Stats />
-        <Testimonials />
-        <CTA />
+        <div id="hero">
+          <Hero onEnter={onEnter} />
+        </div>
+        <div id="features">
+          <Products />
+        </div>
+        <div id="zones">
+          <Industries />
+        </div>
+        <div id="insights">
+          <Stats />
+        </div>
+        <div id="testimonials">
+          <Testimonials />
+        </div>
       </main>
       <Footer />
     </>
