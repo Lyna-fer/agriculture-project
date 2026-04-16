@@ -266,6 +266,22 @@ export const MARAICHERES = [
     kReq: 180,
     soilType: "Sand",
   },
+  {
+    id: "melon",
+    name: "Melon",
+    nameEn: "Melon",
+    emoji: "🍈",
+    ph: [6.0, 7.5],
+    ec: 2.5,
+    tempMin: 18,
+    tempMax: 32,
+    nReq: 120,
+    pReq: 90,
+    kReq: 200,
+    soilType: "Clay Loam",
+    omMin: 2,
+    activeLimeMax: 10,
+  },
 ];
 
 /* ══════════════════════════════════════════════════

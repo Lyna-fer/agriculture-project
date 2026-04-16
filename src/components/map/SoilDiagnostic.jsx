@@ -17,8 +17,89 @@ const EMOJI_BG = {
   "🍅":"#ffd8d0","🥔":"#f5e6cc","🧅":"#f0e0c0","🧄":"#f0e8c0","🫑":"#d0f0d0",
   "🌶️":"#ffd0c0","🥒":"#d0f0e0","🍆":"#e0c8f8","🥕":"#ffe0c0","🥦":"#d0ecd0",
   "🥬":"#c8f0d0","🫘":"#f0e8d0","🍉":"#ffd0d8","🌾":"#f5f0d8","🌽":"#fff0c8",
-  "🫒":"#d8ecd0","🌴":"#d0e8c0","🍊":"#ffe0c0","🍋":"#fff8c8","🍇":"#e0d0f8",
+  "🍈":"#e8f6cc","🫒":"#d8ecd0","🌴":"#d0e8c0","🍊":"#ffe0c0","🍋":"#fff8c8","🍇":"#e0d0f8",
   "🍑":"#ffdcc8","🍎":"#ffd0d0","🍒":"#ffc8cc","🍐":"#e0f0d0",
+};
+
+const CROP_LIMITS = {
+  tomate: { omMin: 2, activeLimeMax: 10 },
+  pomme_terre: { omMin: 2, activeLimeMax: 5 },
+  oignon: { omMin: 2, activeLimeMax: 10 },
+  ail: { omMin: 2, activeLimeMax: 10 },
+  poivron: { omMin: 2, activeLimeMax: 10 },
+  piment: { omMin: 2, activeLimeMax: 10 },
+  courgette: { omMin: 2, activeLimeMax: 10 },
+  aubergine: { omMin: 2, activeLimeMax: 10 },
+  concombre: { omMin: 2, activeLimeMax: 10 },
+  carotte: { omMin: 2, activeLimeMax: 8 },
+  navet: { omMin: 2, activeLimeMax: 10 },
+  betterave: { omMin: 2, activeLimeMax: 12 },
+  chou_fleur: { omMin: 2, activeLimeMax: 10 },
+  laitue: { omMin: 2, activeLimeMax: 10 },
+  haricot_vert: { omMin: 2, activeLimeMax: 10 },
+  petits_pois: { omMin: 2, activeLimeMax: 10 },
+  feve: { omMin: 2, activeLimeMax: 12 },
+  artichaut: { omMin: 2, activeLimeMax: 15 },
+  pasteque: { omMin: 2, activeLimeMax: 8 },
+  melon: { omMin: 2, activeLimeMax: 10 },
+
+  ble_dur: { omMin: 1.5, activeLimeMax: 15 },
+  ble_tendre: { omMin: 1.5, activeLimeMax: 15 },
+  orge: { omMin: 1, activeLimeMax: 15 },
+  avoine: { omMin: 1.5, activeLimeMax: 10 },
+  mais: { omMin: 2, activeLimeMax: 10 },
+  sorgho: { omMin: 1, activeLimeMax: 15 },
+  triticale: { omMin: 1.5, activeLimeMax: 15 },
+  seigle: { omMin: 1, activeLimeMax: 10 },
+  millet: { omMin: 1, activeLimeMax: 15 },
+  quinoa: { omMin: 1, activeLimeMax: 15 },
+  riz: { omMin: 2, activeLimeMax: 5 },
+  lentille: { omMin: 1.5, activeLimeMax: 10 },
+  pois_chiche: { omMin: 1.5, activeLimeMax: 12 },
+  feve_cereale: { omMin: 1.5, activeLimeMax: 10 },
+  vesce: { omMin: 1.5, activeLimeMax: 10 },
+  luzerne: { omMin: 1.5, activeLimeMax: 15 },
+  trefle: { omMin: 1.5, activeLimeMax: 12 },
+  mais_fourrage: { omMin: 2, activeLimeMax: 10 },
+  pois_fourrage: { omMin: 1.5, activeLimeMax: 10 },
+  fenugrec: { omMin: 1.5, activeLimeMax: 12 },
+
+  olivier: { omMin: 1, activeLimeMax: 20 },
+  palmier: { omMin: 1, activeLimeMax: 15 },
+  oranger: { omMin: 1.5, activeLimeMax: 7 },
+  mandarinier: { omMin: 1.5, activeLimeMax: 7 },
+  citronnier: { omMin: 1.5, activeLimeMax: 7 },
+  vigne: { omMin: 1.5, activeLimeMax: 20 },
+  figuier: { omMin: 1, activeLimeMax: 15 },
+  amandier: { omMin: 1, activeLimeMax: 20 },
+  abricotier: { omMin: 1.5, activeLimeMax: 10 },
+  pommier: { omMin: 1.5, activeLimeMax: 8 },
+  poirier: { omMin: 1.5, activeLimeMax: 7 },
+  grenadier: { omMin: 1.5, activeLimeMax: 15 },
+  cerisier: { omMin: 1.5, activeLimeMax: 10 },
+  pecher: { omMin: 1.5, activeLimeMax: 7 },
+  prunier: { omMin: 1.5, activeLimeMax: 10 },
+  nectarinier: { omMin: 1.5, activeLimeMax: 7 },
+  cognassier: { omMin: 1.5, activeLimeMax: 10 },
+  neflier: { omMin: 1.5, activeLimeMax: 10 },
+  pistachier: { omMin: 1, activeLimeMax: 15 },
+  noyer: { omMin: 2, activeLimeMax: 10 },
+};
+
+const SOIL_TEXTURE_TO_KEY = {
+  "Clay Loam": "limon-argileux",
+  "Loam": "limoneux",
+  "Sandy Loam": "sablo-limoneux",
+  "Sand": "sableux",
+  "Clay": "argileux",
+};
+
+const SOIL_TEXTURE_LABEL = {
+  "limon-argileux": "Clay loam",
+  limoneux: "Loam",
+  "sablo-limoneux": "Sandy loam",
+  sableux: "Sandy",
+  argileux: "Clay",
 };
 
 function inferSeasons(c) {
@@ -30,13 +111,19 @@ function inferSeasons(c) {
 }
 
 function toCrop(c) {
+  const limits = CROP_LIMITS[c.id] || { omMin: c.omMin ?? 1.5, activeLimeMax: c.activeLimeMax ?? 15 };
+  const prefTex = SOIL_TEXTURE_TO_KEY[c.soilType] || "limon-argileux";
   return {
     id: c.id, n: c.nameEn, e: c.emoji,
     bg: EMOJI_BG[c.emoji] || "#f0f0f0",
     lat: c.nameEn, ph: c.ph, ce: c.ec,
     tMn: c.tempMin, tMx: c.tempMax, nHi: c.nReq > 100,
+    limeMx: limits.activeLimeMax,
+    omMin: limits.omMin,
+    soilType: c.soilType,
+    prefTex,
     ss: inferSeasons(c),
-    note: `Soil ${c.soilType}. N: ${c.nReq} · P: ${c.pReq} · K: ${c.kReq} mg/kg`,
+    note: `Soil ${c.soilType}. N: ${c.nReq} · P: ${c.pReq} · K: ${c.kReq} mg/kg · OM >= ${limits.omMin}% · Active lime <= ${limits.activeLimeMax}%`,
   };
 }
 
@@ -48,6 +135,9 @@ const ZC = {
   n:    [{c:"#ff8a80",f:20},{c:"#ffcc80",f:15},{c:"#a5d6a7",f:35},{c:"#ffcc80",f:15},{c:"#ff8a80",f:15}],
   p:    [{c:"#ff8a80",f:20},{c:"#ffcc80",f:15},{c:"#a5d6a7",f:40},{c:"#ffcc80",f:15},{c:"#ff8a80",f:10}],
   k:    [{c:"#ff8a80",f:20},{c:"#ffcc80",f:15},{c:"#a5d6a7",f:40},{c:"#ffcc80",f:15},{c:"#ff8a80",f:10}],
+  lime: [{c:"#a5d6a7",f:45},{c:"#ffcc80",f:25},{c:"#ff8a80",f:30}],
+  wind: [{c:"#a5d6a7",f:42},{c:"#ffcc80",f:28},{c:"#ff8a80",f:30}],
+  poll: [{c:"#a5d6a7",f:45},{c:"#ffcc80",f:20},{c:"#ff8a80",f:35}],
 };
 
 const mc   = m => m>=80 ? "#1a7a50" : m>=60 ? "#b06010" : "#c02020";
@@ -60,6 +150,9 @@ const PARAMS = [
   {id:"p",   name:"Phosphore P",u:"mg/kg",mn:0, mx:50 },
   {id:"k",   name:"Potassium K",u:"mg/kg",mn:0, mx:400},
   {id:"temp",name:"Temp. sol",  u:"°C",   mn:0, mx:40 },
+  {id:"lime",name:"Active Lime",u:"%",    mn:0, mx:30 },
+  {id:"wind",name:"Wind",       u:"km/h", mn:0, mx:80 },
+  {id:"poll",name:"Pollution",  u:"idx",  mn:0, mx:100},
 ];
 
 const SN = {
@@ -71,19 +164,22 @@ const SN = {
 
 function calcScore(st) {
   let s = 100;
-  const { ph, ce, temp, n, p, k, mo } = st;
+  const { ph, ce, temp, n, p, k, mo, lime, wind, poll } = st;
   if (ph<5.5||ph>8) s-=18; else if (ph<6||ph>7.5) s-=7;
   if (ce>4) s-=22; else if (ce>2) s-=11;
   if (temp<8||temp>36) s-=12; else if (temp<14||temp>30) s-=5;
   if (n<20||n>80) s-=10; else if (n<30||n>65) s-=4;
   if (p<10||p>45) s-=8; else if (p<15||p>35) s-=3;
   if (k<80||k>350) s-=8; else if (k<130||k>280) s-=3;
+  if (lime>20) s-=10; else if (lime>12) s-=4;
+  if (wind>45) s-=10; else if (wind>30) s-=4;
+  if (poll>70) s-=18; else if (poll>45) s-=10; else if (poll>25) s-=4;
   if (mo==="tres-bas") s-=12; else if (mo==="bas") s-=5; else if (mo==="excellent") s+=5;
   return Math.max(0, Math.min(100, Math.round(s)));
 }
 
 function pSt(id, v) {
-  const R = { ph:[6,7.5], ce:[0,2], n:[30,65], p:[15,35], k:[130,280], temp:[14,30] };
+  const R = { ph:[6,7.5], ce:[0,2], n:[30,65], p:[15,35], k:[130,280], temp:[14,30], lime:[0,12], wind:[0,30], poll:[0,25] };
   const [lo,hi] = R[id] || [0,100];
   if (v>=lo && v<=hi) return "ok";
   if (id==="ce") return "hi";
@@ -92,24 +188,34 @@ function pSt(id, v) {
 
 function cropScore(c, st) {
   let m = 100;
-  const { ph, ce, temp, n, seas } = st;
+  const { ph, ce, temp, n, seas, lime, wind, poll, mo } = st;
   if (ph<c.ph[0]||ph>c.ph[1]) m -= ph<c.ph[0]-1||ph>c.ph[1]+1 ? 24 : 12;
   if (ce>c.ce) m -= ce>c.ce+1.5 ? 20 : 10;
   if (temp<c.tMn) m -= temp<c.tMn-6 ? 20 : 10;
   if (temp>c.tMx) m -= temp>c.tMx+6 ? 15 : 7;
   if (!c.ss.includes(seas)) m -= 16;
   if (c.nHi && n<25) m -= 10;
-  if (st.mo==="tres-bas" && c.nHi) m -= 8;
+  if (mo==="tres-bas" && c.nHi) m -= 8;
+  if (lime>c.limeMx) m -= lime>c.limeMx+5 ? 16 : 8;
+  if (poll>45) m -= poll>70 ? 22 : 10;
+  if (wind>45) m -= 8;
+  if (c.omMin > 2 && (mo === "tres-bas" || mo === "bas")) m -= 6;
+  if (st.tex !== c.prefTex) m -= 8;
   return Math.max(0, Math.round(m));
 }
 
 function cropAdj(c, st) {
   const adj = [];
-  const { ph, ce, temp, seas } = st;
+  const { ph, ce, temp, seas, lime, wind, poll, mo } = st;
   if (ph<c.ph[0]) adj.push({t:`Correct acidity - lime application (target pH ${c.ph[0]}-${c.ph[1]})`,bg:"#fff3c0"});
   if (ph>c.ph[1]) adj.push({t:"Reduce alkalinity - agricultural sulfur",bg:"#fff3c0"});
   if (ce>c.ce)    adj.push({t:"High salinity - leach soil before planting",bg:"#ffc0c0"});
   if (temp<c.tMn) adj.push({t:`Soil too cold - wait for >= ${c.tMn}°C`,bg:"#c0d8ff"});
+  if (lime>c.limeMx) adj.push({t:`Active lime too high - use tolerant crops or acidifying strategy (target <= ${c.limeMx}%)`,bg:"#fff3c0"});
+  if (wind>35) adj.push({t:"Strong wind risk - add windbreaks and adjust irrigation scheduling",bg:"#ffe8c0"});
+  if (poll>35) adj.push({t:"Soil pollution risk - run heavy metal and residue lab panel before planting",bg:"#ffc0c0"});
+  if (c.omMin > 2 && (mo === "tres-bas" || mo === "bas")) adj.push({t:`Increase organic matter to at least ${c.omMin}% (compost + cover crops)`,bg:"#fff3c0"});
+  if (st.tex !== c.prefTex) adj.push({t:`Texture mismatch - preferred soil type: ${c.soilType} (${SOIL_TEXTURE_LABEL[c.prefTex]})`,bg:"#fff3c0"});
   if (!c.ss.includes(seas)) adj.push({t:`Non-optimal season - prefer ${c.ss.join(" or ")}`,bg:"#fff3c0"});
   return adj;
 }
@@ -120,6 +226,9 @@ const freshSt = (mode = "eco") => ({
   ce:   mode==="eco" || mode==="standard" ? SAT_DEFAULTS.ce   : 1.2,
   temp: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.temp : 18,
   n: 45, p: 22, k: 180,
+  lime: 8,
+  wind: 12,
+  poll: 10,
   tex: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.tex : "limon-argileux",
   mo: "moyen", seas: "ete", crop: "",
 });
@@ -180,7 +289,7 @@ function Slider({ id, label, unit, min, max, step, value, onChange, zones, badge
 }
 
 /* ZONE FORM */
-function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange, crops, cultureLabel, onAnalyze, analyzing ,hasResult}) {
+function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultureLabel, onAnalyze, analyzing, hasResult }) {
   // ✅ LOCK fields ONLY in Eco mode. Standard mode stays fully editable.
   const isSat = id => diagMode === "eco" && id in SAT_FIELDS;
 
@@ -217,6 +326,7 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
         <Slider id="n" label="Nitrogen (N)"   unit="mg/kg" min={0}  max={100} step={1} value={st.n} onChange={onChange} zones l="Low"    m="30–60 Optimal" r="High" />
         <Slider id="p" label="Phosphorus (P)" unit="mg/kg" min={0}  max={50}  step={1} value={st.p} onChange={onChange} zones l="0"      m="15–30 Optimal" r="50" />
         <Slider id="k" label="Potassium (K)"  unit="mg/kg" min={0}  max={400} step={5} value={st.k} onChange={onChange} zones l="0"      m="130–250 Opt."  r="400" />
+        <Slider id="lime" label="Active Lime" unit="%" min={0} max={30} step={1} value={st.lime} onChange={onChange} zones l="0 Low" m="8–12 Preferred" r="30 High" />
       </div>
 
       {/* 3 - Physical */}
@@ -240,6 +350,7 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
               {[
                 {val:"limon-argileux",label:"Clay loam", sub:"Ideal for vegetables"},
                 {val:"limoneux",      label:"Loam",      sub:"Very fertile"},
+                {val:"sablo-limoneux",label:"Sandy loam",sub:"Balanced drainage"},
                 {val:"sableux",       label:"Sandy",     sub:"Fast drainage"},
                 {val:"argileux",      label:"Clay",      sub:"High retention"},
               ].map(o => (
@@ -285,9 +396,16 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
         </div>
       </div>
 
-      {/* 4 - Season */}
+      {/* 4 - Environment */}
       <div className="sd-sec">
-        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>4</span>Growing Season</div>
+        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>4</span>Environmental Risks</div>
+        <Slider id="wind" label="Wind Speed" unit="km/h" min={0} max={80} step={1} value={st.wind} onChange={onChange} zones l="0 Calm" m="10–25 Moderate" r="80 Strong" />
+        <Slider id="poll" label="Soil Pollution Index" unit="idx" min={0} max={100} step={1} value={st.poll} onChange={onChange} zones l="0 Clean" m="25 Alert" r="100 Critical" />
+      </div>
+
+      {/* 5 - Season */}
+      <div className="sd-sec">
+        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>5</span>Growing Season</div>
         <div className="sd-seas-row">
           {[
             {val:"printemps",em:"🌱",label:"Spring"},
@@ -306,10 +424,10 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
         </div>
       </div>
 
-      {/* 5 - Crop */}
+      {/* 6 - Crop */}
       <div className="sd-sec">
         <div className="sd-sec-lbl">
-          <span className="sd-sec-num" style={{background:color}}>5</span>
+          <span className="sd-sec-num" style={{background:color}}>6</span>
           Target Crop
           <span className="sd-sec-opt"> - optional</span>
         </div>
@@ -330,28 +448,12 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
       {/* Submit */}
       <div className="sd-sub-wrap">
         {hasResult ? (
-          nZones > 1 && zoneIdx < nZones - 1 ? (
-            <button
-              className="sd-sub-btn"
-              style={{
-                background: `linear-gradient(135deg,${color},${color}cc)`,
-                boxShadow: `0 6px 0 ${color}44,0 10px 24px ${color}28`
-              }}
-              onClick={onNext}
-            >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M5 2l6 5-6 5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Analyze Zone {zoneIdx + 2}
-            </button>
-          ) : (
-            <div className="sd-all-done-btn">
-              <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-                <path d="M2.5 7.5l3.5 3.5 6.5-7" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              All zones analyzed ✓
-            </div>
-          )
+          <div className="sd-zone-done-hint" style={{ borderColor: `${color}44`, background: `${color}12`, color }}>
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M2.5 7.5l3.5 3.5 6.5-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Zone {zoneIdx + 1} analyzed. Continue from the results panel.
+          </div>
         ) : (
           <button
             className="sd-sub-btn"
@@ -374,7 +476,7 @@ function ZoneForm({ zoneIdx,nZones,onNext, color, light, diagMode, st, onChange,
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M3 8.5L6.5 12l6.5-8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                  Analyze Zone {zoneIdx + 1}
+                Analyze Zone {zoneIdx + 1}
               </>
             )}
           </button>
@@ -418,6 +520,8 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
         <div className="sd-score-meta">
           <span className="sd-score-meta-chip">Season: {st.seas}</span>
           <span className="sd-score-meta-chip">Texture: {st.tex}</span>
+          <span className="sd-score-meta-chip">Wind: {st.wind} km/h</span>
+          <span className="sd-score-meta-chip">Pollution: {st.poll}</span>
           <span className="sd-score-meta-chip">
             {diagMode==="eco" || diagMode==="standard" ? "Satellite-assisted" : "Manual inputs"}
           </span>
@@ -448,7 +552,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
 
       {/* 6 param pills */}
       <div className="sd-param-pills sd-a2">
-        {[PARAMS.slice(0,3), PARAMS.slice(3)].map((row,ri) => (
+        {[PARAMS.slice(0,3), PARAMS.slice(3,6), PARAMS.slice(6)].map((row,ri) => (
           <div key={ri} className="sd-param-pill-row">
             {row.map(p => {
               const v = st[p.id], sta = pSt(p.id,v);
@@ -880,7 +984,6 @@ export default function SoilDiagnostic({
               key={`${activeZone}-${diagMode}`}
               zoneIdx={activeZone}
               nZones={n}
-              onNext={() => setActiveZone(prev => Math.min(n-1, prev+1))}
               color={color}
               light={light}
               diagMode={diagMode}
@@ -940,7 +1043,7 @@ function mapSoilTypeToTexture(soilType) {
     "Clay Loam": "limon-argileux",
     "Loam": "limoneux",
     "Silt Loam": "limoneux",
-    "Sandy Loam": "sableux",
+    "Sandy Loam": "sablo-limoneux",
     "Sand": "sableux",
   };
   return map[soilType] || "limon-argileux";
