@@ -16,7 +16,7 @@ Les entrées agronomiques prises en compte incluent : **pH, N, P, K, salinité, 
 
 ---
 
-## Abstract (FR court)
+## Abstract (EN)
 This dissertation presents a web-based agricultural decision-support system for Algerian farming conditions.  
 The proposed workflow has two phases: map-based soil sampling guidance, then soil-parameter-based crop recommendation.  
 The system handles three study groups (vegetables, cereals, perennial crops) and evaluates both top group recommendations and the feasibility of a user-selected crop with corrective actions.
@@ -94,6 +94,9 @@ La solution est structurée autour de deux modules logiques :
 ### Stack utilisée
 - Frontend web avec **React + Vite**.
 - Cartographie interactive (Leaflet et extensions associées).
+- Backend API avec **FastAPI** (Python).
+- Accès données via **SQLAlchemy** vers **PostgreSQL/Neon** avec support géospatial (**GeoAlchemy2/PostGIS**).
+- Intégration de traitements géospatiaux et indicateurs via **Google Earth Engine**.
 
 ### Réalisation fonctionnelle
 - Les sections d’atterrissage (landing) décrivent explicitement le flux en 2 phases.
@@ -137,10 +140,15 @@ Le travail constitue une base solide pour des extensions futures orientées pré
 
 ---
 
-## Bibliographie indicative (à compléter selon vos références exactes)
-- Ouvrages et articles sur les DSS agricoles.
-- Référentiels agronomiques sur pH, N, P, K, salinité et texture des sols.
-- Documentation technique : React, Vite, Leaflet.
+## Bibliographie indicative
+1. Food and Agriculture Organization (FAO). (1976). *A Framework for Land Evaluation*. FAO Soils Bulletin 32.
+2. Food and Agriculture Organization (FAO). (2006). *Guidelines for Soil Description* (4th ed.). Rome.
+3. Rhoades, J. D., Chanduvi, F., & Lesch, S. (1999). *Soil Salinity Assessment: Methods and Interpretation of Electrical Conductivity Measurements*. FAO Irrigation and Drainage Paper 57.
+4. FastAPI Documentation. (2026). https://fastapi.tiangolo.com/
+5. React Documentation. (2026). https://react.dev/
+6. Vite Documentation. (2026). https://vitejs.dev/
+7. Leaflet Documentation. (2026). https://leafletjs.com/
+8. Google Earth Engine Documentation. (2026). https://developers.google.com/earth-engine
 
 ---
 
