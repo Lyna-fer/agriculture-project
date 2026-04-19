@@ -59,9 +59,9 @@ const cards = [
     eyebrow: "Crop guidance",
     img: "https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=900&q=85",
     imgPos: "center top",
-    stat: { value: 30, suffix: "+", label: "Vegetable crops" },
-    text: "Recommendations adapted to your soil pH, texture, and organic matter.",
-    detail: "From leafy greens to field vegetables, each protocol stays practical.",
+    stat: { value: 3, suffix: "", label: "Crop study groups" },
+    text: "Recommendations adapted to soil pH, NPK, salinity, texture, and temperature.",
+    detail: "Covers vegetables, cereals, and permanent crops with group-specific logic.",
   },
   {
     tone: {

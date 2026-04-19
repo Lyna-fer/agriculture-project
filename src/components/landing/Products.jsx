@@ -9,12 +9,12 @@ const products = [
     name: "Sampling Guide",
     kicker: "Map your field and generate the right collection plan.",
     description:
-      "The farmer draws a plot on the map or selects the wilaya and commune. The system calculates sampling points, target depth, and the best collection pattern based on area, crop, and climate zone.",
+      "The farmer draws a plot on the map, chooses one of the 3 crop groups (vegetables, cereals, permanent crops), and gets the number of points, depth, and pattern (zigzag/W/grid) based on area, region, and season.",
     features: [
       "Interactive map to draw or select the plot",
       "Automatic number of sampling points per hectare",
       "Recommended zigzag, W, or grid collection path",
-      "Depth adjusted to crop and local soil conditions",
+      "Depth and protocol adapted to crop group and local soil conditions",
     ],
     metrics: [
       { value: "12", label: "Sampling points" },
@@ -69,17 +69,17 @@ const products = [
     name: "Crop Recommendation",
     kicker: "Turn soil results into practical crop decisions.",
     description:
-      "The farmer enters soil properties such as pH, organic matter, texture, salinity, and temperature. The system scores crop compatibility and presents tailored recommendations with reasoning and alerts.",
+      "The farmer fills soil properties (pH, N, P, K, salinity, temperature, texture, organic matter). The system returns the best crops for the selected group, explains why, and validates a user-selected crop with required soil adjustments.",
     features: [
-      "Input pH, organic matter, texture, salinity, and nutrients",
-      "Compatibility score for each crop option",
+      "Input pH, N, P, K, salinity, temperature, texture, and organic matter",
+      "Compatibility score for each crop option in the selected group",
       "Warnings for acidity, alkalinity, and salinity issues",
-      "Top recommendations with plain-language explanations",
+      "Top recommendations + feasibility check for a chosen crop",
     ],
     metrics: [
-      { value: "Top 6", label: "Suggested crops" },
+      { value: "Top 4", label: "Suggested crops" },
       { value: "Score", label: "Compatibility model" },
-      { value: "Alerts", label: "Risk flags" },
+      { value: "3 groups", label: "Study cases" },
     ],
     accent: "#e3a54d",
     surface: "#fcf4e6",
