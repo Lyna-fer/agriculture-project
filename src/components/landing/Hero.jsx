@@ -24,7 +24,7 @@ const slides = [
     tagline: "SATELLITE DATA",
     title: ["Monitor Your Plot State", "in Real Time"],
     subtitle:
-      "NDVI, NDRE, NDMI indices calculated from Sentinel-2 imagery — visualize vegetation health and soil water stress on your plot.",
+      "NDVI, NDRE, NDMI and related indicators from Sentinel/MODIS-style imagery — visualize vegetation health and soil water stress on your plot.",
   },
   {
     id: 3,
@@ -32,7 +32,7 @@ const slides = [
     tagline: "CROP RECOMMENDATION",
     title: ["Which Crop", "for Your Soil?"],
     subtitle:
-      "Enter your pH, organic matter and soil texture — the system recommends the best vegetable crops with a compatibility score.",
+      "Enter pH, NPK, salinity, temperature, and texture — the system ranks the best options for vegetable, cereal, or permanent crops and checks your chosen crop.",
   },
   {
     id: 4,
