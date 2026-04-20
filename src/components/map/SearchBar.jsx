@@ -59,10 +59,11 @@ export default function SearchBar({ onSelectWilaya }) {
             return (
               <button key={w.code} className="search-result" onClick={() => handleSelect(w)}>
                 <div className="result-left">
-                  <span className="result-flag">🇩🇿</span>
                   <div>
                     <div className="result-name">{w.name}</div>
-                    <div className="result-code">Province {w.code}</div>
+                    <div className="result-meta">
+                      <span>Province {w.code}</span>
+                    </div>
                   </div>
                 </div>
                 <span

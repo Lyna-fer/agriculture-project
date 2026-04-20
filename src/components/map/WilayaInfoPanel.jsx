@@ -65,15 +65,28 @@ export default function WilayaInfoPanel({ wilaya, selectedCultureId, onClose }) 
         <span className="wilaya-close-x">✕</span>
       </button>
 
-      <div className="wilaya-header" style={{ background: zone.bg }}>
-        <div className="wilaya-flag">🇩🇿</div>
+      <div
+        className="wilaya-header"
+        style={{
+          background: `
+            radial-gradient(circle at 16% 14%, rgba(255,255,255,0.34), transparent 24%),
+            linear-gradient(135deg, ${zone.bg}, ${zone.text} 180%)
+          `,
+        }}
+      >
         <div>
           <div className="wilaya-name">{wilaya.name}</div>
           <div className="wilaya-code" style={{ color: zone.text, opacity: 0.75 }}>
             Province {wilaya.code} · {wilaya.lat.toFixed(3)}°N, {wilaya.lng.toFixed(3)}°E
           </div>
         </div>
-        <div className="wilaya-zone-badge" style={{ background: zone.text, color: zone.bg }}>
+        <div
+          className="wilaya-zone-badge"
+          style={{
+            background: `linear-gradient(180deg, rgba(255,255,255,0.28), rgba(255,255,255,0.08)), ${zone.text}`,
+            color: zone.bg,
+          }}
+        >
           {zone.label}
         </div>
       </div>
@@ -88,13 +101,20 @@ export default function WilayaInfoPanel({ wilaya, selectedCultureId, onClose }) 
 
         {rec && (
           <div className="wilaya-rec">
-            <div className="wilaya-rec-label">💡 Advice for this zone</div>
+            <div className="wilaya-rec-top">
+              <div className="wilaya-rec-label">Zone guidance</div>
+              <div className="wilaya-rec-chip">Crop-aware</div>
+            </div>
             <p>{rec}</p>
           </div>
         )}
 
         {!rec && (
           <div className="wilaya-rec muted">
+            <div className="wilaya-rec-top">
+              <div className="wilaya-rec-label">Zone guidance</div>
+              <div className="wilaya-rec-chip">Select a crop</div>
+            </div>
             <p>Select a crop type to get recommendations specific to this zone.</p>
           </div>
         )}

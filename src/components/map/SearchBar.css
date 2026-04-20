@@ -91,14 +91,20 @@
   align-items: center;
   gap: 10px;
 }
-.result-flag { font-size: 1rem; }
 .result-name {
-  font-family: 'Syne', sans-serif;
+  font-family: "DM Sans", sans-serif;
   font-size: 0.85rem;
   font-weight: 700;
   color: var(--soil-dark);
 }
-.result-code { font-size: 0.68rem; color: var(--soil-mid); }
+.result-meta {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-top: 0;
+  font-size: 0.68rem;
+  color: var(--soil-mid);
+}
 .result-zone {
   font-size: 0.62rem;
   font-weight: 600;
