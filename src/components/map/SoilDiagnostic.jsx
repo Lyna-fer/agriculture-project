@@ -5,7 +5,11 @@ import { getCropsByGroup } from "../../data/cropData";
 
 /* ─── Satellite defaults ─────────────────────────────────────────────────── */
 const SAT_DEFAULTS = { ce: 1.2, temp: 22, tex: "limon-argileux" };
-const SAT_FIELDS   = { ce: "Sentinel-2", temp: "MODIS", tex: "AlphaEarth" };
+const SAT_FIELDS   = {
+  ce: "Landsat 8",
+  temp: "MODIS (Terra/Aqua)",
+  tex: "OpenLandMap / SoilGrids (Global Soil Map)",
+};
 const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 /* ─── Zone colour palette ────────────────────────────────────────────────── */
@@ -308,7 +312,7 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
             <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2" />
             <circle cx="5" cy="5" r="1.5" fill="currentColor" />
           </svg>
-          EC · Texture imported from satellite - not editable
+          CE: Landsat 8 · Texture: OpenLandMap / SoilGrids (Global Soil Map) · Surface Temp: MODIS (Terra/Aqua)
         </div>
       )}
 
@@ -316,7 +320,7 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
       <div className="sd-sec">
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>1</span>Soil Chemistry</div>
         <Slider id="ph"   label="Soil pH"          unit="pH"   min={4}  max={9}  step={0.1} value={st.ph}   onChange={onChange} zones badge l="4.0 Acidic"  m="6.5 Neutral"      r="9.0 Alkaline" />
-        <Slider id="ce"   label="Salinity (EC)"    unit="dS/m" min={0}  max={6}  step={0.1} value={st.ce}   onChange={onChange} zones badge l="0 None"      m="2.0 Limit"        r="6.0 Critical"   locked={isSat("ce")}   src="Sentinel-2" />
+        <Slider id="ce"   label="Salinity (EC)"    unit="dS/m" min={0}  max={6}  step={0.1} value={st.ce}   onChange={onChange} zones badge l="0 None"      m="2.0 Limit"        r="6.0 Critical"   locked={isSat("ce")}   src={SAT_FIELDS.ce} />
       </div>
 
       {/* 2 - NPK */}
@@ -341,7 +345,7 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
                     <circle cx="3.5" cy="3.5" r="2.8" stroke="currentColor" strokeWidth="1.1" />
                     <circle cx="3.5" cy="3.5" r="1" fill="currentColor" />
                   </svg>
-                  AlphaEarth
+                  {SAT_FIELDS.tex}
                 </span>
               )}
             </div>
