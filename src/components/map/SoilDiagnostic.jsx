@@ -308,7 +308,7 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
             <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2" />
             <circle cx="5" cy="5" r="1.5" fill="currentColor" />
           </svg>
-          EC · Temperature · Texture imported from satellite - not editable
+          EC · Texture imported from satellite - not editable
         </div>
       )}
 
@@ -317,7 +317,6 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>1</span>Soil Chemistry</div>
         <Slider id="ph"   label="Soil pH"          unit="pH"   min={4}  max={9}  step={0.1} value={st.ph}   onChange={onChange} zones badge l="4.0 Acidic"  m="6.5 Neutral"      r="9.0 Alkaline" />
         <Slider id="ce"   label="Salinity (EC)"    unit="dS/m" min={0}  max={6}  step={0.1} value={st.ce}   onChange={onChange} zones badge l="0 None"      m="2.0 Limit"        r="6.0 Critical"   locked={isSat("ce")}   src="Sentinel-2" />
-        <Slider id="temp" label="Soil Temperature" unit="°C"   min={0}  max={40} step={1}   value={st.temp} onChange={onChange} zones badge l="0°C Cold"   m="15–25°C Optimal" r="40°C Hot"      locked={isSat("temp")} src="MODIS" />
       </div>
 
       {/* 2 - NPK */}
@@ -399,7 +398,6 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
       {/* 4 - Environment */}
       <div className="sd-sec">
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>4</span>Environmental Risks</div>
-        <Slider id="wind" label="Wind Speed" unit="km/h" min={0} max={80} step={1} value={st.wind} onChange={onChange} zones l="0 Calm" m="10–25 Moderate" r="80 Strong" />
         <Slider id="poll" label="Soil Pollution Index" unit="idx" min={0} max={100} step={1} value={st.poll} onChange={onChange} zones l="0 Clean" m="25 Alert" r="100 Critical" />
       </div>
 
@@ -520,6 +518,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
         <div className="sd-score-meta">
           <span className="sd-score-meta-chip">Season: {st.seas}</span>
           <span className="sd-score-meta-chip">Texture: {st.tex}</span>
+          <span className="sd-score-meta-chip">Temp: {st.temp}°C</span>
           <span className="sd-score-meta-chip">Wind: {st.wind} km/h</span>
           <span className="sd-score-meta-chip">Pollution: {st.poll}</span>
           <span className="sd-score-meta-chip">
@@ -1009,7 +1008,7 @@ export default function SoilDiagnostic({
                   <div className="sd-idle-t">Results here</div>
                   <div className="sd-idle-s">
                     {(diagMode==="eco" || diagMode==="standard")
-                      ? "Mode active. EC, Temp, and Texture are preloaded from satellite. Enter NPK and start analysis."
+                        ? "Mode active. EC and Texture are preloaded from satellite. Enter NPK and start analysis."
                       : "Enter soil parameters and start analysis to get recommendations."}
                   </div>
                 </div>

@@ -19,20 +19,86 @@ function PatternDiagram({ type, color, size = 110 }) {
   return diagrams[type] || diagrams.zigzag;
 }
 
-function buildKpis(data, nSamples, parcelleHa) {
+function buildKpis(data, parcelleHa) {
   const fmtHa = ha => ha < 0.1 ? `${(ha*10000).toFixed(0)} m²` : `${ha.toFixed(2)} ha`;
   return [
-    { val: nSamples, lbl: "Sampling\npoints", icon: "📍", bg: "#fff0f6", color: "#ff6b9d" },
     { val: `${data.depths.at(-1).label.split("–")[1].trim()}`, lbl: "Max\ndepth", icon: "⬇️", bg: "#e6f7ff", color: "#5bc4f5" },
     { val: fmtHa(parcelleHa), lbl: "Parcel\narea", icon: "🌿", bg: "#e0faf4", color: "#00d4a0" },
     { val: data.depths.length, lbl: "Required\nlayers", icon: "🪨", bg: "#f0eeff", color: "#9b8ff5" },
   ];
 }
 
+function getPatternCards(cultureId) {
+  const cardsByCulture = {
+    1: [
+      {
+        title: "Zigzag",
+        type: "zigzag",
+        ribbon: "Recommended",
+        why: "Best for vegetable plots and heterogeneous surfaces where variability changes quickly across the field.",
+      },
+      {
+        title: "Grid",
+        type: "grille",
+        ribbon: "More uniform",
+        why: "Useful for regular parcels when the goal is a balanced spatial coverage.",
+      },
+      {
+        title: "Transect",
+        type: "transect",
+        ribbon: "Edge control",
+        why: "Helps compare a field margin with the internal zone when conditions are not uniform.",
+      },
+    ],
+    2: [
+      {
+        title: "W pattern",
+        type: "W",
+        ribbon: "Recommended",
+        why: "Well suited to cereal parcels because it balances coverage across large open fields.",
+      },
+      {
+        title: "X pattern",
+        type: "x",
+        ribbon: "Cross-check",
+        why: "Good for broad plots when you want a quick check of field symmetry and variability.",
+      },
+      {
+        title: "Grid",
+        type: "grille",
+        ribbon: "High control",
+        why: "Fits highly regular parcels where a more structured sampling plan is useful.",
+      },
+    ],
+    3: [
+      {
+        title: "Radial",
+        type: "radial",
+        ribbon: "Recommended",
+        why: "Ideal for permanent crops because it reflects the root zone around the tree canopy.",
+      },
+      {
+        title: "Transect",
+        type: "transect",
+        ribbon: "Layer check",
+        why: "Useful when moving from the tree line toward the inter-row zone.",
+      },
+      {
+        title: "Grid",
+        type: "grille",
+        ribbon: "General view",
+        why: "Useful for larger orchard blocks where a broader layout is needed.",
+      },
+    ],
+  };
+
+  return cardsByCulture[cultureId] || cardsByCulture[1];
+}
+
 const TABS = [
   { id: "schema",    label: "Pattern",    icon: "🗺" },
   { id: "depths",    label: "Layers",     icon: "⛏" },
-  { id: "protocole", label: "Protocol",   icon: "📋" },
+  { id: "protocol",  label: "Protocol",   icon: "📋" },
   { id: "gear",      label: "Equipment",  icon: "🧰" },
 ];
 
@@ -81,7 +147,8 @@ export default function ResultsPanel({
   if (!data) return null;
 
   const A = data.color, AB = data.colorLight, Icon = data.icon;
-  const kpis = buildKpis(data, nSamples, parcelleHa);
+  const kpis = buildKpis(data, parcelleHa);
+  const patternCards = getPatternCards(cultureId);
 
   const initialDiagMode = samplingMode==="economic" ? "eco" : "standard";
 
@@ -89,7 +156,10 @@ export default function ResultsPanel({
     <div className={`cy-root ${open?"cy-root--open":""}`} style={{"--a":A,"--ab":AB}}>
       <div className="rp-hero">
         <div className="rp-topbar">
-          <div className="rp-breadcrumb">Sampling · {region||"Algeria"}</div>
+          <div className="rp-breadcrumb">
+            <span className="rp-live-dot" />
+            Sampling · {region||"Algeria"}
+          </div>
           <button className="rp-close-btn" onClick={onClose}>
             <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1 1l9 9M10 1L1 10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/></svg>
           </button>
@@ -138,7 +208,7 @@ export default function ResultsPanel({
             </div>
             <div className="cy-slab cy-slab--formula" style={{borderColor:`${A}30`}}>
               <div className="cy-slab-left" style={{background:`${A}10`}}>
-                <div className="cy-slab-micro">🧮 Calcul des zones</div>
+                <div className="cy-slab-micro">🧮 Zone calculation</div>
                 <div className="cy-formula-eq">
                   <span className="cy-formula-n" style={{color:A}}>{effectiveZones}</span>
                   {samplingMode==="economic"
@@ -157,6 +227,28 @@ export default function ResultsPanel({
                 </div>
               </div>
             </div>
+
+            <div className="cy-pattern-header">
+              <div>
+                <div className="cy-pattern-kicker">Sampling pattern</div>
+                <div className="cy-pattern-title">A layout that matches the crop and the parcel shape</div>
+              </div>
+              <div className="cy-pattern-note">The recommended pattern changes with crop group and field context.</div>
+            </div>
+
+            <div className="cy-pat-row">
+              {patternCards.map((card) => (
+                <article key={card.title} className="cy-pat-card" style={{ borderColor: `${A}1f` }}>
+                  <div className="cy-pat-ribbon" style={{ background: A }}>{card.ribbon}</div>
+                  <div className="cy-pat-diagram">
+                    <PatternDiagram type={card.type} color={A} />
+                  </div>
+                  <div className="cy-pat-name" style={{ color: A }}>{card.title}</div>
+                  <div className="cy-pat-why">{card.why}</div>
+                </article>
+              ))}
+            </div>
+
             <div className="cy-alerts">
               {data.alerts?.map((a,i)=>(
                 <div key={i} className="cy-alert-toast">
@@ -198,7 +290,7 @@ export default function ResultsPanel({
           </div>
         )}
 
-        {tab==="protocole" &&(
+        {tab==="protocol" &&(
           <div className="cy-flow">
             {data.steps?.map((p,i)=>{
               const col=PALETTE[i%PALETTE.length];
@@ -246,8 +338,6 @@ export default function ResultsPanel({
       <div className="cy-footer">
         <div className="cy-footer-badge" style={{background:A}}><Icon size={13} color="#fff"/> {data.nameShort}</div>
         <div className="cy-footer-stats">
-          <span>{nSamples} pts</span>
-          <span className="cy-footer-dot"/>
           <span>{fmtHa(parcelleHa)}</span>
           <span className="cy-footer-dot"/>
           <span>{data.depths.length} horizons</span>
@@ -262,13 +352,13 @@ export default function ResultsPanel({
           </svg>
           Soil Diagnostic
         </button>
-        <button className="cy-footer-sampling" onClick={onStartSampling}>
+          <button className="cy-footer-sampling" onClick={onStartSampling}>
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
             <path d="M6.5 1v8M3 7l3.5 3.5L10 7M1 12h11" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          Commencer l'échantillonnage
+          Start sampling
         </button>
-        <button className="cy-footer-close" onClick={onClose}>Fermer ✕</button>
+        <button className="cy-footer-close" onClick={onClose}>Close ✕</button>
 
         <SoilDiagnostic
           open={diagOpen}

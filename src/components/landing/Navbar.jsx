@@ -4,9 +4,9 @@ import { LeafyGreen } from "lucide-react";
 
 const navItems = [
   { id: "hero", label: "Overview" },
-  { id: "features", label: "How It Works" },
+  { id: "features", label: "Workflow" },
   { id: "zones", label: "Climate Zones" },
-  { id: "insights", label: "Key Numbers" },
+  { id: "insights", label: "Platform Value" },
   { id: "testimonials", label: "Testimonials" },
 ];
 
@@ -70,7 +70,7 @@ const Navbar = ({ onEnter }) => {
             strokeWidth={2.5}
           />
           <span className="logo-text">AGRIC</span>
-          <span className="lnav__badge">Built for Algerian farms</span>
+          <span className="lnav__badge">Algerian soil sampling</span>
         </button>
 
         <ul className="lnav__menu">

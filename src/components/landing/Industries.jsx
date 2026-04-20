@@ -5,10 +5,10 @@ const zones = [
   {
     id: 1,
     label: "01",
-    tag: "TELL — NORTH",
-    title: "Mediterranean Coast",
-    desc: "Coastal wilayas like Algiers, Oran, and Annaba enjoy a mild Mediterranean climate. Loamy soils with pH 6.5–7.5 are ideal for high-yield vegetables. Tomato, pepper, lettuce, and zucchini are highly recommended with 2–3 sampling points per hectare.",
-    detail: "Recommended analyses: NPK, organic matter, pH, CaCO₃",
+    tag: "TELL - NORTH",
+    title: "Mediterranean coastal belt",
+    desc: "Coastal wilayas such as Algiers, Oran, and Annaba are well suited to intensive vegetable production. The guide favors shallow, evenly distributed sampling to reflect the variability of irrigated plots and market-garden systems.",
+    detail: "Recommended analyses: pH, organic matter, NPK, texture, active lime",
     img: "https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=1200&q=85",
     accent: "#5abf6a",
   },
@@ -16,9 +16,9 @@ const zones = [
     id: 2,
     label: "02",
     tag: "HIGH PLATEAUS",
-    title: "Semi-Arid Highlands",
-    desc: "Wilayas of Sétif, Tiaret, and Djelfa sit on vast cereal plains at altitude. Semi-arid conditions demand careful monitoring of organic matter and water stress. Sampling depth increases to 40 cm to assess deep moisture retention.",
-    detail: "Recommended analyses: NPK, organic matter, pH, water retention",
+    title: "Cereal-growing highlands",
+    desc: "The high plateaus, including areas such as Sétif, Tiaret, and Djelfa, are strongly associated with cereal production. The sampling plan places more emphasis on soil structure, water retention, and basal fertility to support fertilization decisions.",
+    detail: "Recommended analyses: organic matter, NPK, pH, water-holding capacity",
     img: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&q=85",
     accent: "#4db87a",
   },
@@ -26,29 +26,29 @@ const zones = [
     id: 3,
     label: "03",
     tag: "STEPPE REGION",
-    title: "Arid Grasslands",
-    desc: "The steppe wilayas — Laghouat, El Bayadh, Naâma — face harsh aridity and wind erosion. EC (salinity) analysis is mandatory before any vegetable crop. Adapted species like onion, garlic, and potato can succeed with proper irrigation management.",
-    detail: "Recommended analyses: EC, pH, NPK, sodium adsorption ratio",
+    title: "Arid steppe conditions",
+    desc: "In the steppe wilayas, water stress and salinity risk make soil diagnosis essential before any production decision. The system helps determine the right depth, the right number of points, and the necessary analyses for a reliable plan.",
+    detail: "Recommended analyses: electrical conductivity, pH, exchangeable sodium, NPK",
     img: "https://images.unsplash.com/photo-1508193638397-1c4234db14d8?w=1200&q=85",
     accent: "#d4a843",
   },
   {
     id: 4,
     label: "04",
-    tag: "SAHARAN REGION",
-    title: "Desert Oasis Farming",
-    desc: "Extreme heat and scarce rainfall define Ghardaïa, Ouargla, and Adrar. Oasis agriculture under palm shade enables date, tomato, and pepper cultivation. Controlled drip irrigation and deep soil analysis are non-negotiable prerequisites.",
-    detail: "Recommended analyses: EC, pH, calcium, magnesium, micronutrients",
+    tag: "SAHARA REGION",
+    title: "Oasis and permanent crops",
+    desc: "In the South, production depends heavily on water availability, salinity, and the exploitable soil depth. The guide therefore moves toward deeper and more targeted sampling, especially for date palms and other permanent crops.",
+    detail: "Recommended analyses: electrical conductivity, pH, calcium, magnesium, micronutrients",
     img: "https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=1200&q=85",
     accent: "#e07b39",
   },
   {
     id: 5,
     label: "05",
-    tag: "ALL 58 WILAYAS",
-    title: "Nationwide Coverage",
-    desc: "The system covers all 58 Algerian wilayas with a personalized guide for every plot. GPS coordinates determine the exact climate zone, soil type, and season — generating a custom sampling protocol with the right number of points, depth, and analyses.",
-    detail: "Full national database — updated each growing season",
+    tag: "USER PARCEL",
+    title: "Personalized sampling guide",
+    desc: "The process starts when the farmer draws the parcel on the map. Based on area, location, season, and target crop, the platform generates a clear sampling protocol with the number of points, depth, and pattern to use.",
+    detail: "A practical workflow that turns field data into direct sampling instructions.",
     img: "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=1200&q=85",
     accent: "#5abf6a",
   },
@@ -120,7 +120,7 @@ export default function Industries() {
         <div className="ind__header">
           <span className="section-label ind__label">
             <span />
-            Climate Zones
+            Climate zones
           </span>
           <h2 className="ind__title">
             A guide tailored to every
@@ -128,13 +128,17 @@ export default function Industries() {
             region of Algeria
           </h2>
           <p className="ind__subtitle">
-            The number of sampling points, depth, and required analyses vary
-            according to the climate zone of your wilaya.
+            The number of sampling points, sampling depth, and required analyses vary according to the climate zone, season, and crop selected by the farmer.
           </p>
+          <div className="ind__spotlight">
+            <span className="ind__spotlight-label">Active zone</span>
+            <span className="ind__spotlight-value">{zones[activeZone]?.title}</span>
+            <span className="ind__spotlight-meta">{zones[activeZone]?.tag}</span>
+          </div>
           <div className="ind__highlights">
-            <span>58 Wilayas Covered</span>
-            <span>4 Climate Families</span>
-            <span>Custom Protocol per Plot</span>
+            <span>58 wilayas covered</span>
+            <span>4 major climate contexts</span>
+            <span>Custom protocol per parcel</span>
           </div>
         </div>
 
@@ -182,7 +186,7 @@ export default function Industries() {
                     ref={(el) => (imgRefs.current[i] = el)}
                     src={z.img}
                     alt={z.title}
-                    className="ind__img"
+                    className={`ind__img ${activeZone === i ? "ind__img--active" : ""}`}
                     style={{ opacity: i === 0 ? 1 : 0 }}
                   />
                 ))}

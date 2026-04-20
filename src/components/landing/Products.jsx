@@ -4,22 +4,22 @@ import "./Products.css";
 const products = [
   {
     id: "sampling-guide",
-    badge: "Phase 1",
+    badge: "Step 1",
     step: "01",
-    name: "Sampling Guide",
-    kicker: "Map your field and generate the right collection plan.",
+    name: "Draw the parcel",
+    kicker: "Mark the field directly on the map.",
     description:
-      "The farmer draws a plot on the map or selects the wilaya and commune. The system calculates sampling points, target depth, and the best collection pattern based on area, crop, and climate zone.",
+      "The farmer traces the parcel on the map and can also select the wilaya, commune, and plot area. This first action anchors the entire decision process to the real field location.",
     features: [
-      "Interactive map to draw or select the plot",
-      "Automatic number of sampling points per hectare",
-      "Recommended zigzag, W, or grid collection path",
-      "Depth adjusted to crop and local soil conditions",
+      "Interactive map to draw the parcel boundary",
+      "Location-based input using wilaya and commune",
+      "Area captured before the sampling plan is generated",
+      "Field context stored for the next decision step",
     ],
     metrics: [
-      { value: "12", label: "Sampling points" },
-      { value: "0-40 cm", label: "Depth range" },
-      { value: "W/Grid", label: "Pattern logic" },
+      { value: "Map", label: "Parcel input" },
+      { value: "Area", label: "Field size" },
+      { value: "Zone", label: "Location data" },
     ],
     accent: "#5bbf6b",
     surface: "#edf8ef",
@@ -27,29 +27,29 @@ const products = [
     image:
       "https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=900&q=85",
     imagePosition: "center center",
-    spotlightTitle: "Field setup",
-    spotlightText: "Build a plot-specific protocol before anyone enters the field.",
-    panelTitle: "Protocol Preview",
-    panelRows: ["3.0 ha plot", "12 points needed", "20 cm top layer"],
+    spotlightTitle: "Starting point",
+    spotlightText: "The parcel shape and location become the basis for every recommendation that follows.",
+    panelTitle: "Field context",
+    panelRows: ["Parcel traced", "Area recorded", "Location selected"],
   },
   {
     id: "vegetation-indices",
-    badge: "Satellite",
+    badge: "Step 2",
     step: "02",
-    name: "Vegetation Indices",
-    kicker: "Read crop vigor and moisture directly from imagery.",
+    name: "Generate the sampling protocol",
+    kicker: "Turn parcel data into a field-ready plan.",
     description:
-      "After plot selection, the platform retrieves satellite indicators from Sentinel-2. NDVI, NDMI, and NDRE reveal vegetation health, moisture stress, and chlorophyll behavior with a rolling history.",
+      "Once the parcel is known, the system combines region, season, crop type, and plot size to generate a personalized soil sampling guide with the right number of points, depth, and pattern.",
     features: [
-      "NDVI for vegetation performance",
-      "NDMI for moisture and water-stress monitoring",
-      "NDRE for chlorophyll insight",
-      "Historical trends and alert-friendly readings",
+      "Sampling points adapted to the parcel size",
+      "Depth adjusted to the crop and soil context",
+      "Pattern guidance such as zigzag, W, or grid",
+      "Clear instructions for field execution",
     ],
     metrics: [
-      { value: "6", label: "Indices tracked" },
-      { value: "12 mo", label: "History window" },
-      { value: "Live", label: "Signal refresh" },
+      { value: "Guide", label: "Sampling plan" },
+      { value: "Depth", label: "Collection layer" },
+      { value: "Pattern", label: "Field route" },
     ],
     accent: "#69c7b2",
     surface: "#eaf8f4",
@@ -57,29 +57,29 @@ const products = [
     image:
       "https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=900&q=85",
     imagePosition: "center bottom",
-    spotlightTitle: "Remote sensing",
-    spotlightText: "See vegetation changes before they become expensive field issues.",
-    panelTitle: "Index Snapshot",
-    panelRows: ["NDVI 0.72", "NDMI moderate", "Stress low"],
+    spotlightTitle: "Decision support",
+    spotlightText: "The platform transforms plot information into a practical protocol the farmer can follow in the field.",
+    panelTitle: "Protocol summary",
+    panelRows: ["Points: adjusted", "Depth: assigned", "Pattern: selected"],
   },
   {
     id: "crop-recommendation",
-    badge: "Phase 2",
+    badge: "Step 3",
     step: "03",
-    name: "Crop Recommendation",
-    kicker: "Turn soil results into practical crop decisions.",
+    name: "Get crop recommendations",
+    kicker: "Use soil properties to guide the next crop choice.",
     description:
-      "The farmer enters soil properties such as pH, organic matter, texture, salinity, and temperature. The system scores crop compatibility and presents tailored recommendations with reasoning and alerts.",
+      "In the second phase of the workflow, the farmer provides soil properties such as pH, organic matter, texture, and salinity. The system then proposes crop recommendations that fit the field conditions.",
     features: [
-      "Input pH, organic matter, texture, salinity, and nutrients",
-      "Compatibility score for each crop option",
-      "Warnings for acidity, alkalinity, and salinity issues",
-      "Top recommendations with plain-language explanations",
+      "Input soil properties and field constraints",
+      "Crop suggestions adapted to the three case studies",
+      "Warnings for pH, salinity, or fertility issues",
+      "Simple explanations to support the farmer's decision",
     ],
     metrics: [
-      { value: "Top 6", label: "Suggested crops" },
-      { value: "Score", label: "Compatibility model" },
-      { value: "Alerts", label: "Risk flags" },
+      { value: "3", label: "Crop groups" },
+      { value: "Fit", label: "Compatibility" },
+      { value: "Advice", label: "Final output" },
     ],
     accent: "#e3a54d",
     surface: "#fcf4e6",
@@ -87,10 +87,10 @@ const products = [
     image:
       "https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=900&q=85",
     imagePosition: "center center",
-    spotlightTitle: "Decision layer",
-    spotlightText: "Move from raw test values to crops that fit the land better.",
-    panelTitle: "Recommendation View",
-    panelRows: ["Pepper 91%", "Tomato 86%", "Zucchini 82%"],
+    spotlightTitle: "Final decision",
+    spotlightText: "The user ends with a practical recommendation that connects soil diagnosis to crop selection.",
+    panelTitle: "Recommendation view",
+    panelRows: ["Vegetables", "Cereals", "Permanent crops"],
   },
 ];
 
@@ -103,10 +103,10 @@ export default function Products() {
       <div className="container">
         <div className="products__header">
           <span className="section-label">How It Works</span>
-          <h2 className="section-title">A clearer path from field selection to crop decision</h2>
+          <h2 className="section-title">From parcel mapping to personalized agricultural advice</h2>
           <p className="section-subtitle">
-            The experience is designed like a guided workflow: define the plot, read the field
-            conditions, then convert results into recommendations that are actually usable.
+            The workflow follows the real project logic: map the parcel, generate the sampling
+            protocol, then translate soil properties into crop recommendations.
           </p>
         </div>
 
