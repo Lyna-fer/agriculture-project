@@ -7,8 +7,11 @@ export function useMap({ onParcelleChange }) {
   const sampleMarkersRef = useRef([]);
   const zoneLayersRef = useRef([]);
   const parcelleLayerRef = useRef(null);
+  const parcelleLayersRef = useRef({}); // ✅ Store all parcel layers by ID
   const drawControlRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
+  const currentZoomRef = useRef(10);
+  const MIN_ZOOM_FOR_MARKERS = 13; // Hide markers/zones when zoom < 13
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
@@ -25,7 +28,7 @@ export function useMap({ onParcelleChange }) {
     L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
       {
-        attribution: "Esri, USDA, USGS | SolGuide",
+        attribution: "Esri, USDA, USGS | SolGuide ",
         maxZoom: 18,
         maxNativeZoom: 19,
         errorTileUrl:
@@ -116,6 +119,12 @@ export function useMap({ onParcelleChange }) {
       }
     });
 
+    // ✅ Track zoom level changes for auto-hiding markers/zones
+    map.on('zoomend', () => {
+      currentZoomRef.current = map.getZoom();
+      toggleMarkersByZoom();
+    });
+
     mapInstanceRef.current = map;
     setMapReady(true);
   }, []);
@@ -152,7 +161,6 @@ export function useMap({ onParcelleChange }) {
   };
 
   const samplingMarkersRef = useRef([]);
-
   const clearSamplingMarkers = useCallback(() => {
     if (!mapInstanceRef.current) return;
     samplingMarkersRef.current.forEach((m) => mapInstanceRef.current.removeLayer(m));
@@ -210,7 +218,6 @@ export function useMap({ onParcelleChange }) {
     }
   }, []);
 
-  // ✅ Draw a polygon programmatically from lat/lng coordinates
   const drawParcelleFromLatLngs = useCallback((latlngs, color = "#4a7c2f") => {
     const L = window.L;
     const map = mapInstanceRef.current;
@@ -219,13 +226,10 @@ export function useMap({ onParcelleChange }) {
       console.warn("drawParcelleFromLatLngs: missing dependencies");
       return null;
     }
-
     try {
-      // Clear existing drawn items
       drawnItems.clearLayers();
       clearSampleMarkers();
 
-      // Create polygon from lat/lng array
       const polygon = L.polygon(latlngs, {
         color: color,
         fillColor: color,
@@ -233,24 +237,104 @@ export function useMap({ onParcelleChange }) {
         weight: 2.5,
       });
 
-      // Add to map and drawnItems (so it behaves like a user-drawn parcelle)
       drawnItems.addLayer(polygon);
       parcelleLayerRef.current = polygon;
 
-      // Fit map to parcelle bounds
       const bounds = polygon.getBounds();
       const zoom = Math.min(map.getBoundsZoom(bounds), 19);
       map.setView(bounds.getCenter(), zoom);
 
-      // Compute and return stats (so UI can update)
       const stats = computeStats(polygon);
-
       console.log(`✅ Drew parcelle with ${latlngs.length} points`);
       return stats;
     } catch (error) {
       console.error("❌ Error drawing parcelle from latlngs:", error);
       return null;
     }
+  }, []);
+
+  // ✅ Draw all saved parcels on the map
+  const drawAllParcelles = useCallback((parcelles, selectedParcelleId) => {
+    const L = window.L;
+    const map = mapInstanceRef.current;
+    const drawnItems = drawnItemsRef.current;
+
+    if (!map || !L || !drawnItems) {
+      console.warn("drawAllParcelles: map not ready");
+      return;
+    }
+
+    // Clear existing parcel layers
+    Object.values(parcelleLayersRef.current).forEach(layer => {
+      map.removeLayer(layer);
+    });
+    parcelleLayersRef.current = {};
+
+    // Draw each parcel
+    parcelles.forEach(parcel => {
+      if (!parcel.latlngs || parcel.latlngs.length < 3) return;
+
+      const isSelected = parcel.id === selectedParcelleId;
+      const polygon = L.polygon(parcel.latlngs, {
+        color: parcel.color || "#4a7c2f",
+        fillColor: parcel.color || "#4a7c2f",
+        fillOpacity: isSelected ? 0.3 : 0.15,
+        weight: isSelected ? 4 : 2,
+        opacity: 0.8,
+      });
+
+      const popupContent = `
+        <b>${parcel.name || `Parcel #${parcel.id}`}</b><br>
+        Area: ${(parcel.area / 10000).toFixed(2)} ha
+      `;
+      polygon.bindPopup(popupContent);
+
+      polygon.addTo(map);
+      parcelleLayersRef.current[parcel.id] = polygon;
+    });
+
+    console.log(`✅ Drew ${parcelles.length} parcels on map`);
+  }, []);
+
+  // ✅ Clear all parcel layers
+  const clearAllParcelles = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    Object.values(parcelleLayersRef.current).forEach(layer => {
+      map.removeLayer(layer);
+    });
+    parcelleLayersRef.current = {};
+    console.log("✅ Cleared all parcel layers");
+  }, []);
+
+  // ✅ Toggle markers/zones visibility based on zoom level
+  const toggleMarkersByZoom = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    const zoom = map.getZoom();
+    const shouldShow = zoom >= MIN_ZOOM_FOR_MARKERS;
+
+    // Toggle sample markers
+    sampleMarkersRef.current.forEach(m => {
+      if (shouldShow && !map.hasLayer(m)) {
+        map.addLayer(m);
+      } else if (!shouldShow && map.hasLayer(m)) {
+        map.removeLayer(m);
+      }
+    });
+
+    // Toggle zone layers
+    zoneLayersRef.current.forEach(l => {
+      if (shouldShow && !map.hasLayer(l)) {
+        map.addLayer(l);
+      } else if (!shouldShow && map.hasLayer(l)) {
+        map.removeLayer(l);
+      }
+    });
+
+    console.log(`🔍 Zoom: ${zoom} - Markers ${shouldShow ? 'visible' : 'hidden'}`);
   }, []);
 
   const placeSamplePoints = useCallback((zones, color, options = {}) => {
@@ -271,9 +355,19 @@ export function useMap({ onParcelleChange }) {
       console.log("placeSamplePoints: early return - missing map or L");
       return;
     }
+
+    // Check zoom level before creating markers
+    const currentZoom = map.getZoom();
+    currentZoomRef.current = currentZoom;
+
+    if (currentZoom < MIN_ZOOM_FOR_MARKERS) {
+      console.log(`⚠️ Zoom level ${currentZoom} too low to show markers (need ${MIN_ZOOM_FOR_MARKERS}+)`);
+      clearSampleMarkers();
+      return;
+    }
+
     clearSampleMarkers();
     let totalMarkers = 0;
-
     zones.forEach((zone, zoneIdx) => {
       const points = zone.points || [];
 
@@ -308,30 +402,29 @@ export function useMap({ onParcelleChange }) {
           const markerOpacity = !isDone && clickablePointKeys.size > 0 && !isClickable ? 0.45 : 1;
 
           const icon = L.divIcon({
-            className: "",
+            className: " ",
             html: `<div style="
-  width:16px; height:16px;
-  background:${markerBg};
-  border:1.5px solid ${markerBorder};
-  color:${markerTextColor};
-  border-radius:50%;
-  display:flex; align-items:center; justify-content:center;
-  font-size:0.65rem; font-family:'Geist Mono',monospace;
-  cursor:${markerCursor};
-  opacity:${markerOpacity};
-  box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
-">${pointNum}</div>`,
+              width:16px; height:16px;
+              background:${markerBg};
+              border:1.5px solid ${markerBorder};
+              color:${markerTextColor};
+              border-radius:50%;
+              display:flex; align-items:center; justify-content:center;
+              font-size:0.65rem; font-family:'Geist Mono',monospace;
+              cursor:${markerCursor};
+              opacity:${markerOpacity};
+              box-shadow: 0 0 0 3px rgba(255,255,255,0.4);
+            ">${pointNum}</div>`,
             iconSize: [30, 30],
             iconAnchor: [15, 15],
           });
           const marker = L.marker(pt, { icon })
             .addTo(map)
-            .bindPopup(
-              `<b>${zone.id} - Point ${pointNum}</b><br>
-      Sample #${pointNum} / ${points.length}<br>
-       <span style="color:#7a5230;font-size:0.75rem">Lat: ${pt[0].toFixed(5)}, Lng: ${pt[1].toFixed(5)}</span>`,
-            );
-
+            .bindPopup(`
+              ${zone.id} - Point ${pointNum}<br>
+              Sample #${pointNum} / ${points.length}<br>
+              Lat: ${pt[0].toFixed(5)}, Lng: ${pt[1].toFixed(5)}
+            `);
           if (isClickable && typeof onPointClick === "function") {
             marker.on("click", () => onPointClick({ zoneIdx, pointIdx: idx }));
           }
@@ -373,8 +466,9 @@ export function useMap({ onParcelleChange }) {
     if (drawnItemsRef.current) drawnItemsRef.current.clearLayers();
     clearSampleMarkers();
     clearSamplingMarkers();
+    clearAllParcelles();
     parcelleLayerRef.current = null;
-  }, [cancelDraw]);
+  }, [cancelDraw, clearAllParcelles]);
 
   const flyToWilaya = useCallback((wilaya) => {
     if (!mapInstanceRef.current) return;
@@ -412,13 +506,21 @@ export function useMap({ onParcelleChange }) {
         });
         return;
       }
-
-      console.log("displayZones called with", zones.length, "zones");
+      console.log("displayZones called with ", zones.length, "zones");
 
       try {
         clearZones();
       } catch (e) {
-        console.error("Error clearing zones:", e);
+        console.error("Error clearing zones: ", e);
+      }
+
+      // Check zoom level before creating zone layers
+      const currentZoom = map.getZoom();
+      currentZoomRef.current = currentZoom;
+
+      if (currentZoom < MIN_ZOOM_FOR_MARKERS) {
+        console.log(`⚠️ Zoom level ${currentZoom} too low to show zones (need ${MIN_ZOOM_FOR_MARKERS}+)`);
+        return;
       }
 
       const colors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12"];
@@ -464,16 +566,16 @@ export function useMap({ onParcelleChange }) {
             icon: L.divIcon({
               className: " ",
               html: `<div style="
-          background: ${colors[idx % colors.length]};
-          color: white;
-          padding: 4px 12px;
-          border-radius: 12px;
-          font-size: 12px;
-          font-weight: 600;
-          font-family: monospace;
-         box-shadow: 0 4px 12px rgba(0,0,0,0.25), 0 0 0 2px rgba(255,255,255,0.3);
-          white-space: nowrap;
-         ">${zone.id}</div>`,
+                background: ${colors[idx % colors.length]};
+                color: white;
+                padding: 4px 12px;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: 600;
+                font-family: monospace;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.25), 0 0 0 2px rgba(255,255,255,0.3);
+                white-space: nowrap;
+              ">${zone.id}</div>`,
               iconSize: [60, 28],
               iconAnchor: [30, 14],
             }),
@@ -488,7 +590,7 @@ export function useMap({ onParcelleChange }) {
         }
       });
       console.log(
-        "displayZones complete, total layers:",
+        "displayZones complete, total layers: ",
         zoneLayersRef.current.length,
       );
     },
@@ -505,7 +607,9 @@ export function useMap({ onParcelleChange }) {
     activateDrawTool,
     clearAll,
     flyToWilaya,
-    drawParcelleFromLatLngs, // ✅ NEW: Expose this function
+    drawParcelleFromLatLngs,
+    drawAllParcelles, // ✅ Exposed for Map.jsx
+    clearAllParcelles, // ✅ Exposed for Map.jsx
     setSamplingMarkers,
     clearSamplingMarkers,
   };

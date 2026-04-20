@@ -59,7 +59,6 @@ function FieldThumb({ color, latlngs, index = 0 }) {
   const lngs = normalizedLatLngs.map((p) => p.lng);
   const minLat = Math.min(...lats), maxLat = Math.max(...lats);
   const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-
   const rangeX = maxLng - minLng || 0.0001;
   const rangeY = maxLat - minLat || 0.0001;
   const scale = Math.min((W - PAD * 2) / rangeX, (H - PAD * 2) / rangeY);
@@ -96,7 +95,8 @@ export default function LeftPanel({
   parcelles = [],
   selectedParcelle = null,
   selectedGroup = null,
-  samplingMode = "standard",
+  // ✅ REMOVED: samplingMode prop (no longer needed)
+  // ✅ REMOVED: onSamplingModeChange prop (no longer needed)
   activeTool = null,
   pendingParcelleInfo = null,
   pendingColor = "#2ecc71",
@@ -104,7 +104,6 @@ export default function LeftPanel({
   onSelectParcelle,
   onDeleteParcelle,
   onGroupChange,
-  onSamplingModeChange,
   onGenerate,
   onClearAll,
   onSaveParcelle,
@@ -115,9 +114,11 @@ export default function LeftPanel({
   const totalArea = parcelles.reduce((s, p) => s + (p.area || 0), 0);
   const step1done = parcelles.length > 0;
   const step2done = !!selectedGroup;
-
   const drawPanelOpen = !!activeTool || !!pendingParcelleInfo;
   const drawPhase = pendingParcelleInfo ? "confirm" : "drawing";
+
+  // ✅ NEW: Extract existing names to pass to DrawPanel
+  const existingNames = parcelles.map((p) => p.name || "");
 
   return (
     <aside className="lp">
@@ -126,8 +127,11 @@ export default function LeftPanel({
           <img src={leafIcon} alt="leaf" />
         </div>
         <div>
-          <div className="lp-brand-name">Agric</div>
-          <div className="lp-brand-sub">Soil Sampling · Algeria</div>
+          <div className="lp-brand-name">
+            Agric
+            <br />
+            <span className="lp-brand-sub">Soil Sampling · Algeria</span>
+          </div>
         </div>
         <div className="lp-brand-badge">Field Lab</div>
       </div>
@@ -263,29 +267,7 @@ export default function LeftPanel({
           </button>
         )}
 
-        {canGenerate && (
-          <div className="lp-mode-selector">
-            <div className="lp-mode-label">Sampling mode</div>
-            <div className="lp-mode-buttons">
-              <button
-                className={`lp-mode-btn ${samplingMode === "standard" ? "active" : ""}`}
-                onClick={() => onSamplingModeChange("standard")}
-                title="Maximizes precision with more zones"
-              >
-                <span className="lp-mode-icon">📊</span>
-                Standard
-              </button>
-              <button
-                className={`lp-mode-btn ${samplingMode === "economic" ? "active" : ""}`}
-                onClick={() => onSamplingModeChange("economic")}
-                title="Optimizes budget with fewer zones"
-              >
-                <span className="lp-mode-icon">💰</span>
-                Economic
-              </button>
-            </div>
-          </div>
-        )}
+        {/* ✅ REMOVED: Entire lp-mode-selector block (Standard/Economic buttons) */}
 
         <button
           className={`lp-gen ${canGenerate ? "ready" : ""} ${isAnalyzing ? "loading" : ""}`}
@@ -314,6 +296,7 @@ export default function LeftPanel({
         defaultColor={pendingColor}
         onSave={onSaveParcelle}
         onCancel={onCancelDraw}
+        existingNames={existingNames} // ✅ NEW: Pass names for validation
       />
     </aside>
   );

@@ -43,18 +43,16 @@ export default function Map() {
   const [pendingColor,       setPendingColor]        = useState("#2ecc71");
   const [parcelleInfo,       setParcelleInfo]        = useState(null);
   const [selectedGroupId,    setSelectedGroupId]     = useState(null);
-  const [samplingMode,       setSamplingMode]        = useState("standard");
+  const samplingMode = "standard"; // ✅ Hardcoded to standard mode (economic removed)
   const [activeTool,         setActiveTool]          = useState(null);
   const [resultsOpen,        setResultsOpen]         = useState(false);
   const [selectedWilaya,     setSelectedWilaya]      = useState(null);
   const [toast,              setToast]               = useState({ msg: "", visible: false });
   const [geeReady,           setGeeReady]            = useState(false);
   const [isAnalyzing,        setIsAnalyzing]         = useState(false);
-  //  number of zones returned by the backend after analysis
   const [nZonesFromBackend,  setNZonesFromBackend]   = useState(1);
   const [analyzedZones,      setAnalyzedZones]       = useState([]);
   const [samplingColor,      setSamplingColor]       = useState("#2ecc71");
-  // Sampling state
   const [isSampling,         setIsSampling]          = useState(false);
   const [samplingState,      setSamplingState]       = useState(null);
 
@@ -80,7 +78,7 @@ export default function Map() {
           }
         }
       } catch (error) {
-        console.warn("⚠️ Could not fetch parcelles from DB:", error);
+        console.warn("⚠️ Could not fetch parcelles from DB: ", error);
       }
     };
     fetchUserParcelles();
@@ -125,7 +123,18 @@ export default function Map() {
     mapRef, placeSamplePoints, clearSampleMarkers, activateDrawTool, clearAll,
     flyToWilaya, displayZones, clearZones, drawParcelleFromLatLngs,
     setSamplingMarkers, clearSamplingMarkers,
+    drawAllParcelles, // ✅ NEW: For displaying all parcels
+    clearAllParcelles, // ✅ NEW: For clearing all parcels
   } = useMap({ onParcelleChange: handleParcelleChange });
+
+  // ✅ NEW: Draw all parcels whenever parcelles list changes
+  useEffect(() => {
+    if (parcelles.length > 0) {
+      drawAllParcelles(parcelles, selectedParcelleId);
+    } else {
+      clearAllParcelles();
+    }
+  }, [parcelles, selectedParcelleId, drawAllParcelles, clearAllParcelles]);
 
   const handleActivateTool = useCallback((tool) => {
     setActiveTool(tool);
@@ -157,7 +166,6 @@ export default function Map() {
     showToast("✕ Drawing canceled");
   }, [activateDrawTool, clearAll, parcelles.length, showToast]);
 
-  // ✅ FIXED: Delete single parcelle immediately (UI + Map + DB)
   const handleDeleteParcelle = useCallback(
     async (id) => {
       if (!id) return;
@@ -171,7 +179,7 @@ export default function Map() {
         setSelectedParcelleId(null);
         setParcelleInfo(null);
         setResultsOpen(false);
-        clearAll(); // ✅ Removes the polygon from the map immediately
+        clearAll();
       }
 
       // 3. Backend deletion
@@ -180,8 +188,8 @@ export default function Map() {
           const response = await fetch(`${API_BASE}/api/parcels/${id}`, {
             method: "DELETE",
             headers: {
-               "Authorization": `Bearer ${token}`,
-               "Content-Type": "application/json"
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json"
             },
           });
 
@@ -202,13 +210,10 @@ export default function Map() {
     [selectedParcelleId, showToast, clearAll]
   );
 
-  // ✅ FIXED: Bulk delete - uses snapshot of IDs to ensure ALL are deleted
   const handleClearAll = useCallback(async () => {
     clearAll();
     clearZones();
     const token = localStorage.getItem("token");
-
-    // Take a snapshot of IDs to delete to avoid state staleness issues
     const idsToDelete = parcelles.map(p => p.id);
 
     if (idsToDelete.length > 0 && token) {
@@ -219,8 +224,8 @@ export default function Map() {
             fetch(`${API_BASE}/api/parcels/${id}`, {
               method: "DELETE",
               headers: {
-                 "Authorization": `Bearer ${token}`,
-                 "Content-Type": "application/json"
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json"
               },
             }).then(async (res) => {
               if (!res.ok) {
@@ -240,11 +245,10 @@ export default function Map() {
           showToast("🗑 Everything cleared");
         }
       } catch (error) {
-        console.error("❌ Bulk delete error:", error);
+        console.error("❌ Bulk delete error: ", error);
         showToast("❌ Error during deletion");
       }
     } else if (idsToDelete.length > 0 && !token) {
-      // If no token, just clear UI
       showToast("🗑 Everything cleared (UI only)");
     }
 
@@ -284,8 +288,8 @@ export default function Map() {
     const token = localStorage.getItem("token");
     if (!token) { showToast("❌ Please sign in first"); return; }
     if (isAnalyzing) return;
-    setIsAnalyzing(true);
 
+    setIsAnalyzing(true);
     const isExistingParcelle = selectedParcelleId && !pendingParcelleInfo;
     const targetParcelle = isExistingParcelle ? parcelles.find(p => p.id === selectedParcelleId) : null;
     const geometry = isExistingParcelle && targetParcelle?.latlngs
@@ -355,7 +359,7 @@ export default function Map() {
         setResultsOpen(true);
 
         const totalPoints = data.zones.reduce((sum, z) => sum + (z.points?.length || 0), 0);
-        const modeLabel = samplingMode === "economic" ? "economic" : "standard";
+        const modeLabel = "standard"; // ✅ Always standard mode
         showToast(data.savedParcelleId
           ? `🔬 ${totalPoints} pts · ${data.zones.length} zone(s) + 💾 Parcel #${data.savedParcelleId} saved! (${modeLabel})`
           : `🔬 ${totalPoints} points generated in ${data.zones.length} zone(s)! (${modeLabel})`
@@ -370,7 +374,7 @@ export default function Map() {
         showToast("⚠️ No zone generated");
       }
     } catch (error) {
-      console.error("Network Error:", error);
+      console.error("Network Error: ", error);
       showToast("❌ Network error");
     } finally {
       setIsAnalyzing(false);
@@ -384,9 +388,8 @@ export default function Map() {
   const openGoogleMapsForBatch = useCallback((state) => {
     const points = getCurrentBatchPoints(analyzedZones, state);
     if (!points || points.length === 0) return;
-
     const fmt = ([lat, lng]) => `${lat},${lng}`;
-    let url = "";
+    let url = " ";
 
     if (points.length === 1) {
       url = `https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=${fmt(points[0])}`;
@@ -407,7 +410,6 @@ export default function Map() {
 
   const renderSamplingPoints = useCallback((state) => {
     if (!analyzedZones || analyzedZones.length === 0) return;
-
     if (!state) {
       placeSamplePoints(analyzedZones, samplingColor);
       return;
@@ -437,7 +439,6 @@ export default function Map() {
       showToast("❌ Aucune parcelle analysée");
       return;
     }
-
     if (isSampling && samplingState) {
       const remainingCurrent = getCurrentBatchPoints(analyzedZones, samplingState);
       if (remainingCurrent.length > 0) {
@@ -504,7 +505,6 @@ export default function Map() {
           parcelles={parcelles}
           selectedParcelle={selectedParcelleId}
           selectedGroup={selectedGroupId}
-          samplingMode={samplingMode}
           activeTool={activeTool}
           pendingParcelleInfo={pendingParcelleInfo}
           pendingColor={pendingColor}
@@ -512,7 +512,6 @@ export default function Map() {
           onSelectParcelle={handleSelectParcelle}
           onDeleteParcelle={handleDeleteParcelle}
           onGroupChange={handleGroupChange}
-          onSamplingModeChange={setSamplingMode}
           onGenerate={handleAnalyze}
           onClearAll={handleClearAll}
           onSaveParcelle={handleSaveParcelle}
@@ -527,19 +526,19 @@ export default function Map() {
           selectedWilaya={selectedWilaya}
           onCloseWilaya={() => setSelectedWilaya(null)}
         />
+        <ResultsPanel
+          open={resultsOpen}
+          onClose={() => setResultsOpen(false)}
+          cultureId={selectedGroupId}
+          parcelleHa={parcelleInfo?.area}
+          region={selectedWilaya?.name}
+          samplingMode={samplingMode}
+          parcelle={selectedParcelle}
+          nZones={nZonesFromBackend}
+          onStartSampling={handleStartSampling}
+        />
+        <Toast message={toast.msg} visible={toast.visible} />
       </div>
-      <ResultsPanel
-        open={resultsOpen}
-        onClose={() => setResultsOpen(false)}
-        cultureId={selectedGroupId}
-        parcelleHa={parcelleInfo?.area}
-        region={selectedWilaya?.name}
-        samplingMode={samplingMode}
-        parcelle={selectedParcelle}
-        nZones={nZonesFromBackend}   /*  zones from backend to SoilDiagnostic tabs */
-        onStartSampling={handleStartSampling}
-      />
-      <Toast message={toast.msg} visible={toast.visible} />
     </>
   );
 }
