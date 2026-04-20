@@ -219,7 +219,7 @@
   padding: 9px 14px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   box-shadow: var(--rp-shadow-sm);
   flex: 1;
   min-width: 0;
@@ -242,7 +242,7 @@
 .rp-kpi-pill-val {
   font-family: "JetBrains Mono", monospace;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -277,13 +277,13 @@
   align-items: center;
   gap: 6px;
   padding: 7px 15px;
-  border-radius: 50px;
+  border-radius: 999px;
   border: 1.5px solid rgba(26, 24, 37, 0.1);
   background: rgba(255, 255, 255, 0.85);
   color: var(--rp-ink3);
   font-family: "Nunito", inherit;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   cursor: pointer;
   transition: all 0.18s;
   white-space: nowrap;
