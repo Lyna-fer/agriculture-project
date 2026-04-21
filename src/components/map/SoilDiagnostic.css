@@ -390,6 +390,16 @@
 .sd-sel:focus { border-color:rgba(32,149,110,.35); box-shadow:0 0 0 4px rgba(97,214,163,.14), var(--sdsh-sm); transform:translateY(-1px) }
 .sd-sel-arrow { position:absolute; right:13px; top:50%; transform:translateY(-50%); color:var(--sd-ink4); pointer-events:none }
 
+/* Lab Request Button */
+.sd-lab-request-btn {
+  display:flex; align-items:center; justify-content:center; gap:7px;
+  padding:10px 14px; border-radius:14px; border:1px solid rgba(18,77,146,.2);
+  background:rgba(245,250,255,.9); color:#184a86;
+  font-family:var(--sd-font); font-size:.7rem; font-weight:700;
+  cursor:pointer; transition:all .16s var(--sd-ease); box-shadow:var(--sdsh-xs);
+}
+.sd-lab-request-btn:hover { transform:translateY(-1px); background:rgba(236,246,255,.98); border-color:rgba(18,77,146,.4); box-shadow:var(--sdsh-sm) }
+
 /* Submit */
 .sd-sub-wrap {
   position: static;
@@ -696,6 +706,15 @@
   .sd-param-pill-row {
     grid-template-columns: 1fr;
     display: grid;
+  }
+
+  .sd-act-row {
+    flex-wrap: wrap;
+  }
+
+  .sd-act {
+    flex: 1 1 calc(50% - 10px);
+    justify-content: center;
   }
 
   .sd-rec-cards {

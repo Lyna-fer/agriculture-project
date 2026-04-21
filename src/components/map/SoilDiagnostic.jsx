@@ -114,7 +114,7 @@ function toCrop(c) {
   const limits = CROP_LIMITS[c.id] || { omMin: c.omMin ?? 1.5, activeLimeMax: c.activeLimeMax ?? 15 };
   const prefTex = SOIL_TEXTURE_TO_KEY[c.soilType] || "limon-argileux";
   return {
-    id: c.id, n: c.nameEn, e: c.emoji,
+    id: c.id, n: c.nameEn, ar: c.nameAr || c.name, e: c.emoji,
     bg: EMOJI_BG[c.emoji] || "#f0f0f0",
     lat: c.nameEn, ph: c.ph, ce: c.ec,
     tMn: c.tempMin, tMx: c.tempMax, nHi: c.nReq > 100,
@@ -220,6 +220,258 @@ function cropAdj(c, st) {
   return adj;
 }
 
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildLabRequestHtml({
+  parcelleName,
+  parcelleHa,
+  cultureLabel,
+  zoneNumber,
+  totalZones,
+  generatedAt,
+}) {
+  const surface =
+    parcelleHa > 0
+      ? `${parcelleHa < 0.1 ? (parcelleHa * 10000).toFixed(0) + " m2" : parcelleHa.toFixed(2) + " ha"}`
+      : "A renseigner";
+
+  const safeParcelle = escapeHtml(parcelleName || "Parcelle Agricole");
+  const safeCulture = escapeHtml(cultureLabel || "Culture non precisee");
+  const safeDate = escapeHtml(generatedAt);
+
+  return `<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bordereau - Demande d'analyse de sol</title>
+  <style>
+    :root {
+      --ink: #16324f;
+      --ink-soft: #425c78;
+      --line: #b9c9d8;
+      --accent: #0b6bcb;
+      --paper: #ffffff;
+      --bg: #eef3f8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Calibri", "Arial", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.45;
+      padding: 20px;
+    }
+    .paper {
+      max-width: 900px;
+      margin: 0 auto;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 28px;
+      box-shadow: 0 8px 32px rgba(11, 38, 68, 0.08);
+    }
+    .head {
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 14px;
+      margin-bottom: 18px;
+    }
+    .title {
+      margin: 0 0 4px;
+      font-size: 24px;
+      letter-spacing: 0.02em;
+      color: var(--accent);
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .subtitle {
+      margin: 0;
+      color: var(--ink-soft);
+      font-size: 15px;
+    }
+    .meta {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 18px;
+      font-size: 14px;
+    }
+    .meta th,
+    .meta td {
+      border: 1px solid var(--line);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .meta th {
+      width: 32%;
+      color: var(--ink-soft);
+      font-weight: 700;
+      background: #f7fbff;
+    }
+    .intro {
+      margin: 0 0 16px;
+      color: #20384f;
+      font-size: 14px;
+    }
+    h2 {
+      margin: 18px 0 8px;
+      font-size: 16px;
+      color: #123f69;
+      border-left: 4px solid var(--accent);
+      padding-left: 8px;
+    }
+    .checklist {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 8px;
+    }
+    .checklist li {
+      border: 1px solid #d9e4ef;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    .box {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 1.7px solid #2f4f6e;
+      border-radius: 3px;
+      margin-right: 8px;
+      vertical-align: -3px;
+    }
+    .method {
+      color: #2f4f6e;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    .foot {
+      margin-top: 22px;
+      border-top: 1px dashed var(--line);
+      padding-top: 14px;
+      font-size: 13px;
+      color: var(--ink-soft);
+    }
+    .sign {
+      margin-top: 26px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      font-size: 13px;
+    }
+    .sign-box {
+      border-top: 1px solid var(--line);
+      padding-top: 6px;
+      min-height: 40px;
+      color: #294765;
+    }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .paper { max-width: none; border-radius: 0; border: none; box-shadow: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <article class="paper">
+    <header class="head">
+      <h1 class="title">Bordereau de demande d'analyse de sol</h1>
+      <p class="subtitle">A l'attention du Laboratoire d'Analyses Agronomiques</p>
+    </header>
+
+    <table class="meta" aria-label="Informations de la demande">
+      <tr><th>Date d'edition</th><td>${safeDate}</td></tr>
+      <tr><th>Parcelle</th><td>${safeParcelle}</td></tr>
+      <tr><th>Surface</th><td>${surface}</td></tr>
+      <tr><th>Culture cible</th><td>${safeCulture}</td></tr>
+      <tr><th>Zone analysee</th><td>Zone ${zoneNumber} / ${totalZones}</td></tr>
+    </table>
+
+    <p class="intro">
+      Veuillez realiser les analyses physico-chimiques ci-dessous sur l'echantillon de sol joint.
+      Afin d'assurer la compatibilite avec notre systeme de recommandation agronomique,
+      merci de respecter les methodes d'extraction indiquees.
+    </p>
+
+    <h2>1. Analyses physiques (texture)</h2>
+    <ul class="checklist">
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        Granulometrie (3 ou 5 fractions)
+        <div class="method">Methode recommandee: pipette de Robinson ou densimetre de Bouyoucos. Resultat attendu: classe texturale exploitable.</div>
+      </li>
+    </ul>
+
+    <h2>2. Analyses chimiques (salinite et pH)</h2>
+    <ul class="checklist">
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        pH (potentiel hydrogene)
+        <div class="method">Mesure pH eau sur suspension sol/eau 1:5.</div>
+      </li>
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        Conductivite electrique (CE / salinite)
+        <div class="method">Sur extrait de pate saturee (ou extrait 1:5 avec conversion explicite).</div>
+      </li>
+    </ul>
+
+    <h2>3. Statut organo-calcique</h2>
+    <ul class="checklist">
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        Matiere organique (%)
+        <div class="method">Methode Anne ou Walkley-Black (oxydation au bichromate de potassium).</div>
+      </li>
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        Calcaire actif (%)
+        <div class="method">Methode Drouineau-Galet. Mesure prioritaire (ne pas confondre avec calcaire total).</div>
+      </li>
+    </ul>
+
+    <h2>4. Elements fertilisants majeurs (NPK)</h2>
+    <ul class="checklist">
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        Azote total (N)
+        <div class="method">Methode Kjeldahl.</div>
+      </li>
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        Phosphore assimilable (P2O5)
+        <div class="method">Methode Olsen (extraction au bicarbonate de sodium), obligatoire pour les sols alcalins.</div>
+      </li>
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        Potassium echangeable (K2O)
+        <div class="method">Extraction a l'acetate d'ammonium normal neutre.</div>
+      </li>
+    </ul>
+
+    <div class="foot">
+      Merci d'indiquer sur le rapport final les unites de mesure, les methodes analytiques appliquees,
+      ainsi que les seuils de reference utilises par le laboratoire.
+    </div>
+
+    <div class="sign">
+      <div class="sign-box">Signature technicien laboratoire</div>
+      <div class="sign-box">Signature demandeur / agriculteur</div>
+    </div>
+  </article>
+</body>
+</html>`;
+}
+
 /* ─── Default state factory ──────────────────────────────────────────────── */
 const freshSt = (mode = "eco") => ({
   ph: 6.5,
@@ -289,7 +541,7 @@ function Slider({ id, label, unit, min, max, step, value, onChange, zones, badge
 }
 
 /* ZONE FORM */
-function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultureLabel, onAnalyze, analyzing, hasResult }) {
+function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultureLabel, onAnalyze, analyzing, hasResult, onPrintLabRequest }) {
   // ✅ LOCK fields ONLY in Eco mode. Standard mode stays fully editable.
   const isSat = id => diagMode === "eco" && id in SAT_FIELDS;
 
@@ -310,6 +562,17 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
           </svg>
           EC · Texture imported from satellite - not editable
         </div>
+      )}
+
+      {/* Print Lab Request (Standard mode only) */}
+      {diagMode === "standard" && (
+        <button className="sd-lab-request-btn" onClick={onPrintLabRequest}>
+          <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+            <path d="M3 2h7v9H3z" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M4.5 4.3h4M4.5 6.3h4M4.5 8.3h2.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          </svg>
+          📄 Print Lab Request
+        </button>
       )}
 
       {/* 1 - Chemistry */}
@@ -435,7 +698,7 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
         <div className="sd-select-wrap">
           <select className="sd-sel" value={st.crop} onChange={e => onChange("crop", e.target.value)}>
             <option value="">🔀 Recommend for me</option>
-            {crops.map(c => <option key={c.id} value={c.id}>{c.e} {c.n}</option>)}
+            {crops.map(c => <option key={c.id} value={c.id}>{c.e} {c.n} / {c.ar}</option>)}
           </select>
           <svg className="sd-sel-arrow" width="13" height="13" viewBox="0 0 13 13" fill="none">
             <path d="M2 4.5l4.5 4.5 4.5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -594,7 +857,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
                   <div className="sd-rec-emoji" style={{background:c.bg}}>{c.e}</div>
                   <div className="sd-rec-info">
                     <div className="sd-rec-name">{c.n}</div>
-                    <div className="sd-rec-lat">{c.lat}</div>
+                    <div className="sd-rec-lat">{c.ar}</div>
                   </div>
                   <div className="sd-rec-score">
                     <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}%</div>
@@ -689,7 +952,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
                         <div className="sd-rec-emoji" style={{background:c.bg}}>{c.e}</div>
                         <div className="sd-rec-info">
                           <div className="sd-rec-name">{c.n}</div>
-                          <div className="sd-rec-lat">{c.lat}</div>
+                          <div className="sd-rec-lat">{c.ar}</div>
                         </div>
                         <div className="sd-rec-score">
                           <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}%</div>
@@ -874,6 +1137,38 @@ export default function SoilDiagnostic({
     setZoneResults(prev => { const next=[...prev]; next[idx]=null; return next; });
   }, []);
 
+  const handlePrintLabRequest = useCallback(() => {
+    const now = new Date();
+    const dateLabel = now.toLocaleDateString("fr-FR", {
+      year: "numeric",
+      month: "long",
+      day: "2-digit",
+    });
+
+    const html = buildLabRequestHtml({
+      parcelleName,
+      parcelleHa,
+      cultureLabel,
+      zoneNumber: activeZone + 1,
+      totalZones: n,
+      generatedAt: dateLabel,
+    });
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const parcelSlug = (parcelleName || "parcelle")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || "parcelle";
+    a.href = url;
+    a.download = `bordereau-analyse-sol-${parcelSlug}-zone-${activeZone + 1}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [activeZone, cultureLabel, n, parcelleHa, parcelleName]);
+
   if (!open) return null;
 
   const color  = ZONE_COLORS[activeZone % ZONE_COLORS.length];
@@ -993,6 +1288,7 @@ export default function SoilDiagnostic({
               onAnalyze={handleAnalyze}
               analyzing={analyzing}
               hasResult={!!result}
+              onPrintLabRequest={handlePrintLabRequest}
             />
 
             <div className="sd-rc">
