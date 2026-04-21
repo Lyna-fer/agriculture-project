@@ -777,57 +777,90 @@
 }
 
 .cy-footer {
-  background: var(--rp-ink);
-  border-top: none;
-  padding: 12px 20px;
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, rgba(252, 252, 254, 0.98), rgba(242, 240, 247, 0.98));
+  border-top: 1px solid rgba(26, 24, 37, 0.06);
+  padding: 14px 16px 15px;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
   flex-shrink: 0;
-  flex-wrap: wrap;
+  box-shadow:
+    0 -10px 28px rgba(26, 24, 37, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  overflow: hidden;
 }
-.cy-footer-badge {
+
+.cy-footer::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background:
+    linear-gradient(90deg, var(--a, #00d4a0), rgba(82, 163, 255, 0.95), rgba(196, 129, 255, 0.88));
+  pointer-events: none;
+  z-index: -1;
+}
+
+.cy-footer-summary {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  font-weight: 800;
-  color: #fff;
-  padding: 6px 14px;
-  border-radius: 50px;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 2px 0;
 }
+
 .cy-footer-stats {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
+  flex-wrap: wrap;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--rp-ink);
   font-family: "JetBrains Mono", monospace;
   font-weight: 500;
 }
 .cy-footer-dot {
-  width: 3px;
-  height: 3px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
+  background: linear-gradient(180deg, rgba(26, 24, 37, 0.42), rgba(26, 24, 37, 0.18));
+  box-shadow: 0 0 0 3px rgba(26, 24, 37, 0.03);
 }
+
+.cy-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .cy-footer-close {
   margin-left: auto;
   font-family: "Nunito", inherit;
   font-size: 12px;
   font-weight: 800;
-  padding: 8px 18px;
+  padding: 9px 18px;
   border-radius: 50px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.07);
-  color: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(26, 24, 37, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 242, 248, 0.96));
+  color: var(--rp-ink);
   cursor: pointer;
   transition: all 0.14s;
+  box-shadow:
+    0 8px 18px rgba(26, 24, 37, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 .cy-footer-close:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(248, 247, 251, 1));
+  color: var(--rp-ink);
+  transform: translateY(-1px);
 }
 
 @media (max-width: 600px) {
@@ -859,20 +892,25 @@
   font-family: "Nunito", inherit;
   font-size: 12px;
   font-weight: 800;
-  padding: 8px 16px;
+  padding: 9px 16px;
   border-radius: 50px;
-  border: none;
-  background: linear-gradient(135deg, #2aaa82, #1e8c68);
-  color: #fff;
+  border: 1px solid rgba(32, 149, 110, 0.18);
+  background:
+    linear-gradient(135deg, rgba(37, 181, 132, 0.98), rgba(25, 141, 102, 0.98));
+  color: #ffffff;
   cursor: pointer;
   transition: all 0.15s;
-  box-shadow: 0 4px 14px rgba(42, 170, 130, 0.4);
+  box-shadow:
+    0 8px 18px rgba(32, 149, 110, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
   white-space: nowrap;
 }
 .cy-footer-diag:hover {
-  filter: brightness(1.1);
+  filter: brightness(1.01);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(42, 170, 130, 0.5);
+  box-shadow:
+    0 10px 22px rgba(32, 149, 110, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
 }
 
 .cy-footer-sampling {
@@ -882,21 +920,26 @@
   font-family: "Nunito", inherit;
   font-size: 12px;
   font-weight: 800;
-  padding: 8px 16px;
+  padding: 9px 16px;
   border-radius: 50px;
-  border: none;
-  background: linear-gradient(135deg, #3498db, #2c6fbe);
-  color: #fff;
+  border: 1px solid rgba(43, 116, 219, 0.16);
+  background:
+    linear-gradient(135deg, rgba(46, 140, 245, 0.98), rgba(32, 106, 213, 0.98));
+  color: #ffffff;
   cursor: pointer;
   transition: all 0.15s;
-  box-shadow: 0 4px 14px rgba(44, 111, 190, 0.4);
+  box-shadow:
+    0 8px 18px rgba(43, 116, 219, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
   white-space: nowrap;
 }
 
 .cy-footer-sampling:hover {
-  filter: brightness(1.1);
+  filter: brightness(1.01);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(44, 111, 190, 0.5);
+  box-shadow:
+    0 10px 22px rgba(43, 116, 219, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.98);
 }
 
 @media (max-width: 860px) {
@@ -917,8 +960,21 @@
 }
 
 @media (max-width: 520px) {
+  .cy-footer {
+    padding: 14px 14px 16px;
+  }
+
+  .cy-footer-summary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .cy-footer-stats {
-    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .cy-footer-stats {
+    width: 100%;
   }
 
   .cy-footer-diag,
@@ -926,5 +982,10 @@
   .cy-footer-close {
     width: 100%;
     justify-content: center;
+    margin-left: 0;
+  }
+
+  .cy-footer-actions {
+    width: 100%;
   }
 }

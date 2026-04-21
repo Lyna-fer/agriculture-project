@@ -19,10 +19,9 @@ function PatternDiagram({ type, color, size = 110 }) {
   return diagrams[type] || diagrams.zigzag;
 }
 
-function buildKpis(data, nSamples, parcelleHa) {
+function buildKpis(data, parcelleHa) {
   const fmtHa = ha => ha < 0.1 ? `${(ha*10000).toFixed(0)} m²` : `${ha.toFixed(2)} ha`;
   return [
-    { val: nSamples, lbl: "Sampling\npoints", icon: "📍", bg: "#fff0f6", color: "#ff6b9d" },
     { val: `${data.depths.at(-1).label.split("–")[1].trim()}`, lbl: "Max\ndepth", icon: "⬇️", bg: "#e6f7ff", color: "#5bc4f5" },
     { val: fmtHa(parcelleHa), lbl: "Parcel\narea", icon: "🌿", bg: "#e0faf4", color: "#00d4a0" },
     { val: data.depths.length, lbl: "Required\nlayers", icon: "🪨", bg: "#f0eeff", color: "#9b8ff5" },
@@ -53,17 +52,6 @@ export default function ResultsPanel({
 
   const data = CULTURES.find(c => c.id === cultureId);
 
-  const nSamples = useMemo(() => {
-    if (!data || parcelleHa <= 0) return 0;
-    const { coresPerHa, minCores, maxCores } = {
-      coresPerHa: cultureId===1 ? 7 : cultureId===2 ? 4 : 5,
-      minCores:   cultureId===1 ? 8 : cultureId===2 ? 6 : 6,
-      maxCores:   20,
-    };
-    const densityFactor = samplingMode==="economic" ? 0.5 : 1.0;
-    return Math.max(minCores, Math.min(maxCores, Math.round(parcelleHa * coresPerHa * densityFactor)));
-  }, [data, parcelleHa, cultureId, samplingMode]);
-
   const zoneHa = cultureId===1 ? 3 : cultureId===2 ? 5 : 4;
   const calcZones = useMemo(() => {
     if (samplingMode==="economic") {
@@ -80,7 +68,7 @@ export default function ResultsPanel({
   if (!data) return null;
 
   const A = data.color, AB = data.colorLight, Icon = data.icon;
-  const kpis = buildKpis(data, nSamples, parcelleHa);
+  const kpis = buildKpis(data, parcelleHa);
 
   const initialDiagMode = samplingMode==="economic" ? "eco" : "standard";
 
@@ -152,7 +140,7 @@ export default function ResultsPanel({
                 <div className="cy-slab-micro">📌 Field rule</div>
                 <div className="cy-slab-text">
                   The parcel is divided into <b>{effectiveZones} homogeneous management zone(s)</b>.
-                  In each zone, collect <b>{nSamples}</b> samples and mix them in a separate bucket.
+                  In each zone, collect the required samples and mix them in a separate bucket.
                 </div>
               </div>
             </div>
@@ -243,31 +231,32 @@ export default function ResultsPanel({
       </div>
 
       <div className="cy-footer">
-        <div className="cy-footer-badge" style={{background:A}}><Icon size={13} color="#fff"/> {data.nameShort}</div>
-        <div className="cy-footer-stats">
-          <span>{nSamples} pts</span>
-          <span className="cy-footer-dot"/>
-          <span>{fmtHa(parcelleHa)}</span>
-          <span className="cy-footer-dot"/>
-          <span>{data.depths.length} horizons</span>
-          <span className="cy-footer-dot"/>
-          <span>{effectiveZones} zone{effectiveZones>1?"s":" "}</span>
+        <div className="cy-footer-summary">
+          <div className="cy-footer-stats">
+            <span>{fmtHa(parcelleHa)}</span>
+            <span className="cy-footer-dot"/>
+            <span>{data.depths.length} horizons</span>
+            <span className="cy-footer-dot"/>
+            <span>{effectiveZones} zone{effectiveZones>1?"s":" "}</span>
+          </div>
         </div>
 
-        <button className="cy-footer-diag" onClick={()=>setDiagOpen(true)}>
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <circle cx="6.5" cy="6.5" r="5.5" stroke="white" strokeWidth="1.3"/>
-            <path d="M6.5 4v3l2 2" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
-          </svg>
-          Soil Diagnostic
-        </button>
-        <button className="cy-footer-sampling" onClick={onStartSampling}>
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path d="M6.5 1v8M3 7l3.5 3.5L10 7M1 12h11" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Télécharger KML
-        </button>
-        <button className="cy-footer-close" onClick={onClose}>Fermer ✕</button>
+        <div className="cy-footer-actions">
+          <button className="cy-footer-diag" onClick={()=>setDiagOpen(true)}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <circle cx="6.5" cy="6.5" r="5.5" stroke="white" strokeWidth="1.3"/>
+              <path d="M6.5 4v3l2 2" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+            Soil Diagnostic
+          </button>
+          <button className="cy-footer-sampling" onClick={onStartSampling}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M6.5 1v8M3 7l3.5 3.5L10 7M1 12h11" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Télécharger KML
+          </button>
+          <button className="cy-footer-close" onClick={onClose}>Fermer ✕</button>
+        </div>
 
         <SoilDiagnostic
           open={diagOpen}
