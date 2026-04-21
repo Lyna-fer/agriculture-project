@@ -7,8 +7,6 @@ import {
   RectangleHorizontal,
   Trash2,
   BadgeCheck,
-  CircleCheck,
-  Dot,
   X,
 } from "lucide-react";
 import { CULTURES } from "../../data/cultures";
@@ -59,6 +57,7 @@ function FieldThumb({ color, latlngs, index = 0 }) {
   const lngs = normalizedLatLngs.map((p) => p.lng);
   const minLat = Math.min(...lats), maxLat = Math.max(...lats);
   const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+
   const rangeX = maxLng - minLng || 0.0001;
   const rangeY = maxLat - minLat || 0.0001;
   const scale = Math.min((W - PAD * 2) / rangeX, (H - PAD * 2) / rangeY);
@@ -95,8 +94,6 @@ export default function LeftPanel({
   parcelles = [],
   selectedParcelle = null,
   selectedGroup = null,
-  // ✅ REMOVED: samplingMode prop (no longer needed)
-  // ✅ REMOVED: onSamplingModeChange prop (no longer needed)
   activeTool = null,
   pendingParcelleInfo = null,
   pendingColor = "#2ecc71",
@@ -114,10 +111,10 @@ export default function LeftPanel({
   const totalArea = parcelles.reduce((s, p) => s + (p.area || 0), 0);
   const step1done = parcelles.length > 0;
   const step2done = !!selectedGroup;
+
   const drawPanelOpen = !!activeTool || !!pendingParcelleInfo;
   const drawPhase = pendingParcelleInfo ? "confirm" : "drawing";
 
-  // ✅ NEW: Extract existing names to pass to DrawPanel
   const existingNames = parcelles.map((p) => p.name || "");
 
   return (
@@ -267,8 +264,6 @@ export default function LeftPanel({
           </button>
         )}
 
-        {/* ✅ REMOVED: Entire lp-mode-selector block (Standard/Economic buttons) */}
-
         <button
           className={`lp-gen ${canGenerate ? "ready" : ""} ${isAnalyzing ? "loading" : ""}`}
           disabled={!canGenerate || isAnalyzing}
@@ -296,7 +291,7 @@ export default function LeftPanel({
         defaultColor={pendingColor}
         onSave={onSaveParcelle}
         onCancel={onCancelDraw}
-        existingNames={existingNames} // ✅ NEW: Pass names for validation
+        existingNames={existingNames}
       />
     </aside>
   );

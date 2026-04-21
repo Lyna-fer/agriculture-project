@@ -13,13 +13,6 @@ import {
   authenticateGEE,
 } from "../lib/samplingEngine";
 import { ZONE_COLORS } from "../data/wilayas";
-import {
-  initializeSamplingState,
-  getCurrentBatchPoints,
-  markPointDone,
-  advanceSamplingBatch,
-} from "../services/samplingLogic";
-
 const CULTURES_TO_STRATEGIES = {
   1: "vegetables",
   2: "cereals",
@@ -43,18 +36,17 @@ export default function Map() {
   const [pendingColor,       setPendingColor]        = useState("#2ecc71");
   const [parcelleInfo,       setParcelleInfo]        = useState(null);
   const [selectedGroupId,    setSelectedGroupId]     = useState(null);
-  const samplingMode = "standard"; // ✅ Hardcoded to standard mode (economic removed)
+  const samplingMode = "standard";
   const [activeTool,         setActiveTool]          = useState(null);
   const [resultsOpen,        setResultsOpen]         = useState(false);
   const [selectedWilaya,     setSelectedWilaya]      = useState(null);
   const [toast,              setToast]               = useState({ msg: "", visible: false });
   const [geeReady,           setGeeReady]            = useState(false);
   const [isAnalyzing,        setIsAnalyzing]         = useState(false);
+  //  number of zones returned by the backend after analysis
   const [nZonesFromBackend,  setNZonesFromBackend]   = useState(1);
   const [analyzedZones,      setAnalyzedZones]       = useState([]);
   const [samplingColor,      setSamplingColor]       = useState("#2ecc71");
-  const [isSampling,         setIsSampling]          = useState(false);
-  const [samplingState,      setSamplingState]       = useState(null);
 
   const toastTimer = useRef(null);
 
@@ -78,7 +70,7 @@ export default function Map() {
           }
         }
       } catch (error) {
-        console.warn("⚠️ Could not fetch parcelles from DB: ", error);
+        console.warn("⚠️ Could not fetch parcelles from DB:", error);
       }
     };
     fetchUserParcelles();
@@ -112,8 +104,6 @@ export default function Map() {
     setParcelleInfo(info);
     setAnalyzedZones([]);
     setSamplingColor(color);
-    setIsSampling(false);
-    setSamplingState(null);
     setResultsOpen(false);
     const ha = info.area || 0;
     showToast(`✅ Parcel drawn - ${ha < 0.1 ? info.areaM2?.toFixed(0) + " m²" : ha.toFixed(2) + " ha"} · Give it a name`);
@@ -122,12 +112,9 @@ export default function Map() {
   const {
     mapRef, placeSamplePoints, clearSampleMarkers, activateDrawTool, clearAll,
     flyToWilaya, displayZones, clearZones, drawParcelleFromLatLngs,
-    setSamplingMarkers, clearSamplingMarkers,
-    drawAllParcelles, // ✅ NEW: For displaying all parcels
-    clearAllParcelles, // ✅ NEW: For clearing all parcels
+    clearSamplingMarkers, drawAllParcelles, clearAllParcelles,
   } = useMap({ onParcelleChange: handleParcelleChange });
 
-  // ✅ NEW: Draw all parcels whenever parcelles list changes
   useEffect(() => {
     if (parcelles.length > 0) {
       drawAllParcelles(parcelles, selectedParcelleId);
@@ -166,6 +153,7 @@ export default function Map() {
     showToast("✕ Drawing canceled");
   }, [activateDrawTool, clearAll, parcelles.length, showToast]);
 
+  // ✅ FIXED: Delete single parcelle immediately (UI + Map + DB)
   const handleDeleteParcelle = useCallback(
     async (id) => {
       if (!id) return;
@@ -179,7 +167,7 @@ export default function Map() {
         setSelectedParcelleId(null);
         setParcelleInfo(null);
         setResultsOpen(false);
-        clearAll();
+        clearAll(); // ✅ Removes the polygon from the map immediately
       }
 
       // 3. Backend deletion
@@ -188,8 +176,8 @@ export default function Map() {
           const response = await fetch(`${API_BASE}/api/parcels/${id}`, {
             method: "DELETE",
             headers: {
-              "Authorization": `Bearer ${token}`,
-              "Content-Type": "application/json"
+               "Authorization": `Bearer ${token}`,
+               "Content-Type": "application/json"
             },
           });
 
@@ -210,10 +198,13 @@ export default function Map() {
     [selectedParcelleId, showToast, clearAll]
   );
 
+  // ✅ FIXED: Bulk delete - uses snapshot of IDs to ensure ALL are deleted
   const handleClearAll = useCallback(async () => {
     clearAll();
     clearZones();
     const token = localStorage.getItem("token");
+
+    // Take a snapshot of IDs to delete to avoid state staleness issues
     const idsToDelete = parcelles.map(p => p.id);
 
     if (idsToDelete.length > 0 && token) {
@@ -224,8 +215,8 @@ export default function Map() {
             fetch(`${API_BASE}/api/parcels/${id}`, {
               method: "DELETE",
               headers: {
-                "Authorization": `Bearer ${token}`,
-                "Content-Type": "application/json"
+                 "Authorization": `Bearer ${token}`,
+                 "Content-Type": "application/json"
               },
             }).then(async (res) => {
               if (!res.ok) {
@@ -245,10 +236,11 @@ export default function Map() {
           showToast("🗑 Everything cleared");
         }
       } catch (error) {
-        console.error("❌ Bulk delete error: ", error);
+        console.error("❌ Bulk delete error:", error);
         showToast("❌ Error during deletion");
       }
     } else if (idsToDelete.length > 0 && !token) {
+      // If no token, just clear UI
       showToast("🗑 Everything cleared (UI only)");
     }
 
@@ -263,8 +255,6 @@ export default function Map() {
     setNZonesFromBackend(1);
     setAnalyzedZones([]);
     setSamplingColor("#2ecc71");
-    setIsSampling(false);
-    setSamplingState(null);
   }, [parcelles, clearAll, clearZones, showToast, setNZonesFromBackend]);
 
   const handleSelectParcelle = useCallback((id) => {
@@ -288,8 +278,8 @@ export default function Map() {
     const token = localStorage.getItem("token");
     if (!token) { showToast("❌ Please sign in first"); return; }
     if (isAnalyzing) return;
-
     setIsAnalyzing(true);
+
     const isExistingParcelle = selectedParcelleId && !pendingParcelleInfo;
     const targetParcelle = isExistingParcelle ? parcelles.find(p => p.id === selectedParcelleId) : null;
     const geometry = isExistingParcelle && targetParcelle?.latlngs
@@ -351,15 +341,13 @@ export default function Map() {
         setNZonesFromBackend(data.zones.length);
         setAnalyzedZones(data.zones);
         setSamplingColor(culture.color);
-        setIsSampling(false);
-        setSamplingState(null);
         clearSamplingMarkers();
         displayZones(data.zones, samplingMode);
         placeSamplePoints(data.zones, culture.color);
         setResultsOpen(true);
 
         const totalPoints = data.zones.reduce((sum, z) => sum + (z.points?.length || 0), 0);
-        const modeLabel = "standard"; // ✅ Always standard mode
+        const modeLabel = "standard";
         showToast(data.savedParcelleId
           ? `🔬 ${totalPoints} pts · ${data.zones.length} zone(s) + 💾 Parcel #${data.savedParcelleId} saved! (${modeLabel})`
           : `🔬 ${totalPoints} points generated in ${data.zones.length} zone(s)! (${modeLabel})`
@@ -367,14 +355,12 @@ export default function Map() {
       } else {
         showToast("⚠️ No zone generated");
         setAnalyzedZones([]);
-        setIsSampling(false);
-        setSamplingState(null);
         clearSamplingMarkers();
         clearSampleMarkers();
         showToast("⚠️ No zone generated");
       }
     } catch (error) {
-      console.error("Network Error: ", error);
+      console.error("Network Error:", error);
       showToast("❌ Network error");
     } finally {
       setIsAnalyzing(false);
@@ -385,109 +371,63 @@ export default function Map() {
     showToast, isAnalyzing, clearSampleMarkers, clearSamplingMarkers,
   ]);
 
-  const openGoogleMapsForBatch = useCallback((state) => {
-    const points = getCurrentBatchPoints(analyzedZones, state);
-    if (!points || points.length === 0) return;
-    const fmt = ([lat, lng]) => `${lat},${lng}`;
-    let url = " ";
-
-    if (points.length === 1) {
-      url = `https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=${fmt(points[0])}`;
-    } else {
-      const origin = fmt(points[0]);
-      const destination = fmt(points[points.length - 1]);
-      const waypoints = points.slice(1, -1).map(fmt).join("|");
-      url = `https://www.google.com/maps/dir/?api=1&travelmode=walking&origin=${origin}&destination=${destination}`;
-      if (waypoints) {
-        url += `&waypoints=${encodeURIComponent(waypoints)}`;
-      }
-    }
-
-    window.open(url, "_blank", "noopener,noreferrer");
-  }, [analyzedZones]);
-
-  const buildPointKey = useCallback((zoneIdx, pointIdx) => `${zoneIdx}:${pointIdx}`, []);
-
-  const renderSamplingPoints = useCallback((state) => {
-    if (!analyzedZones || analyzedZones.length === 0) return;
-    if (!state) {
-      placeSamplePoints(analyzedZones, samplingColor);
+  const exportSamplingKml = useCallback(async () => {
+    if (!analyzedZones || analyzedZones.length === 0) {
+      showToast("❌ Aucune parcelle analysée");
       return;
     }
 
-    const donePointKeys = new Set((state.done || []).map((i) => buildPointKey(state.zone, i)));
-    const currentBatch = state.unmarked.slice(0, 10);
-    const clickablePointKeys = new Set(currentBatch.map((i) => buildPointKey(state.zone, i)));
+    const token = localStorage.getItem("token");
+    if (!token) {
+      showToast("❌ Veuillez vous connecter d'abord");
+      return;
+    }
 
-    placeSamplePoints(analyzedZones, samplingColor, {
-      donePointKeys,
-      clickablePointKeys,
-      onPointClick: ({ zoneIdx, pointIdx }) => {
-        setSamplingState((prev) => {
-          if (!prev || prev.zone !== zoneIdx) return prev;
-          const batch = prev.unmarked.slice(0, 10);
-          const batchIndex = batch.indexOf(pointIdx);
-          if (batchIndex === -1) return prev;
-          return markPointDone(prev, batchIndex);
-        });
-      },
-    });
-  }, [analyzedZones, buildPointKey, placeSamplePoints, samplingColor]);
+    try {
+      const response = await fetch(`${API_BASE}/api/sampling/export-kml`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          zones: analyzedZones,
+          parcelleName: pendingParcelleInfo?.name || parcelleInfo?.name || "sampling-points",
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.detail || response.statusText || "KML export failed");
+      }
+
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `${(pendingParcelleInfo?.name || parcelleInfo?.name || "sampling-points").trim().replace(/\s+/g, "-")}.kml`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000);
+      showToast("✅ Fichier KML téléchargé");
+    } catch (error) {
+      console.error("KML export error:", error);
+      showToast(`❌ ${error.message}`);
+    }
+  }, [analyzedZones, parcelleInfo, pendingParcelleInfo, showToast]);
 
   const handleStartSampling = useCallback(() => {
     if (!analyzedZones || analyzedZones.length === 0) {
       showToast("❌ Aucune parcelle analysée");
       return;
     }
-    if (isSampling && samplingState) {
-      const remainingCurrent = getCurrentBatchPoints(analyzedZones, samplingState);
-      if (remainingCurrent.length > 0) {
-        openGoogleMapsForBatch(samplingState);
-        return;
-      }
-
-      const next = advanceSamplingBatch(analyzedZones, samplingState);
-      if (!next || getCurrentBatchPoints(analyzedZones, next).length === 0) {
-        setIsSampling(false);
-        setSamplingState(null);
-        placeSamplePoints(analyzedZones, samplingColor);
-        clearSamplingMarkers();
-        showToast("✅ Échantillonnage terminé pour toutes les zones !");
-        return;
-      }
-
-      setSamplingState(next);
-      openGoogleMapsForBatch(next);
-      return;
-    }
-
-    const initialState = initializeSamplingState(analyzedZones);
-    if (!initialState) {
-      showToast("❌ Erreur d'initialisation de l'échantillonnage");
-      return;
-    }
-    setSamplingState(initialState);
-    setIsSampling(true);
-    clearSampleMarkers();
-    openGoogleMapsForBatch(initialState);
-    showToast("🚀 Points numérotés affichés. Cliquez pour les passer en vert.");
+    exportSamplingKml();
   }, [
     analyzedZones,
-    isSampling,
-    samplingState,
-    clearSampleMarkers,
-    clearSamplingMarkers,
-    placeSamplePoints,
-    samplingColor,
-    openGoogleMapsForBatch,
+    exportSamplingKml,
     showToast,
   ]);
-
-  useEffect(() => {
-    if (!analyzedZones || analyzedZones.length === 0) return;
-    if (!isSampling || !samplingState) return;
-    renderSamplingPoints(samplingState);
-  }, [analyzedZones, isSampling, samplingState, renderSamplingPoints]);
 
   const handleSelectWilaya = useCallback((wilaya) => {
     setSelectedWilaya(wilaya); flyToWilaya(wilaya);
@@ -526,19 +466,19 @@ export default function Map() {
           selectedWilaya={selectedWilaya}
           onCloseWilaya={() => setSelectedWilaya(null)}
         />
-        <ResultsPanel
-          open={resultsOpen}
-          onClose={() => setResultsOpen(false)}
-          cultureId={selectedGroupId}
-          parcelleHa={parcelleInfo?.area}
-          region={selectedWilaya?.name}
-          samplingMode={samplingMode}
-          parcelle={selectedParcelle}
-          nZones={nZonesFromBackend}
-          onStartSampling={handleStartSampling}
-        />
-        <Toast message={toast.msg} visible={toast.visible} />
       </div>
+      <ResultsPanel
+        open={resultsOpen}
+        onClose={() => setResultsOpen(false)}
+        cultureId={selectedGroupId}
+        parcelleHa={parcelleInfo?.area}
+        region={selectedWilaya?.name}
+        samplingMode={samplingMode}
+        parcelle={selectedParcelle}
+        nZones={nZonesFromBackend}
+        onStartSampling={handleStartSampling}
+      />
+      <Toast message={toast.msg} visible={toast.visible} />
     </>
   );
 }

@@ -9,6 +9,7 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import Response
 from pydantic import BaseModel
 from jose import JWTError, jwt
 
@@ -16,6 +17,10 @@ try:
     from Backend.services.sampling import run_sampling_pipeline
 except ModuleNotFoundError:
     from services.sampling import run_sampling_pipeline
+try:
+    from Backend.services.kml_export import build_sampling_kml
+except ModuleNotFoundError:
+    from services.kml_export import build_sampling_kml
 import asyncio
 
 # ─── DATABASE SETUP ───────────────────────────────────────────────────────────
@@ -196,6 +201,11 @@ class SamplingRequest(BaseModel):
 
 class SatelliteSoilRequest(BaseModel):
     polygonPoints: list[list[float]]
+
+
+class KmlExportRequest(BaseModel):
+    zones: list[dict]
+    parcelleName: Optional[str] = None
 
 
 # ─── FASTAPI APP ──────────────────────────────────────────────────────────────
@@ -580,6 +590,27 @@ def get_satellite_soil_metrics(
     except Exception as e:
         print(f"❌ ERROR in satellite metrics: {type(e).__name__}: {e}")
         raise HTTPException(500, detail=f"Satellite processing failed: {str(e)}")
+
+
+@app.post("/api/sampling/export-kml")
+def export_sampling_kml(
+        request: KmlExportRequest,
+        current_user: AuthUser = Depends(get_current_user)
+):
+    del current_user
+    try:
+        kml = build_sampling_kml(request.zones, request.parcelleName or "Sampling points")
+        safe_name = (request.parcelleName or "sampling-points").strip().replace(" ", "-") or "sampling-points"
+        return Response(
+            content=kml,
+            media_type="application/vnd.google-earth.kml+xml",
+            headers={
+                "Content-Disposition": f'attachment; filename="{safe_name}.kml"'
+            },
+        )
+    except Exception as e:
+        print(f"❌ ERROR in KML export: {type(e).__name__}: {e}")
+        raise HTTPException(500, detail=f"KML export failed: {str(e)}")
 
 
 # ─── PERSISTENT PARCELLE ENDPOINTS ─────────────────────────────────────────────
