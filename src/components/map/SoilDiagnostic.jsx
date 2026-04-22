@@ -127,7 +127,7 @@ function toCrop(c) {
     soilType: c.soilType,
     prefTex,
     ss: inferSeasons(c),
-    note: `Soil ${c.soilType}. N: ${c.nReq} · P: ${c.pReq} · K: ${c.kReq} mg/kg · OM >= ${limits.omMin}% · Active lime <= ${limits.activeLimeMax}%`,
+    note: `Soil ${c.soilType}. N: ${c.nReq} kg/ha · P: ${c.pReq} kg/ha · K: ${c.kReq} kg/ha · OM >= ${limits.omMin}% · Active lime <= ${limits.activeLimeMax}%`,
   };
 }
 
@@ -150,13 +150,19 @@ const mcBg = m => m>=80 ? "#c8f5e0" : m>=60 ? "#fff3c8" : "#ffc8c8";
 const PARAMS = [
   {id:"ph",  name:"pH",         u:"",     mn:4, mx:9  },
   {id:"ce",  name:"CE",         u:"dS/m", mn:0, mx:6  },
-  {id:"n",   name:"Azote N",    u:"mg/kg",mn:0, mx:100},
-  {id:"p",   name:"Phosphore P",u:"mg/kg",mn:0, mx:50 },
-  {id:"k",   name:"Potassium K",u:"mg/kg",mn:0, mx:400},
+  {id:"n",   name:"Azote N",    u:"kg/ha",mn:0, mx:400},
+  {id:"p",   name:"Phosphore P",u:"kg/ha",mn:0, mx:400},
+  {id:"k",   name:"Potassium K",u:"kg/ha",mn:0, mx:400},
   {id:"temp",name:"Temp. sol",  u:"°C",   mn:0, mx:40 },
   {id:"lime",name:"Active Lime",u:"%",    mn:0, mx:30 },
   {id:"wind",name:"Wind",       u:"km/h", mn:0, mx:80 },
-  {id:"poll",name:"Pollution",  u:"idx",  mn:0, mx:100},
+  {id:"poll",name:"Pollution",  u:"mg/kg",mn:0, mx:100},
+];
+
+const PARAM_ROWS = [
+  PARAMS.slice(0, 3),
+  PARAMS.slice(3, 6),
+  PARAMS.slice(6),
 ];
 
 const SN = {
@@ -564,7 +570,7 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
             <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2" />
             <circle cx="5" cy="5" r="1.5" fill="currentColor" />
           </svg>
-          CE: Landsat 8 · Texture: OpenLandMap / SoilGrids (Global Soil Map) · Surface Temp: MODIS (Terra/Aqua)
+          CE: Landsat 8 · Texture: OpenLandMap / SoilGrids (Global Soil Map)
         </div>
       )}
 
@@ -589,9 +595,9 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
       {/* 2 - NPK */}
       <div className="sd-sec">
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>2</span>NPK Fertility</div>
-        <Slider id="n" label="Nitrogen (N)"   unit="mg/kg" min={0}  max={100} step={1} value={st.n} onChange={onChange} zones l="Low"    m="30–60 Optimal" r="High" />
-        <Slider id="p" label="Phosphorus (P)" unit="mg/kg" min={0}  max={50}  step={1} value={st.p} onChange={onChange} zones l="0"      m="15–30 Optimal" r="50" />
-        <Slider id="k" label="Potassium (K)"  unit="mg/kg" min={0}  max={400} step={5} value={st.k} onChange={onChange} zones l="0"      m="130–250 Opt."  r="400" />
+        <Slider id="n" label="Nitrogen (N)"   unit="kg/ha" min={0}  max={400} step={1} value={st.n} onChange={onChange} zones l="Low"    m="30–60 Optimal" r="400" />
+        <Slider id="p" label="Phosphorus (P)" unit="kg/ha" min={0}  max={400} step={1} value={st.p} onChange={onChange} zones l="0"      m="15–30 Optimal" r="400" />
+        <Slider id="k" label="Potassium (K)"  unit="kg/ha" min={0}  max={400} step={5} value={st.k} onChange={onChange} zones l="0"      m="130–250 Opt."  r="400" />
         <Slider id="lime" label="Active Lime" unit="%" min={0} max={30} step={1} value={st.lime} onChange={onChange} zones l="0 Low" m="8–12 Preferred" r="30 High" />
       </div>
 
@@ -665,7 +671,7 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
       {/* 4 - Environment */}
       <div className="sd-sec">
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>4</span>Environmental Risks</div>
-        <Slider id="poll" label="Soil Pollution Index" unit="idx" min={0} max={100} step={1} value={st.poll} onChange={onChange} zones l="0 Clean" m="25 Alert" r="100 Critical" />
+        <Slider id="poll" label="Soil Pollution" unit="mg/kg" min={0} max={100} step={1} value={st.poll} onChange={onChange} zones l="0 Clean" m="25 Alert" r="100 Critical" />
       </div>
 
       {/* 5 - Season */}
@@ -787,7 +793,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
           <span className="sd-score-meta-chip">Texture: {st.tex}</span>
           <span className="sd-score-meta-chip">Temp: {st.temp}°C</span>
           <span className="sd-score-meta-chip">Wind: {st.wind} km/h</span>
-          <span className="sd-score-meta-chip">Pollution: {st.poll}</span>
+          <span className="sd-score-meta-chip">Pollution: {st.poll} mg/kg</span>
           <span className="sd-score-meta-chip">
             {diagMode==="eco" || diagMode==="standard" ? "Satellite-assisted" : "Manual inputs"}
           </span>
@@ -818,7 +824,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
 
       {/* 6 param pills */}
       <div className="sd-param-pills sd-a2">
-        {[PARAMS.slice(0,3), PARAMS.slice(3,6), PARAMS.slice(6)].map((row,ri) => (
+        {PARAM_ROWS.map((row,ri) => (
           <div key={ri} className="sd-param-pill-row">
             {row.map(p => {
               const v = st[p.id], sta = pSt(p.id,v);
