@@ -1,0 +1,118 @@
+PARTIE MÉMOIRE — IMPLÉMENTATION / RÉALISATION
+Projet : Landing Map (Système expert d’optimisation des parcelles agricoles)
+
+1) Introduction de la partie implémentation
+
+Dans cette partie, nous présentons la réalisation technique de la plateforme Landing Map, développée pour aider les agriculteurs à délimiter leurs parcelles, générer des points d’échantillonnage, exploiter des indicateurs satellitaires, puis obtenir une aide à la décision agronomique.
+
+L’objectif de l’implémentation est de transformer les besoins fonctionnels en un système web opérationnel, composé d’un frontend interactif (React + Vite) et d’un backend API (FastAPI + PostgreSQL/PostGIS), avec intégration de Google Earth Engine pour certaines données environnementales.
+
+2) Architecture technique réalisée
+
+L’architecture suit une logique en couches :
+
+- Couche présentation : application React (interface cartographique, formulaires, visualisation des résultats).
+- Couche services : API FastAPI (authentification, traitement géospatial, pipeline d’échantillonnage, export KML).
+- Couche données : PostgreSQL/PostGIS (utilisateurs, parcelles, points d’échantillonnage).
+- Services externes : Google Earth Engine (indicateurs de sol et d’environnement), Google Maps (navigation terrain).
+
+Cette architecture facilite la séparation des responsabilités :
+- le frontend gère l’expérience utilisateur,
+- le backend centralise la logique métier,
+- la base de données garantit la persistance et la traçabilité.
+
+3) Réalisation du frontend (React + Vite)
+
+Le frontend est organisé autour de composants spécialisés :
+
+- Map.jsx : orchestration principale de la page cartographique (dessin, sélection parcelle, lancement analyse, affichage résultat).
+- LeftPanel.jsx : actions utilisateur (dessin, sauvegarde, suppression, analyse).
+- MapView.jsx + hook useMap : interaction Leaflet (dessin de polygones, affichage zones et points).
+- ResultsPanel.jsx : synthèse des résultats d’échantillonnage (zones, horizons, protocole, matériel, actions).
+- SoilDiagnostic.jsx : diagnostic agronomique multi-critères (pH, CE, température, NPK, calcaire actif, texture…).
+
+Choix techniques de réalisation :
+- React hooks (useState, useEffect, useMemo, useCallback) pour la gestion d’état et la performance.
+- Découpage composant pour limiter le couplage et faciliter la maintenance.
+- Appels API via fetch avec token JWT pour les routes protégées.
+
+4) Réalisation du backend (FastAPI + PostgreSQL/PostGIS)
+
+Le backend fournit des endpoints REST pour :
+- authentification (inscription, connexion, profil utilisateur),
+- gestion des parcelles (création, liste, suppression),
+- exécution de l’analyse d’échantillonnage (pipeline complet),
+- export des résultats au format KML,
+- récupération de métriques satellitaires.
+
+Éléments implémentés :
+- Authentification JWT (création et validation de jeton).
+- Vérification mot de passe compatible hash Django PBKDF2.
+- Modèles relationnels (auth_user, farmer, parcelles, soil_samples).
+- Géométries PostGIS (POLYGON pour parcelles, POINT pour échantillons).
+
+Le pipeline d’analyse combine :
+- calcul de surface,
+- estimation du nombre de zones,
+- génération des points d’échantillonnage,
+- sauvegarde base de données,
+- retour structuré pour affichage dans le frontend.
+
+5) Logique métier implémentée
+
+La logique métier de la plateforme couvre :
+
+a) Délimitation de parcelle
+- L’utilisateur dessine un polygone sur la carte.
+- La surface est calculée et affichée automatiquement.
+
+b) Échantillonnage
+- Le système propose une stratégie d’échantillonnage selon le type de culture.
+- Les zones et points sont générés puis affichés visuellement.
+
+c) Diagnostic agronomique
+- Le module SoilDiagnostic calcule des scores de compatibilité.
+- Les paramètres analysés incluent : pH, CE, température, N, P, K, calcaire actif, matière organique, texture.
+- Le système fournit des recommandations pratiques en fonction des écarts détectés.
+
+d) Export terrain
+- Les points/zonages peuvent être exportés en KML pour usage terrain (Google Earth/Maps).
+
+6) Validation et vérification de la réalisation
+
+La validation technique s’est appuyée sur :
+- tests manuels des scénarios clés (dessin, analyse, affichage, export),
+- vérification des flux frontend-backend (requêtes/réponses JSON),
+- contrôle de persistance en base de données,
+- build de l’application frontend en production (Vite build).
+
+Résultat : l’application réalise le flux principal défini dans le cahier de besoins MVP : dessiner la parcelle, lancer l’analyse, obtenir les zones/points, visualiser un diagnostic initial, puis exporter.
+
+7) Difficultés rencontrées et solutions
+
+Principales difficultés :
+- cohérence des formats géométriques entre frontend, API et base PostGIS ;
+- synchronisation des états UI lors des opérations asynchrones ;
+- équilibre entre règles agronomiques, simplicité d’usage et performances.
+
+Solutions appliquées :
+- normalisation des coordonnées et du format des payloads ;
+- gestion explicite des états et retours utilisateur (toasts/messages) ;
+- structuration de la logique de scoring pour faciliter les ajustements.
+
+8) Limites actuelles et perspectives
+
+Limites actuelles (MVP) :
+- certaines recommandations restent simplifiées,
+- dépendance à la disponibilité des services externes (ex. Earth Engine),
+- fonctionnalités avancées (historique complet, NPK détaillé, alertes étendues) encore partielles.
+
+Perspectives :
+- enrichir l’intelligence agronomique (règles locales plus fines),
+- renforcer l’historisation des analyses,
+- améliorer l’aide à la décision multi-saisons,
+- étendre le module de recommandations et de suivi opérationnel.
+
+9) Conclusion de la partie implémentation
+
+La réalisation de Landing Map montre qu’une approche web SIG + API peut fournir un outil concret d’aide à l’échantillonnage et au diagnostic de sol. L’implémentation actuelle répond aux objectifs essentiels de la phase MVP et constitue une base solide pour l’industrialisation et l’enrichissement fonctionnel du système expert.
