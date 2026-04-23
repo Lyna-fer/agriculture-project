@@ -311,29 +311,27 @@ classDiagram
     ResultsPanel --> DataCatalog
 ```
 
-## 5) Optional Data Utility Modules
+## 5) Crop Requirements API Module
 
 ```mermaid
 classDiagram
     direction LR
 
-    class CropData {
-        <<data-module>>
-        +getCropsByGroup(groupId)
-        +findCropById(id)
+    class CropRequirementsAPI {
+        <<backend-endpoint>>
+        +GET /api/crops/requirements?groupId=
     }
 
-    class CulturesData {
-        <<data-module>>
-        +CULTURES
+    class CropRequirementsTable {
+        <<postgres-table>>
+        +crop_requirements
     }
 
-    class WilayasData {
-        <<data-module>>
-        +WILAYAS
-        +ZONE_COLORS
+    class SoilDiagnostic {
+        <<component>>
+        +fetch crop requirements by group
     }
 
-    CropData --> CulturesData
-    WilayasData --> CulturesData
+    SoilDiagnostic --> CropRequirementsAPI
+    CropRequirementsAPI --> CropRequirementsTable
 ```

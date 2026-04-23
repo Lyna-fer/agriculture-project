@@ -208,6 +208,29 @@ class KmlExportRequest(BaseModel):
     parcelleName: Optional[str] = None
 
 
+class CropRequirementOut(BaseModel):
+    id: str
+    nameEn: str
+    nameAr: Optional[str] = None
+    emoji: Optional[str] = None
+    ph: list[float]
+    ec: float
+    tempMin: float
+    tempMax: float
+    nReq: int
+    pReq: int
+    kReq: int
+    soilType: str
+    omMin: float
+    activeLimeMax: float
+    maxWindKmh: int
+    windCriticalStartDays: int
+    pollutionAccumulationRisk: str
+    dbId: int
+    category: str
+    crop_name: str
+
+
 # ─── FASTAPI APP ──────────────────────────────────────────────────────────────
 app = FastAPI(title="AgriTech Auth + Sampling", version="2.0")
 
@@ -674,3 +697,68 @@ def test_db(db: Session = Depends(get_db)):
         "parcelles_count": parcelles,
         "soil_samples_count": samples
     }
+
+
+@app.get("/api/crops/requirements", response_model=list[CropRequirementOut])
+def get_crop_requirements(groupId: Optional[int] = None, db: Session = Depends(get_db)):
+    category_map = {1: "vegetables", 2: "cereals", 3: "trees"}
+    category = category_map.get(groupId) if groupId is not None else None
+
+    where_clause = "WHERE category = :category" if category else ""
+    params = {"category": category} if category else {}
+
+    # temp_min/temp_max are optional DB columns; fallback keeps endpoint resilient.
+    query = text(f"""
+        SELECT
+            id,
+            category,
+            crop_name,
+            ph_min,
+            ph_max,
+            ec_max,
+            n_req,
+            p_req,
+            k_req,
+            soil_type,
+            om_min,
+            active_lime_max,
+            max_wind_kmh,
+            wind_critical_start_days,
+            pollution_accumulation_risk,
+            name_ar,
+            emoji,
+            crop_slug,
+            COALESCE(temp_min, 10) AS temp_min,
+            COALESCE(temp_max, 30) AS temp_max
+        FROM crop_requirements
+        {where_clause}
+        ORDER BY id
+    """)
+
+    rows = db.execute(query, params).mappings().all()
+
+    return [
+        {
+            "id": row["crop_slug"] or row["crop_name"].lower().replace(" ", "_"),
+            "nameEn": row["crop_name"],
+            "nameAr": row["name_ar"],
+            "emoji": row["emoji"],
+            "ph": [float(row["ph_min"]), float(row["ph_max"])],
+            "ec": float(row["ec_max"]),
+            "tempMin": float(row["temp_min"]),
+            "tempMax": float(row["temp_max"]),
+            "nReq": int(row["n_req"]),
+            "pReq": int(row["p_req"]),
+            "kReq": int(row["k_req"]),
+            "soilType": row["soil_type"],
+            "omMin": float(row["om_min"]),
+            "activeLimeMax": float(row["active_lime_max"]),
+            "maxWindKmh": int(row["max_wind_kmh"]),
+            "windCriticalStartDays": int(row["wind_critical_start_days"]),
+            "pollutionAccumulationRisk": row["pollution_accumulation_risk"],
+            "dbId": int(row["id"]),
+            "category": row["category"],
+            "crop_name": row["crop_name"],
+        }
+        for row in rows
+    ]

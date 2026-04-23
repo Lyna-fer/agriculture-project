@@ -1,7 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import "./SoilDiagnostic.css";
 import PortalOverlay from "./PortalOverlay";
-import { getCropsByGroup } from "../../data/cropData";
 
 /* ─── Satellite defaults ─────────────────────────────────────────────────── */
 const SAT_DEFAULTS = { ce: 1.2, temp: 22, tex: "limon-argileux" };
@@ -25,71 +24,6 @@ const EMOJI_BG = {
   "🍑":"#ffdcc8","🍎":"#ffd0d0","🍒":"#ffc8cc","🍐":"#e0f0d0",
 };
 
-const CROP_LIMITS = {
-  tomate: { omMin: 2, activeLimeMax: 10 },
-  pomme_terre: { omMin: 2, activeLimeMax: 5 },
-  oignon: { omMin: 2, activeLimeMax: 10 },
-  ail: { omMin: 2, activeLimeMax: 10 },
-  poivron: { omMin: 2, activeLimeMax: 10 },
-  piment: { omMin: 2, activeLimeMax: 10 },
-  courgette: { omMin: 2, activeLimeMax: 10 },
-  aubergine: { omMin: 2, activeLimeMax: 10 },
-  concombre: { omMin: 2, activeLimeMax: 10 },
-  carotte: { omMin: 2, activeLimeMax: 8 },
-  navet: { omMin: 2, activeLimeMax: 10 },
-  betterave: { omMin: 2, activeLimeMax: 12 },
-  chou_fleur: { omMin: 2, activeLimeMax: 10 },
-  laitue: { omMin: 2, activeLimeMax: 10 },
-  haricot_vert: { omMin: 2, activeLimeMax: 10 },
-  petits_pois: { omMin: 2, activeLimeMax: 10 },
-  feve: { omMin: 2, activeLimeMax: 12 },
-  artichaut: { omMin: 2, activeLimeMax: 15 },
-  pasteque: { omMin: 2, activeLimeMax: 8 },
-  melon: { omMin: 2, activeLimeMax: 10 },
-
-  ble_dur: { omMin: 1.5, activeLimeMax: 15 },
-  ble_tendre: { omMin: 1.5, activeLimeMax: 15 },
-  orge: { omMin: 1, activeLimeMax: 15 },
-  avoine: { omMin: 1.5, activeLimeMax: 10 },
-  mais: { omMin: 2, activeLimeMax: 10 },
-  sorgho: { omMin: 1, activeLimeMax: 15 },
-  triticale: { omMin: 1.5, activeLimeMax: 15 },
-  seigle: { omMin: 1, activeLimeMax: 10 },
-  millet: { omMin: 1, activeLimeMax: 15 },
-  quinoa: { omMin: 1, activeLimeMax: 15 },
-  riz: { omMin: 2, activeLimeMax: 5 },
-  lentille: { omMin: 1.5, activeLimeMax: 10 },
-  pois_chiche: { omMin: 1.5, activeLimeMax: 12 },
-  feve_cereale: { omMin: 1.5, activeLimeMax: 10 },
-  vesce: { omMin: 1.5, activeLimeMax: 10 },
-  luzerne: { omMin: 1.5, activeLimeMax: 15 },
-  trefle: { omMin: 1.5, activeLimeMax: 12 },
-  mais_fourrage: { omMin: 2, activeLimeMax: 10 },
-  pois_fourrage: { omMin: 1.5, activeLimeMax: 10 },
-  fenugrec: { omMin: 1.5, activeLimeMax: 12 },
-
-  olivier: { omMin: 1, activeLimeMax: 20 },
-  palmier: { omMin: 1, activeLimeMax: 15 },
-  oranger: { omMin: 1.5, activeLimeMax: 7 },
-  mandarinier: { omMin: 1.5, activeLimeMax: 7 },
-  citronnier: { omMin: 1.5, activeLimeMax: 7 },
-  vigne: { omMin: 1.5, activeLimeMax: 20 },
-  figuier: { omMin: 1, activeLimeMax: 15 },
-  amandier: { omMin: 1, activeLimeMax: 20 },
-  abricotier: { omMin: 1.5, activeLimeMax: 10 },
-  pommier: { omMin: 1.5, activeLimeMax: 8 },
-  poirier: { omMin: 1.5, activeLimeMax: 7 },
-  grenadier: { omMin: 1.5, activeLimeMax: 15 },
-  cerisier: { omMin: 1.5, activeLimeMax: 10 },
-  pecher: { omMin: 1.5, activeLimeMax: 7 },
-  prunier: { omMin: 1.5, activeLimeMax: 10 },
-  nectarinier: { omMin: 1.5, activeLimeMax: 7 },
-  cognassier: { omMin: 1.5, activeLimeMax: 10 },
-  neflier: { omMin: 1.5, activeLimeMax: 10 },
-  pistachier: { omMin: 1, activeLimeMax: 15 },
-  noyer: { omMin: 2, activeLimeMax: 10 },
-};
-
 const SOIL_TEXTURE_TO_KEY = {
   "Clay Loam": "limon-argileux",
   "Loam": "limoneux",
@@ -106,6 +40,186 @@ const SOIL_TEXTURE_LABEL = {
   argileux: "Clay",
 };
 
+const TEXTURE_ORDER = ["sableux", "sablo-limoneux", "limoneux", "limon-argileux", "argileux"];
+const OM_LEVEL_VALUES = {
+  "tres-bas": 0.5,
+  bas: 1.5,
+  moyen: 3,
+  bon: 5,
+  excellent: 7,
+};
+const POLLUTION_RISK_SHIFT = { low: 10, medium: 0, high: -10 };
+
+const GROUP_SCORE_WEIGHTS = {
+  vegetables: {
+    texture: 0.12,
+    ph: 0.18,
+    ec: 0.24,
+    om: 0.16,
+    lime: 0.07,
+    n: 0.08,
+    p: 0.05,
+    k: 0.06,
+    pollution: 0,
+    temp: 0.08,
+    wind: 0.04,
+  },
+  cereals: {
+    texture: 0.16,
+    ph: 0.15,
+    ec: 0.22,
+    om: 0.10,
+    lime: 0.08,
+    n: 0.12,
+    p: 0.09,
+    k: 0.08,
+    pollution: 0,
+    temp: 0.07,
+    wind: 0.03,
+  },
+  trees: {
+    texture: 0.20,
+    ph: 0.15,
+    ec: 0.20,
+    om: 0.07,
+    lime: 0.13,
+    n: 0.04,
+    p: 0.04,
+    k: 0.08,
+    pollution: 0,
+    temp: 0.06,
+    wind: 0.07,
+  },
+};
+
+function clampScore(value) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function getGroupKey(crop = {}) {
+  if (crop.category === "cereals") return "cereals";
+  if (crop.category === "trees") return "trees";
+  return "vegetables";
+}
+
+function scoreTexture(preferred, actual) {
+  const preferredIndex = TEXTURE_ORDER.indexOf(preferred);
+  const actualIndex = TEXTURE_ORDER.indexOf(actual);
+  if (preferredIndex === -1 || actualIndex === -1) return 60;
+  const distance = Math.abs(preferredIndex - actualIndex);
+  if (distance === 0) return 100;
+  if (distance === 1) return 80;
+  if (distance === 2) return 55;
+  if (distance === 3) return 30;
+  return 10;
+}
+
+function scoreRange(value, min, max, bands) {
+  if (value >= min && value <= max) return 100;
+  const delta = value < min ? min - value : value - max;
+  if (delta <= bands[0]) return 95;
+  if (delta <= bands[1]) return 85;
+  if (delta <= bands[2]) return 70;
+  if (delta <= bands[3]) return 45;
+  return 20;
+}
+
+function scorePh(value, min, max) {
+  return scoreRange(value, min, max, [0.75, 1.5, 2.5, 3.5]);
+}
+
+function scoreEc(value, maxAllowed) {
+  if (value <= maxAllowed) return 100;
+  const excess = value - maxAllowed;
+  if (excess <= 0.2) return 100;
+  if (excess <= 0.5) return 90;
+  if (excess <= 1) return 75;
+  if (excess <= 1.5) return 55;
+  if (excess <= 2.5) return 32;
+  if (excess <= 3.5) return 15;
+  return 0;
+}
+
+function scoreOrganicMatter(level, minimumRequired) {
+  const actual = OM_LEVEL_VALUES[level] ?? 3;
+  const gap = minimumRequired - actual;
+  if (gap <= 0) return 100;
+  if (gap <= 0.5) return 92;
+  if (gap <= 1) return 78;
+  if (gap <= 1.5) return 55;
+  return 20;
+}
+
+function scoreLime(value, maxAllowed) {
+  const excess = value - maxAllowed;
+  if (excess <= 0) return 100;
+  if (excess <= 2) return 90;
+  if (excess <= 5) return 72;
+  if (excess <= 10) return 45;
+  return 15;
+}
+
+function scoreNutrient(value, required) {
+  if (!required || required <= 0) return 100;
+  const ratio = value / required;
+  if (ratio >= 1.25) return 98;
+  if (ratio >= 1.0) return 100;
+  if (ratio >= 0.75) return 90;
+  if (ratio >= 0.5) return 72;
+  if (ratio >= 0.25) return 48;
+  return 20;
+}
+
+function scoreTemperature(value, min, max, seasonCompatible) {
+  const base = scoreRange(value, min, max, [1.5, 3, 5, 8]);
+  return seasonCompatible ? base : Math.min(base, 78);
+}
+
+function scoreWind(value, maxAllowed) {
+  if (value <= maxAllowed) return 100;
+  const excess = value - maxAllowed;
+  if (excess <= 5) return 92;
+  if (excess <= 10) return 78;
+  if (excess <= 20) return 55;
+  if (excess <= 30) return 30;
+  return 8;
+}
+
+function scorePollution(value, crop) {
+  const groupKey = getGroupKey(crop);
+  if (value <= 50) return 100;
+  if (value <= 80) return 70;
+  if (groupKey === "vegetables") return 0;
+  if (groupKey === "cereals") return 70;
+  return 85;
+}
+
+function scoreCropByFormula(crop, st) {
+  const weights = GROUP_SCORE_WEIGHTS[getGroupKey(crop)];
+  const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
+
+  const seasonCompatible = crop.ss?.includes(st.seas) ?? true;
+  const scores = {
+    texture: scoreTexture(crop.prefTex, st.tex),
+    ph: scorePh(st.ph, crop.ph[0], crop.ph[1]),
+    ec: scoreEc(st.ce, crop.ec) * (crop.category === "vegetables" ? 1.05 : 1),
+    om: scoreOrganicMatter(st.mo, crop.omMin),
+    lime: scoreLime(st.lime, crop.limeMx),
+    n: scoreNutrient(st.n, crop.nReq),
+    p: scoreNutrient(st.p, crop.pReq),
+    k: scoreNutrient(st.k, crop.kReq),
+    pollution: scorePollution(st.poll, crop),
+    temp: scoreTemperature(st.temp, crop.tMn, crop.tMx, seasonCompatible),
+    wind: scoreWind(st.wind, crop.maxWindKmh),
+  };
+
+  const weightedScore = Object.entries(weights).reduce((sum, [key, weight]) => {
+    return sum + scores[key] * weight;
+  }, 0);
+
+  return clampScore((weightedScore / totalWeight));
+}
+
 function inferSeasons(c) {
   if (c.tempMin >= 18) return ["ete"];
   if (c.tempMin >= 15) return ["printemps","ete"];
@@ -115,13 +229,21 @@ function inferSeasons(c) {
 }
 
 function toCrop(c) {
-  const limits = CROP_LIMITS[c.id] || { omMin: c.omMin ?? 1.5, activeLimeMax: c.activeLimeMax ?? 15 };
+  const limits = { omMin: c.omMin ?? 1.5, activeLimeMax: c.activeLimeMax ?? 15 };
   const prefTex = SOIL_TEXTURE_TO_KEY[c.soilType] || "limon-argileux";
   return {
-    id: c.id, n: c.nameEn, ar: c.nameAr || c.name, e: c.emoji,
+    ...c,
+    id: c.id,
+    n: c.nameEn,
+    ar: c.nameAr || c.nameEn,
+    e: c.emoji,
     bg: EMOJI_BG[c.emoji] || "#f0f0f0",
-    lat: c.nameEn, ph: c.ph, ce: c.ec,
-    tMn: c.tempMin, tMx: c.tempMax, nHi: c.nReq > 100,
+    lat: c.nameEn,
+    ph: c.ph,
+    ce: c.ec,
+    tMn: c.tempMin,
+    tMx: c.tempMax,
+    nHi: c.nReq > 100,
     limeMx: limits.activeLimeMax,
     omMin: limits.omMin,
     soilType: c.soilType,
@@ -172,23 +294,63 @@ const SN = {
   automne:"🍂 Autumn: favorable for Mediterranean crops.",
 };
 
-function calcScore(st) {
-  let s = 100;
-  const { ph, ce, temp, n, p, k, mo, lime, wind, poll } = st;
-  if (ph<5.5||ph>8) s-=18; else if (ph<6||ph>7.5) s-=7;
-  if (ce>4) s-=22; else if (ce>2) s-=11;
-  if (temp<8||temp>36) s-=12; else if (temp<14||temp>30) s-=5;
-  if (n<20||n>80) s-=10; else if (n<30||n>65) s-=4;
-  if (p<10||p>45) s-=8; else if (p<15||p>35) s-=3;
-  if (k<80||k>350) s-=8; else if (k<130||k>280) s-=3;
-  if (lime>20) s-=10; else if (lime>12) s-=4;
-  if (wind>45) s-=10; else if (wind>30) s-=4;
-  if (poll>70) s-=18; else if (poll>45) s-=10; else if (poll>25) s-=4;
-  if (mo==="tres-bas") s-=12; else if (mo==="bas") s-=5; else if (mo==="excellent") s+=5;
-  return Math.max(0, Math.min(100, Math.round(s)));
-}
+function pSt(id, v, crop = null) {
+  if (crop) {
+    if (id === "ph") {
+      if (v >= crop.ph[0] && v <= crop.ph[1]) return "ok";
+      return Math.min(Math.abs(v - crop.ph[0]), Math.abs(v - crop.ph[1])) <= 0.5 ? "lo" : "hi";
+    }
 
-function pSt(id, v) {
+    if (id === "ce") {
+      if (v <= crop.ce) return "ok";
+      return v <= crop.ce + 0.5 ? "lo" : "hi";
+    }
+
+    if (id === "n" || id === "p" || id === "k") {
+      const req = Number(crop[`${id}Req`] || 0);
+      const val = Number(v || 0);
+      if (!req) return "ok";
+      if (val >= req) return "ok";
+      return val >= req * 0.9 ? "lo" : "hi";
+    }
+
+    if (id === "temp") {
+      if (v >= crop.tMn && v <= crop.tMx) return "ok";
+      const delta = v < crop.tMn ? crop.tMn - v : v - crop.tMx;
+      return delta <= 2 ? "lo" : "hi";
+    }
+
+    if (id === "lime") {
+      if (v <= crop.limeMx) return "ok";
+      return v <= crop.limeMx + 2 ? "lo" : "hi";
+    }
+
+    if (id === "wind") {
+      if (v <= crop.maxWindKmh) return "ok";
+      return v <= crop.maxWindKmh + 10 ? "lo" : "hi";
+    }
+
+    if (id === "poll") {
+      if (v <= 50) return "ok";
+      if (v <= 80) return "lo";
+      return crop.category === "vegetables" ? "hi" : "lo";
+    }
+
+    if (id === "tex") {
+      const preferredIndex = TEXTURE_ORDER.indexOf(crop.prefTex);
+      const actualIndex = TEXTURE_ORDER.indexOf(v);
+      if (preferredIndex === -1 || actualIndex === -1) return "hi";
+      const distance = Math.abs(preferredIndex - actualIndex);
+      if (distance === 0) return "ok";
+      return distance === 1 ? "lo" : "hi";
+    }
+
+    if (id === "mo") {
+      if (OM_LEVEL_VALUES[v] >= crop.omMin) return "ok";
+      return (crop.omMin - (OM_LEVEL_VALUES[v] ?? 0)) <= 0.5 ? "lo" : "hi";
+    }
+  }
+
   const R = { ph:[6,7.5], ce:[0,2], n:[30,65], p:[15,35], k:[130,280], temp:[14,30], lime:[0,12], wind:[0,30], poll:[0,25] };
   const [lo,hi] = R[id] || [0,100];
   if (v>=lo && v<=hi) return "ok";
@@ -196,22 +358,80 @@ function pSt(id, v) {
   return v<lo ? "lo" : "hi";
 }
 
+function statusLabel(id, v, crop = null) {
+  if (crop) {
+    if (id === "ph") {
+      if (v < crop.ph[0]) return "Too low";
+      if (v > crop.ph[1]) return "Too high";
+      return "✓ OK";
+    }
+
+    if (id === "ce") {
+      if (v > crop.ce) return v <= crop.ce + 0.5 ? "⚠ Near" : "Too high";
+      return "✓ OK";
+    }
+
+    if (id === "n" || id === "p" || id === "k") {
+      const req = Number(crop[`${id}Req`] || 0);
+      const val = Number(v || 0);
+      if (!req || val >= req) return "✓ OK";
+      return val >= req * 0.9 ? "⚠ Near" : "Too low";
+    }
+
+    if (id === "temp") {
+      if (v < crop.tMn) return crop.tMn - v <= 2 ? "⚠ Near" : "Too low";
+      if (v > crop.tMx) return v - crop.tMx <= 2 ? "⚠ Near" : "Too high";
+      return "✓ OK";
+    }
+
+    if (id === "lime") {
+      if (v > crop.limeMx) return v <= crop.limeMx + 2 ? "⚠ Near" : "Too high";
+      return "✓ OK";
+    }
+
+    if (id === "wind") {
+      if (v > crop.maxWindKmh) return v <= crop.maxWindKmh + 10 ? "⚠ Near" : "Too high";
+      return "✓ OK";
+    }
+
+    if (id === "poll") {
+      if (v <= 50) return "✓ OK";
+      if (v <= 80) return "⚠ Warning";
+      if (crop.category === "vegetables") return "🚨 Health alert";
+      if (crop.category === "cereals") return "⚠ Warning";
+      return "ℹ Advice";
+    }
+
+    if (id === "tex") {
+      const preferredIndex = TEXTURE_ORDER.indexOf(crop.prefTex);
+      const actualIndex = TEXTURE_ORDER.indexOf(v);
+      if (preferredIndex === -1 || actualIndex === -1) return "Too high";
+      const distance = Math.abs(preferredIndex - actualIndex);
+      if (distance === 0) return "✓ OK";
+      return distance === 1 ? "⚠ Near" : "Too far";
+    }
+
+    if (id === "mo") {
+      return (OM_LEVEL_VALUES[v] ?? 0) >= crop.omMin ? "✓ OK" : ((crop.omMin - (OM_LEVEL_VALUES[v] ?? 0)) <= 0.5 ? "⚠ Near" : "Too low");
+    }
+  }
+
+  const fallback = { ok: "✓ OK", lo: "⚠ Near", hi: "Too high" };
+  return fallback[pSt(id, v)] || "✓ OK";
+}
+
+function calcScore(st, crops = []) {
+  if (!st || !Array.isArray(crops) || crops.length === 0) return 0;
+
+  const selectedCrop = st.crop ? crops.find((crop) => crop.id === st.crop) : null;
+  if (selectedCrop) return scoreCropByFormula(selectedCrop, st);
+
+  const bestScore = Math.max(...crops.map((crop) => scoreCropByFormula(crop, st)));
+  return clampScore(bestScore);
+}
+
 function cropScore(c, st) {
-  let m = 100;
-  const { ph, ce, temp, n, seas, lime, wind, poll, mo } = st;
-  if (ph<c.ph[0]||ph>c.ph[1]) m -= ph<c.ph[0]-1||ph>c.ph[1]+1 ? 24 : 12;
-  if (ce>c.ce) m -= ce>c.ce+1.5 ? 20 : 10;
-  if (temp<c.tMn) m -= temp<c.tMn-6 ? 20 : 10;
-  if (temp>c.tMx) m -= temp>c.tMx+6 ? 15 : 7;
-  if (!c.ss.includes(seas)) m -= 16;
-  if (c.nHi && n<25) m -= 10;
-  if (mo==="tres-bas" && c.nHi) m -= 8;
-  if (lime>c.limeMx) m -= lime>c.limeMx+5 ? 16 : 8;
-  if (poll>45) m -= poll>70 ? 22 : 10;
-  if (wind>45) m -= 8;
-  if (c.omMin > 2 && (mo === "tres-bas" || mo === "bas")) m -= 6;
-  if (st.tex !== c.prefTex) m -= 8;
-  return Math.max(0, Math.round(m));
+  return scoreCropByFormula(c, st);
 }
 
 function cropAdj(c, st) {
@@ -220,10 +440,21 @@ function cropAdj(c, st) {
   if (ph<c.ph[0]) adj.push({t:`Correct acidity - lime application (target pH ${c.ph[0]}-${c.ph[1]})`,bg:"#fff3c0"});
   if (ph>c.ph[1]) adj.push({t:"Reduce alkalinity - agricultural sulfur",bg:"#fff3c0"});
   if (ce>c.ce)    adj.push({t:"High salinity - leach soil before planting",bg:"#ffc0c0"});
+  if (st.n < c.nReq) adj.push({t:`Add Nitrogen (N) - need at least ${c.nReq} kg/ha, current ${st.n} kg/ha`,bg:"#fff3c0"});
+  if (st.p < c.pReq) adj.push({t:`Add Phosphorus (P) - need at least ${c.pReq} kg/ha, current ${st.p} kg/ha`,bg:"#fff3c0"});
+  if (st.k < c.kReq) adj.push({t:`Add Potassium (K) - need at least ${c.kReq} kg/ha, current ${st.k} kg/ha`,bg:"#fff3c0"});
   if (temp<c.tMn) adj.push({t:`Soil too cold - wait for >= ${c.tMn}°C`,bg:"#c0d8ff"});
   if (lime>c.limeMx) adj.push({t:`Active lime too high - use tolerant crops or acidifying strategy (target <= ${c.limeMx}%)`,bg:"#fff3c0"});
   if (wind>35) adj.push({t:"Strong wind risk - add windbreaks and adjust irrigation scheduling",bg:"#ffe8c0"});
-  if (poll>35) adj.push({t:"Soil pollution risk - run heavy metal and residue lab panel before planting",bg:"#ffc0c0"});
+  if (poll > 50 && poll <= 80) {
+    adj.push({t:"Pollution warning (50-80 mg/kg) - verify contamination before intensive use",bg:"#fff3c0"});
+  } else if (poll > 80 && c.category === "vegetables") {
+    adj.push({t:"RED ALERT - human health risk for edible vegetables (pollution > 80 mg/kg)",bg:"#ffb3b3"});
+  } else if (poll > 80 && c.category === "cereals") {
+    adj.push({t:"High pollution - cereals need caution and residue testing",bg:"#fff3c0"});
+  } else if (poll > 80 && c.category === "trees") {
+    adj.push({t:"Advice - trees are more tolerant; monitor fruit quality and irrigation source",bg:"#e8f4ff"});
+  }
   if (c.omMin > 2 && (mo === "tres-bas" || mo === "bas")) adj.push({t:`Increase organic matter to at least ${c.omMin}% (compost + cover crops)`,bg:"#fff3c0"});
   if (st.tex !== c.prefTex) adj.push({t:`Texture mismatch - preferred soil type: ${c.soilType} (${SOIL_TEXTURE_LABEL[c.prefTex]})`,bg:"#fff3c0"});
   if (!c.ss.includes(seas)) adj.push({t:`Non-optimal season - prefer ${c.ss.join(" or ")}`,bg:"#fff3c0"});
@@ -759,10 +990,11 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
 
 /* RESULTS VIEW */
 function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNext }) {
-  const sc = calcScore(st), scC = mc(sc), scBg = mcBg(sc);
+  const sc = calcScore(st, crops), scC = mc(sc), scBg = mcBg(sc);
   const scLbl = sc>=80 ? "Excellent 🎉" : sc>=60 ? "Needs improvement" : "Difficult";
   const scored = crops.map(c => ({...c, sc: cropScore(c,st), adj: cropAdj(c,st)})).sort((a,b)=>b.sc-a.sc);
   const tgt  = st.crop ? scored.find(c => c.id===st.crop) : null;
+  const focusCrop = tgt || scored[0] || null;
   const recs = tgt ? null : scored.slice(0,4);
   const alts = tgt ? scored.filter(c => c.id!==st.crop).slice(0,2) : [];
   const sn   = SN[st.seas], iw = st.seas==="hiver";
@@ -827,10 +1059,11 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
         {PARAM_ROWS.map((row,ri) => (
           <div key={ri} className="sd-param-pill-row">
             {row.map(p => {
-              const v = st[p.id], sta = pSt(p.id,v);
+              const v = st[p.id];
               const pct = (((v-p.mn)/(p.mx-p.mn))*100).toFixed(1);
-              const [bg2,c2] = {ok:["#c8f5e0","#1a7a50"],lo:["#fff3c8","#b06010"],hi:["#ffc8c8","#c02020"]}[sta];
-              const pill = {ok:"✓ OK",lo:"↓ Low",hi:"↑ High"}[sta];
+              const fit = pSt(p.id, v, focusCrop);
+              const [bg2,c2] = {ok:["#c8f5e0","#1a7a50"],lo:["#fff3c8","#b06010"],hi:["#ffc8c8","#c02020"]}[fit];
+              const pill = statusLabel(p.id, v, focusCrop);
               const isSatPill = (diagMode==="eco" || diagMode==="standard") && SAT_FIELDS[p.id];
               return (
                 <div key={p.id} className={`sd-param-pill ${isSatPill?"sd-param-pill--sat":""}`} style={{borderBottom:`3px solid ${c2}40`}}>
@@ -882,7 +1115,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
                   </div>
                   <div className="sd-rec-mini-bars">
                     {["ph","ce","temp"].map((bid,j) => {
-                      const sv = pSt(bid,st[bid]);
+                      const sv = pSt(bid, st[bid], c);
                       const bc = {ok:"#5ed4a0",lo:"#f5c040",hi:"#f06060"}[sv];
                       const [mn,mx] = {ph:[4,9],ce:[0,6],temp:[0,40]}[bid];
                       const bp = (((st[bid]-mn)/(mx-mn))*100).toFixed(0);
@@ -1034,12 +1267,35 @@ export default function SoilDiagnostic({
   const [diagMode,    setDiagMode]    = useState(initialDiagMode);
   const [activeZone,  setActiveZone]  = useState(0);
   const [analyzing,   setAnalyzing]   = useState(false);
+  const [rawCrops,    setRawCrops]    = useState([]);
   const [zoneStates,  setZoneStates]  = useState(() => Array.from({length: Math.max(1,nZones)}, () => freshSt(initialDiagMode)));
   const [zoneResults, setZoneResults] = useState(() => Array(Math.max(1,nZones)).fill(null));
   const n = Math.max(1, nZones);
 
-  const CROPS = useMemo(() => getCropsByGroup(cultureGroupId).map(toCrop), [cultureGroupId]);
+  const CROPS = useMemo(() => rawCrops.map(toCrop), [rawCrops]);
   const cultureLabel = cultureGroupId===1?"Vegetables":cultureGroupId===2?"Cereals":"Permanent";
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchCrops = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/crops/requirements?groupId=${cultureGroupId}`);
+        if (!response.ok) throw new Error("Failed to load crop requirements");
+        const data = await response.json();
+        if (!cancelled) setRawCrops(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.warn("⚠️ Crop requirements fetch failed:", error);
+        if (!cancelled) setRawCrops([]);
+      }
+    };
+
+    fetchCrops();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cultureGroupId]);
 
   /* Reset on open */
   useEffect(() => {
@@ -1274,7 +1530,7 @@ export default function SoilDiagnostic({
                     )}
                     Zone {i+1}
                     {done && !on && (
-                      <span className="sd-zone-tab-score" style={{color:zc}}>{calcScore(zoneResults[i])}</span>
+                      <span className="sd-zone-tab-score" style={{color:zc}}>{calcScore(zoneResults[i], CROPS)}</span>
                     )}
                   </button>
                 );

@@ -681,13 +681,14 @@ landing-map-part1-logic2/
 │   │   │   └── samplingLogic.js          ← Logique points
 │   │   ├── lib/
 │   │   │   └── samplingEngine.js         ← Algo échantillonnage
-│   │   └── data/
-│   │       └── cropData.js               ← Seuils cultures
+│   │   └── components/map/
+│   │       └── SoilDiagnostic.jsx        ← Seuils cultures via API backend
 │   └── package.json
 │
 └── Backend (FastAPI + Python)
     ├── Backend/
     │   ├── main.py                       ← Routes FastAPI
+  │   │                                 ← /api/crops/requirements (Neon DB)
     │   ├── constants.py                  ← Seuils agronomiques
     │   ├── models.py                     ← ORM SQLAlchemy
     │   ├── services/
