@@ -92,6 +92,8 @@ const GROUP_SCORE_WEIGHTS = {
   },
 };
 
+const HEAVY_METAL_PARAMS = new Set(["pb", "cd"]);
+
 function clampScore(value) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
@@ -194,6 +196,10 @@ function scorePollution(value, crop) {
   return 85;
 }
 
+function contaminationValue(st) {
+  return Math.max(Number(st?.pb || 0), Number(st?.cd || 0));
+}
+
 function scoreCropByFormula(crop, st) {
   const weights = GROUP_SCORE_WEIGHTS[getGroupKey(crop)];
   const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
@@ -208,7 +214,7 @@ function scoreCropByFormula(crop, st) {
     n: scoreNutrient(st.n, crop.nReq),
     p: scoreNutrient(st.p, crop.pReq),
     k: scoreNutrient(st.k, crop.kReq),
-    pollution: scorePollution(st.poll, crop),
+    pollution: scorePollution(contaminationValue(st), crop),
     temp: scoreTemperature(st.temp, crop.tMn, crop.tMx, seasonCompatible),
     wind: scoreWind(st.wind, crop.maxWindKmh),
   };
@@ -263,7 +269,8 @@ const ZC = {
   k:    [{c:"#ff8a80",f:20},{c:"#ffcc80",f:15},{c:"#a5d6a7",f:40},{c:"#ffcc80",f:15},{c:"#ff8a80",f:10}],
   lime: [{c:"#a5d6a7",f:45},{c:"#ffcc80",f:25},{c:"#ff8a80",f:30}],
   wind: [{c:"#a5d6a7",f:42},{c:"#ffcc80",f:28},{c:"#ff8a80",f:30}],
-  poll: [{c:"#a5d6a7",f:45},{c:"#ffcc80",f:20},{c:"#ff8a80",f:35}],
+  pb:   [{c:"#a5d6a7",f:45},{c:"#ffcc80",f:20},{c:"#ff8a80",f:35}],
+  cd:   [{c:"#a5d6a7",f:45},{c:"#ffcc80",f:20},{c:"#ff8a80",f:35}],
 };
 
 const mc   = m => m>=80 ? "#1a7a50" : m>=60 ? "#b06010" : "#c02020";
@@ -278,7 +285,8 @@ const PARAMS = [
   {id:"temp",name:"Temp. sol",  u:"°C",   mn:0, mx:40 },
   {id:"lime",name:"Active Lime",u:"%",    mn:0, mx:30 },
   {id:"wind",name:"Wind",       u:"km/h", mn:0, mx:80 },
-  {id:"poll",name:"Pollution",  u:"mg/kg",mn:0, mx:100},
+  {id:"pb",  name:"Lead (Pb)",   u:"mg/kg",mn:0, mx:100},
+  {id:"cd",  name:"Cadmium (Cd)",u:"mg/kg",mn:0, mx:100},
 ];
 
 const PARAM_ROWS = [
@@ -330,7 +338,7 @@ function pSt(id, v, crop = null) {
       return v <= crop.maxWindKmh + 10 ? "lo" : "hi";
     }
 
-    if (id === "poll") {
+    if (HEAVY_METAL_PARAMS.has(id)) {
       if (v <= 50) return "ok";
       if (v <= 80) return "lo";
       return crop.category === "vegetables" ? "hi" : "lo";
@@ -351,7 +359,7 @@ function pSt(id, v, crop = null) {
     }
   }
 
-  const R = { ph:[6,7.5], ce:[0,2], n:[30,65], p:[15,35], k:[130,280], temp:[14,30], lime:[0,12], wind:[0,30], poll:[0,25] };
+  const R = { ph:[6,7.5], ce:[0,2], n:[30,65], p:[15,35], k:[130,280], temp:[14,30], lime:[0,12], wind:[0,30], pb:[0,25], cd:[0,25] };
   const [lo,hi] = R[id] || [0,100];
   if (v>=lo && v<=hi) return "ok";
   if (id==="ce") return "hi";
@@ -394,7 +402,7 @@ function statusLabel(id, v, crop = null) {
       return "✓ OK";
     }
 
-    if (id === "poll") {
+    if (HEAVY_METAL_PARAMS.has(id)) {
       if (v <= 50) return "✓ OK";
       if (v <= 80) return "⚠ Warning";
       if (crop.category === "vegetables") return "🚨 Health alert";
@@ -436,7 +444,7 @@ function cropScore(c, st) {
 
 function cropAdj(c, st) {
   const adj = [];
-  const { ph, ce, temp, seas, lime, wind, poll, mo } = st;
+  const { ph, ce, temp, seas, lime, wind, pb, cd, mo } = st;
   if (ph<c.ph[0]) adj.push({t:`Correct acidity - lime application (target pH ${c.ph[0]}-${c.ph[1]})`,bg:"#fff3c0"});
   if (ph>c.ph[1]) adj.push({t:"Reduce alkalinity - agricultural sulfur",bg:"#fff3c0"});
   if (ce>c.ce)    adj.push({t:"High salinity - leach soil before planting",bg:"#ffc0c0"});
@@ -446,15 +454,20 @@ function cropAdj(c, st) {
   if (temp<c.tMn) adj.push({t:`Soil too cold - wait for >= ${c.tMn}°C`,bg:"#c0d8ff"});
   if (lime>c.limeMx) adj.push({t:`Active lime too high - use tolerant crops or acidifying strategy (target <= ${c.limeMx}%)`,bg:"#fff3c0"});
   if (wind>35) adj.push({t:"Strong wind risk - add windbreaks and adjust irrigation scheduling",bg:"#ffe8c0"});
-  if (poll > 50 && poll <= 80) {
-    adj.push({t:"Pollution warning (50-80 mg/kg) - verify contamination before intensive use",bg:"#fff3c0"});
-  } else if (poll > 80 && c.category === "vegetables") {
-    adj.push({t:"RED ALERT - human health risk for edible vegetables (pollution > 80 mg/kg)",bg:"#ffb3b3"});
-  } else if (poll > 80 && c.category === "cereals") {
-    adj.push({t:"High pollution - cereals need caution and residue testing",bg:"#fff3c0"});
-  } else if (poll > 80 && c.category === "trees") {
-    adj.push({t:"Advice - trees are more tolerant; monitor fruit quality and irrigation source",bg:"#e8f4ff"});
-  }
+  [
+    [pb, "Lead (Pb)"],
+    [cd, "Cadmium (Cd)"],
+  ].forEach(([value, label]) => {
+    if (value > 50 && value <= 80) {
+      adj.push({t:`${label} warning (50-80 mg/kg) - verify contamination before intensive use`,bg:"#fff3c0"});
+    } else if (value > 80 && c.category === "vegetables") {
+      adj.push({t:`RED ALERT - human health risk for edible vegetables (${label.toLowerCase()} > 80 mg/kg)`,bg:"#ffb3b3"});
+    } else if (value > 80 && c.category === "cereals") {
+      adj.push({t:`High ${label.toLowerCase()} - cereals need caution and residue testing`,bg:"#fff3c0"});
+    } else if (value > 80 && c.category === "trees") {
+      adj.push({t:`Advice - trees are more tolerant; monitor fruit quality and irrigation source (${label.toLowerCase()})`,bg:"#e8f4ff"});
+    }
+  });
   if (c.omMin > 2 && (mo === "tres-bas" || mo === "bas")) adj.push({t:`Increase organic matter to at least ${c.omMin}% (compost + cover crops)`,bg:"#fff3c0"});
   if (st.tex !== c.prefTex) adj.push({t:`Texture mismatch - preferred soil type: ${c.soilType} (${SOIL_TEXTURE_LABEL[c.prefTex]})`,bg:"#fff3c0"});
   if (!c.ss.includes(seas)) adj.push({t:`Non-optimal season - prefer ${c.ss.join(" or ")}`,bg:"#fff3c0"});
@@ -721,7 +734,8 @@ const freshSt = (mode = "eco") => ({
   n: 45, p: 22, k: 180,
   lime: 8,
   wind: 12,
-  poll: 10,
+  pb: 10,
+  cd: 5,
   tex: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.tex : "limon-argileux",
   mo: "moyen", seas: "ete", crop: "",
 });
@@ -902,7 +916,8 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
       {/* 4 - Environment */}
       <div className="sd-sec">
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>4</span>Environmental Risks</div>
-        <Slider id="poll" label="Soil Pollution" unit="mg/kg" min={0} max={100} step={1} value={st.poll} onChange={onChange} zones l="0 Clean" m="25 Alert" r="100 Critical" />
+        <Slider id="pb" label="Lead (Pb)" unit="mg/kg" min={0} max={100} step={1} value={st.pb} onChange={onChange} zones l="0 Clean" m="25 Alert" r="100 Critical" />
+        <Slider id="cd" label="Cadmium (Cd)" unit="mg/kg" min={0} max={100} step={1} value={st.cd} onChange={onChange} zones l="0 Clean" m="25 Alert" r="100 Critical" />
       </div>
 
       {/* 5 - Season */}
@@ -1025,7 +1040,8 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
           <span className="sd-score-meta-chip">Texture: {st.tex}</span>
           <span className="sd-score-meta-chip">Temp: {st.temp}°C</span>
           <span className="sd-score-meta-chip">Wind: {st.wind} km/h</span>
-          <span className="sd-score-meta-chip">Pollution: {st.poll} mg/kg</span>
+          <span className="sd-score-meta-chip">Lead (Pb): {st.pb} mg/kg</span>
+          <span className="sd-score-meta-chip">Cadmium (Cd): {st.cd} mg/kg</span>
           <span className="sd-score-meta-chip">
             {diagMode==="eco" || diagMode==="standard" ? "Satellite-assisted" : "Manual inputs"}
           </span>
