@@ -302,6 +302,45 @@ const SN = {
   automne:"🍂 Autumn: favorable for Mediterranean crops.",
 };
 
+const SEASON_LABELS = {
+  printemps: "Spring",
+  ete: "Summer",
+  automne: "Autumn",
+  hiver: "Winter",
+};
+
+const SEASON_EMOJIS = {
+  printemps: "🌱",
+  ete: "☀️",
+  automne: "🍂",
+  hiver: "❄️",
+};
+
+function toDateInputValue(date = new Date()) {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function seasonFromDate(value) {
+  if (!value) return "ete";
+
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return "ete";
+
+  const month = date.getMonth() + 1;
+  if (month === 12 || month <= 2) return "hiver";
+  if (month <= 5) return "printemps";
+  if (month <= 8) return "ete";
+  return "automne";
+}
+
+function getSeasonLabel(season) {
+  return SEASON_LABELS[season] || season;
+}
+
 function pSt(id, v, crop = null) {
   if (crop) {
     if (id === "ph") {
@@ -728,6 +767,7 @@ function buildLabRequestHtml({
 
 /* ─── Default state factory ──────────────────────────────────────────────── */
 const freshSt = (mode = "eco") => ({
+  date: toDateInputValue(),
   ph: 6.5,
   ce:   mode==="eco" || mode==="standard" ? SAT_DEFAULTS.ce   : 1.2,
   temp: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.temp : 18,
@@ -737,7 +777,9 @@ const freshSt = (mode = "eco") => ({
   pb: 10,
   cd: 5,
   tex: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.tex : "limon-argileux",
-  mo: "moyen", seas: "ete", crop: "",
+  mo: "moyen",
+  seas: seasonFromDate(toDateInputValue()),
+  crop: "",
 });
 
 /* ATOM COMPONENTS */
@@ -799,6 +841,8 @@ function Slider({ id, label, unit, min, max, step, value, onChange, zones, badge
 function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultureLabel, onAnalyze, analyzing, hasResult, onPrintLabRequest }) {
   // ✅ LOCK fields ONLY in Eco mode. Standard mode stays fully editable.
   const isSat = id => diagMode === "eco" && id in SAT_FIELDS;
+  const seasonLabel = getSeasonLabel(st.seas);
+  const seasonEmoji = SEASON_EMOJIS[st.seas] || "📅";
 
   return (
     <div className="sd-fc">
@@ -922,22 +966,23 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
 
       {/* 5 - Season */}
       <div className="sd-sec">
-        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>5</span>Growing Season</div>
-        <div className="sd-seas-row">
-          {[
-            {val:"printemps",em:"🌱",label:"Spring"},
-            {val:"ete",      em:"☀️",label:"Summer"},
-            {val:"automne",  em:"🍂",label:"Autumn"},
-            {val:"hiver",    em:"❄️",label:"Winter"},
-          ].map(s => (
-            <div key={s.val}
-              className={`sd-seas ${st.seas===s.val?"sd-seas--on":""}`}
-              style={st.seas===s.val ? {borderColor:color, background:`${color}12`, boxShadow:`0 4px 0 ${color}30`} : {}}
-              onClick={() => onChange("seas", s.val)}>
-              <span className="sd-seas-em">{s.em}</span>
-              <span className="sd-seas-lbl" style={st.seas===s.val?{color}:{}}>{s.label}</span>
-            </div>
-          ))}
+        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>5</span>Field Date</div>
+        <div className="sd-date-grid">
+          <label className="sd-date-card" style={{borderColor:`${color}24`}}>
+            <span className="sd-date-card-lbl">Pick a day</span>
+            <input
+              type="date"
+              className="sd-date-input"
+              value={st.date}
+              onChange={e => onChange("date", e.target.value)}
+            />
+            <span className="sd-date-card-hint">Used in the analysis and recommendations.</span>
+          </label>
+          <div className="sd-season-card" style={{background:`${color}10`, borderColor:`${color}22`}}>
+            <span className="sd-season-card-lbl">Derived season</span>
+            <div className="sd-season-card-val" style={{color}}>{seasonEmoji} {seasonLabel}</div>
+            <span className="sd-season-card-hint">Used in the analysis result and recommendations.</span>
+          </div>
         </div>
       </div>
 
@@ -1004,58 +1049,51 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
 }
 
 /* RESULTS VIEW */
-function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNext }) {
+function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNext,onDownloadReport }) {
   const sc = calcScore(st, crops), scC = mc(sc), scBg = mcBg(sc);
   const scLbl = sc>=80 ? "Excellent 🎉" : sc>=60 ? "Needs improvement" : "Difficult";
   const scored = crops.map(c => ({...c, sc: cropScore(c,st), adj: cropAdj(c,st)})).sort((a,b)=>b.sc-a.sc);
   const tgt  = st.crop ? scored.find(c => c.id===st.crop) : null;
+  const bestCrop = scored[0] || null;
   const focusCrop = tgt || scored[0] || null;
-  const recs = tgt ? null : scored.slice(0,4);
-  const alts = tgt ? scored.filter(c => c.id!==st.crop).slice(0,2) : [];
+  const recs = tgt ? null : scored.slice(1,4);
+  const alts = tgt ? scored.filter(c => c.id!==st.crop && c.id!==bestCrop?.id).slice(0,3) : [];
   const sn   = SN[st.seas], iw = st.seas==="hiver";
 
   return (
     <div className="sd-results">
-      {/* Score card */}
-      <div className="sd-score-hero sd-a1" style={{borderTop:`3px solid ${color}`}}>
-        <div className="sd-score-hero-top">
-          <div>
-            <div className="sd-score-eyebrow">Soil Report</div>
-            <div className="sd-score-title">
-              Your soil is<br />
-              <em style={{color:scC}}>{sc>=80?"ready to cultivate":sc>=60?"to optimize":"to improve"}</em>
+      {!tgt && (
+        <div className="sd-a1">
+          <div className="sd-sec-head">
+            <span className="sd-sec-head-t">🌱 Top recommendation</span>
+            <span className="sd-sec-head-m">Best match</span>
+          </div>
+          {bestCrop && (
+            <div className="sd-rec-card sd-rec-card--top">
+              <div className="sd-rec-top">
+                <div className="sd-rec-rank">#1</div>
+                <div className="sd-rec-emoji" style={{background:bestCrop.bg}}>{bestCrop.e}</div>
+                <div className="sd-rec-info">
+                  <div className="sd-rec-name">{bestCrop.n}</div>
+                  <div className="sd-rec-lat">{bestCrop.ar}</div>
+                </div>
+                <div className="sd-rec-score">
+                  <div className="sd-rec-pct" style={{color:mc(bestCrop.sc)}}>{bestCrop.sc}%</div>
+                  <div className="sd-rec-pct-lbl">compatibility</div>
+                  <div className="sd-rec-best-tag">★ Best choice</div>
+                </div>
+              </div>
+              <div className="sd-rec-bottom">
+                <div className="sd-rec-chip-row">
+                  <span className="sd-rec-chip">Top crop</span>
+                  <span className="sd-rec-chip">Season match</span>
+                </div>
+                <div className="sd-rec-note">{bestCrop.note}</div>
+              </div>
             </div>
-          </div>
-          <div className="sd-score-right">
-            <div className="sd-score-number" style={{color:scC}}>{sc}</div>
-            <div className="sd-score-sub">Quality Score</div>
-            <div className="sd-score-pill" style={{background:scBg,color:scC}}>{scLbl}</div>
-          </div>
+          )}
         </div>
-        <div className="sd-score-desc">
-          {sc>=80?"Conditions are favorable. You can start your season now.":"Adjustments are recommended to optimize yields."}
-        </div>
-        <div className="sd-score-meta">
-          <span className="sd-score-meta-chip">Season: {st.seas}</span>
-          <span className="sd-score-meta-chip">Texture: {st.tex}</span>
-          <span className="sd-score-meta-chip">Temp: {st.temp}°C</span>
-          <span className="sd-score-meta-chip">Wind: {st.wind} km/h</span>
-          <span className="sd-score-meta-chip">Lead (Pb): {st.pb} mg/kg</span>
-          <span className="sd-score-meta-chip">Cadmium (Cd): {st.cd} mg/kg</span>
-          <span className="sd-score-meta-chip">
-            {diagMode==="eco" || diagMode==="standard" ? "Satellite-assisted" : "Manual inputs"}
-          </span>
-        </div>
-        {(diagMode==="eco" || diagMode==="standard") && (
-          <div className="sd-eco-tag">
-            <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-              <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" strokeWidth="1.1" />
-              <circle cx="4.5" cy="4.5" r="1.2" fill="currentColor" />
-            </svg>
-            Satellite data included
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Season alert */}
       {sn && (
@@ -1106,7 +1144,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
         <div className="sd-a3">
           <div className="sd-sec-head">
             <span className="sd-sec-head-t">🌱 Recommended Crops</span>
-            <span className="sd-sec-head-m">{st.seas} · top 4</span>
+            <span className="sd-sec-head-m">{st.seas} · next 3</span>
           </div>
           <div className="sd-rec-cards">
             {recs.map((c,i) => (
@@ -1241,7 +1279,13 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
           </svg>
           Edit
         </button>
-        {nZones > 1 && zoneIdx < nZones - 1 ? (
+        <button className="sd-act sd-act-p" onClick={onDownloadReport}>
+          <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+            <path d="M6.5 1v8M3 7l3.5 3.5L10 7M1 12h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Download Report
+        </button>
+        {nZones > 1 && zoneIdx < nZones - 1 && (
           <button
             className="sd-act sd-act-next"
             style={{
@@ -1256,13 +1300,6 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path d="M4.5 2L9 6l-4.5 4" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-          </button>
-        ) : (
-          <button className="sd-act sd-act-p">
-            <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
-              <path d="M6.5 1v8M3 7l3.5 3.5L10 7M1 12h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Download Report
           </button>
         )}
       </div>
@@ -1396,7 +1433,11 @@ export default function SoilDiagnostic({
   const handleFieldChange = useCallback((id, v) => {
     setZoneStates(prev => {
       const next = [...prev];
-      next[activeZone] = {...next[activeZone], [id]: v};
+      const updated = { ...next[activeZone], [id]: v };
+      if (id === "date") {
+        updated.seas = seasonFromDate(v);
+      }
+      next[activeZone] = updated;
       return next;
     });
   }, [activeZone]);
@@ -1600,6 +1641,7 @@ export default function SoilDiagnostic({
                   zoneIdx={activeZone}
                   nZones={n}
                   onNext={() => setActiveZone(prev => Math.min(n - 1, prev + 1))}
+                  onDownloadReport={handlePrintLabRequest}
                 />
               )}
             </div>

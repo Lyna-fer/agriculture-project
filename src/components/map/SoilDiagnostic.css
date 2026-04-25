@@ -374,6 +374,61 @@
 .sd-seas-em  { font-size:1.48rem; display:block; margin-bottom:5px }
 .sd-seas-lbl { font-size:.64rem; font-weight:800; color:var(--sd-ink3) }
 
+.sd-date-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(180px, .9fr);
+  gap: 10px;
+}
+.sd-date-card,
+.sd-season-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(27,34,48,.08);
+  background: rgba(255,255,255,.82);
+  box-shadow: var(--sdsh-xs);
+  backdrop-filter: blur(10px);
+}
+.sd-date-card-lbl,
+.sd-season-card-lbl {
+  font-size: .6rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--sd-ink3);
+}
+.sd-date-input {
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(27,34,48,.1);
+  background: rgba(247,250,255,.95);
+  font-family: var(--sd-font);
+  font-size: .82rem;
+  font-weight: 700;
+  color: var(--sd-ink);
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+}
+.sd-date-input:focus {
+  border-color: rgba(47,142,243,.35);
+  box-shadow: 0 0 0 4px rgba(47,142,243,.12), inset 0 1px 0 rgba(255,255,255,.9);
+}
+.sd-date-card-hint,
+.sd-season-card-hint {
+  font-size: .62rem;
+  line-height: 1.45;
+  color: var(--sd-ink3);
+  font-family: var(--sd-font2);
+}
+.sd-season-card-val {
+  font-size: 1.02rem;
+  font-weight: 900;
+  letter-spacing: -.02em;
+}
+
 /* Crops count */
 .sd-crops-count {
   font-size: .6rem; font-weight: 700; color: var(--sd-mint-d);
@@ -723,5 +778,9 @@
 
   .sd-seas-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .sd-date-grid {
+    grid-template-columns: 1fr;
   }
 }
