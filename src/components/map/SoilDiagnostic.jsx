@@ -104,96 +104,110 @@ function getGroupKey(crop = {}) {
   return "vegetables";
 }
 
-function scoreTexture(preferred, actual) {
-  const preferredIndex = TEXTURE_ORDER.indexOf(preferred);
-  const actualIndex = TEXTURE_ORDER.indexOf(actual);
-  if (preferredIndex === -1 || actualIndex === -1) return 60;
-  const distance = Math.abs(preferredIndex - actualIndex);
-  if (distance === 0) return 100;
-  if (distance === 1) return 80;
-  if (distance === 2) return 55;
-  if (distance === 3) return 30;
-  return 10;
+const SCORE_LEVEL_FACTOR = { optimal: 1, stress: 0.5, destroyable: 0.2 };
+
+function pointsByLevel(weight, level) {
+  return weight * (SCORE_LEVEL_FACTOR[level] ?? SCORE_LEVEL_FACTOR.destroyable);
 }
 
-function scoreRange(value, min, max, bands) {
-  if (value >= min && value <= max) return 100;
-  const delta = value < min ? min - value : value - max;
-  if (delta <= bands[0]) return 95;
-  if (delta <= bands[1]) return 85;
-  if (delta <= bands[2]) return 70;
-  if (delta <= bands[3]) return 45;
-  return 20;
+function within(value, min, max) {
+  return value >= min && value <= max;
 }
 
-function scorePh(value, min, max) {
-  return scoreRange(value, min, max, [0.75, 1.5, 2.5, 3.5]);
+function seasonRelation(actual, target) {
+  if (!actual || !target) return "destroyable";
+  if (actual === target) return "optimal";
+  const tolerantPairs = new Set([
+    "printemps|ete", "ete|printemps",
+    "automne|ete", "ete|automne",
+    "hiver|automne", "automne|hiver",
+  ]);
+  return tolerantPairs.has(`${actual}|${target}`) ? "stress" : "destroyable";
 }
 
-function scoreEc(value, maxAllowed) {
-  if (value <= maxAllowed) return 100;
-  const excess = value - maxAllowed;
-  if (excess <= 0.2) return 100;
-  if (excess <= 0.5) return 90;
-  if (excess <= 1) return 75;
-  if (excess <= 1.5) return 55;
-  if (excess <= 2.5) return 32;
-  if (excess <= 3.5) return 15;
-  return 0;
+function seasonLevel(actualSeason, targetSeasons = []) {
+  if (!Array.isArray(targetSeasons) || targetSeasons.length === 0) return "optimal";
+  if (targetSeasons.includes(actualSeason)) return "optimal";
+  return targetSeasons.some(s => seasonRelation(actualSeason, s) === "stress") ? "stress" : "destroyable";
 }
 
-function scoreOrganicMatter(level, minimumRequired) {
-  const actual = OM_LEVEL_VALUES[level] ?? 3;
-  const gap = minimumRequired - actual;
-  if (gap <= 0) return 100;
-  if (gap <= 0.5) return 92;
-  if (gap <= 1) return 78;
-  if (gap <= 1.5) return 55;
-  return 20;
+function textureLevel(preferred, actual) {
+  if (!preferred || !actual) return "destroyable";
+  if (preferred === actual) return "optimal";
+
+  const safe = new Set([
+    "limoneux|sablo-limoneux", "sablo-limoneux|limoneux",
+    "limoneux|limon-argileux", "limon-argileux|limoneux",
+  ]);
+  if (safe.has(`${preferred}|${actual}`)) return "stress";
+
+  const functionalStress = new Set([
+    "sablo-limoneux|sableux", "sableux|sablo-limoneux",
+    "limon-argileux|argileux", "argileux|limon-argileux",
+  ]);
+  if (functionalStress.has(`${preferred}|${actual}`)) return "stress";
+
+  const severe = new Set([
+    "sableux|argileux", "argileux|sableux",
+    "limoneux|sableux", "sableux|limoneux",
+    "limoneux|argileux", "argileux|limoneux",
+  ]);
+  if (severe.has(`${preferred}|${actual}`)) return "destroyable";
+
+  return "destroyable";
 }
 
-function scoreLime(value, maxAllowed) {
-  const excess = value - maxAllowed;
-  if (excess <= 0) return 100;
-  if (excess <= 2) return 90;
-  if (excess <= 5) return 72;
-  if (excess <= 10) return 45;
-  return 15;
+function organicMatterPoints(level, groupKey) {
+  const table = {
+    vegetables: { excellent: 16, bon: 12, moyen: 8, bas: 4, "tres-bas": 3.2 },
+    cereals:    { excellent: 10, bon: 7.5, moyen: 5, bas: 2.5, "tres-bas": 2 },
+    trees:      { excellent: 7, bon: 7, moyen: 3.5, bas: 3.5, "tres-bas": 1.4 },
+  };
+  return table[groupKey]?.[level] ?? table[groupKey]?.moyen ?? 0;
 }
 
-function scoreNutrient(value, required) {
-  if (!required || required <= 0) return 100;
-  const ratio = value / required;
-  if (ratio >= 1.25) return 98;
-  if (ratio >= 1.0) return 100;
-  if (ratio >= 0.75) return 90;
-  if (ratio >= 0.5) return 72;
-  if (ratio >= 0.25) return 48;
-  return 20;
+function nutrientLevel(value, optimal, lowDelta, highDelta) {
+  if (!Number.isFinite(optimal) || optimal <= 0) return "optimal";
+  if (value === optimal) return "optimal";
+  const min = optimal - lowDelta;
+  const max = optimal + highDelta;
+  return within(value, min, max) ? "stress" : "destroyable";
 }
 
-function scoreTemperature(value, min, max, seasonCompatible) {
-  const base = scoreRange(value, min, max, [1.5, 3, 5, 8]);
-  return seasonCompatible ? base : Math.min(base, 78);
+function pollutionThresholds(crop) {
+  const risk = String(crop?.pollutionAccumulationRisk || "").toLowerCase();
+  if (risk.includes("hyper") || risk.includes("sensitive")|| risk.includes("high")) {
+    return { cdSafe: 0.5, cdLethal: 2, pbSafe: 30, pbLethal: 150 };
+  }
+  if (risk.includes("tolerant") || risk.includes("low")) {
+    return { cdSafe: 2, cdLethal: 15, pbSafe: 100, pbLethal: 800 };
+  }
+  return { cdSafe: 1, cdLethal: 5, pbSafe: 50, pbLethal: 400 };
 }
 
-function scoreWind(value, maxAllowed) {
-  if (value <= maxAllowed) return 100;
-  const excess = value - maxAllowed;
-  if (excess <= 5) return 92;
-  if (excess <= 10) return 78;
-  if (excess <= 20) return 55;
-  if (excess <= 30) return 30;
-  return 8;
+function pollutantMultiplier(actual, safe, lethal) {
+  if (actual <= safe) return 1;
+  if (actual >= lethal) return 0;
+  return 1 - ((actual - safe) / (lethal - safe));
 }
 
-function scorePollution(value, crop) {
-  const groupKey = getGroupKey(crop);
-  if (value <= 50) return 100;
-  if (value <= 80) return 70;
-  if (groupKey === "vegetables") return 0;
-  if (groupKey === "cereals") return 70;
-  return 85;
+function pollutionMultiplier(st, crop) {
+  const thresholds = pollutionThresholds(crop);
+  const cdFactor = pollutantMultiplier(Number(st?.cd || 0), thresholds.cdSafe, thresholds.cdLethal);
+  const pbFactor = pollutantMultiplier(Number(st?.pb || 0), thresholds.pbSafe, thresholds.pbLethal);
+  return Math.max(0, Math.min(cdFactor, pbFactor));
+}
+
+// ✅ NEW: Severe contamination check (Pb > 800 OR Cd > 15 blocks ALL crops)
+function isSoilToxic(st) {
+  const pb = Number(st?.pb || 0);
+  const cd = Number(st?.cd || 0);
+  return {
+    isToxic: pb > 800 || cd > 15,
+    pb, cd,
+    pbExcess: pb > 800 ? pb - 800 : 0,
+    cdExcess: cd > 15 ? cd - 15 : 0,
+  };
 }
 
 function contaminationValue(st) {
@@ -201,29 +215,56 @@ function contaminationValue(st) {
 }
 
 function scoreCropByFormula(crop, st) {
-  const weights = GROUP_SCORE_WEIGHTS[getGroupKey(crop)];
-  const totalWeight = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
+  const groupKey = getGroupKey(crop);
+  const phMin = Number(crop.ph?.[0] ?? 6);
+  const phMax = Number(crop.ph?.[1] ?? 7.5);
+  const phCenter = (phMin + phMax) / 2;
+  const seasonFit = seasonLevel(st.seas, crop.ss);
+  const texFit = textureLevel(crop.prefTex, st.tex);
 
-  const seasonCompatible = crop.ss?.includes(st.seas) ?? true;
-  const scores = {
-    texture: scoreTexture(crop.prefTex, st.tex),
-    ph: scorePh(st.ph, crop.ph[0], crop.ph[1]),
-    ec: scoreEc(st.ce, crop.ec) * (crop.category === "vegetables" ? 1.05 : 1),
-    om: scoreOrganicMatter(st.mo, crop.omMin),
-    lime: scoreLime(st.lime, crop.limeMx),
-    n: scoreNutrient(st.n, crop.nReq),
-    p: scoreNutrient(st.p, crop.pReq),
-    k: scoreNutrient(st.k, crop.kReq),
-    pollution: scorePollution(contaminationValue(st), crop),
-    temp: scoreTemperature(st.temp, crop.tMn, crop.tMx, seasonCompatible),
-    wind: scoreWind(st.wind, crop.maxWindKmh),
+  let base = 0;
+  let maxPoints = 0;
+  const add = (weight, level) => {
+    maxPoints += weight;
+    base += pointsByLevel(weight, level);
   };
 
-  const weightedScore = Object.entries(weights).reduce((sum, [key, weight]) => {
-    return sum + scores[key] * weight;
-  }, 0);
+  if (groupKey === "vegetables") {
+    add(18, within(st.ph, phMin, phMax) ? "optimal" : within(st.ph, phMin - 2, phMax + 2) ? "stress" : "destroyable");
+    add(16, st.ce <= crop.ce ? "optimal" : st.ce <= crop.ce + 1.5 ? "stress" : "destroyable");
+    maxPoints += 16; base += organicMatterPoints(st.mo, groupKey);
+    add(12, texFit);
+    add(8, seasonFit);
+    add(7, st.lime <= crop.limeMx ? "optimal" : st.lime <= crop.limeMx + 5 ? "stress" : "destroyable");
+    add(4, st.wind <= crop.maxWindKmh ? "optimal" : st.wind <= crop.maxWindKmh + 25 ? "stress" : "destroyable");
+    add(8, nutrientLevel(st.n, crop.nReq, 10, 20));
+    add(5, nutrientLevel(st.p, crop.pReq, 15, 30));
+    add(6, nutrientLevel(st.k, crop.kReq, 80, 150));
+  } else if (groupKey === "cereals") {
+    add(15, within(st.ph, phCenter - 1, phCenter + 1) ? "optimal" : within(st.ph, phCenter - 2, phCenter + 2) ? "stress" : "destroyable");
+    add(12, st.ce <= crop.ce ? "optimal" : st.ce <= crop.ce + 4 ? "stress" : "destroyable");
+    maxPoints += 10; base += organicMatterPoints(st.mo, groupKey);
+    add(12, nutrientLevel(st.n, crop.nReq, 60, 80));
+    add(9, nutrientLevel(st.p, crop.pReq, 15, 30));
+    add(8, nutrientLevel(st.k, crop.kReq, 80, 150));
+    add(8, st.lime <= crop.limeMx ? "optimal" : st.lime <= crop.limeMx + 7 ? "stress" : "destroyable");
+    add(7, seasonFit);
+    add(3, st.wind <= crop.maxWindKmh ? "optimal" : st.wind <= crop.maxWindKmh + 30 ? "stress" : "destroyable");
+  } else {
+    add(20, texFit);
+    add(15, within(st.ph, phMin, phMax) ? "optimal" : within(st.ph, phCenter - 1, phCenter + 1) ? "stress" : "destroyable");
+    add(12, st.ce <= crop.ce ? "optimal" : st.ce <= crop.ce + 3 ? "stress" : "destroyable");
+    add(13, st.lime <= crop.limeMx ? "optimal" : st.lime <= crop.limeMx + 5 ? "stress" : "destroyable");
+    add(8, nutrientLevel(st.k, crop.kReq, 60, 100));
+    add(7, st.wind <= crop.maxWindKmh ? "optimal" : st.wind <= crop.maxWindKmh + 20 ? "stress" : "destroyable");
+    maxPoints += 7; base += organicMatterPoints(st.mo, groupKey);
+    add(6, seasonFit);
+    add(4, nutrientLevel(st.n, crop.nReq, 20, 50));
+    add(4, nutrientLevel(st.p, crop.pReq, 20, 50));
+  }
 
-  return clampScore((weightedScore / totalWeight));
+  const normalizedBase = maxPoints > 0 ? (base / maxPoints) * 100 : 0;
+  return clampScore(normalizedBase * pollutionMultiplier(st, crop));
 }
 
 function inferSeasons(c) {
@@ -254,7 +295,10 @@ function toCrop(c) {
     omMin: limits.omMin,
     soilType: c.soilType,
     prefTex,
-    ss: inferSeasons(c),
+    // Prefer explicit seasons from DB; fallback to inferred seasons.
+    ss: c.season
+      ? c.season.split(",").map(s => s.trim()).filter(Boolean)
+      : inferSeasons(c),
     note: `Soil ${c.soilType}. N: ${c.nReq} kg/ha · P: ${c.pReq} kg/ha · K: ${c.kReq} kg/ha · OM >= ${limits.omMin}% · Active lime <= ${limits.activeLimeMax}%`,
   };
 }
@@ -335,6 +379,14 @@ function seasonFromDate(value) {
   if (month <= 5) return "printemps";
   if (month <= 8) return "ete";
   return "automne";
+}
+
+function monthFromDatePlusDays(value, offsetDays = 0) {
+  if (!value) return null;
+  const date = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setDate(date.getDate() + Number(offsetDays || 0));
+  return date.getMonth() + 1;
 }
 
 function getSeasonLabel(season) {
@@ -974,7 +1026,11 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
               type="date"
               className="sd-date-input"
               value={st.date}
-              onChange={e => onChange("date", e.target.value)}
+              onChange={e => {
+                const d = e.target.value;
+                onChange("date", d);
+                onChange("seas", seasonFromDate(d));
+              }}
             />
             <span className="sd-date-card-hint">Used in the analysis and recommendations.</span>
           </label>
@@ -1048,11 +1104,32 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
   );
 }
 
-/* RESULTS VIEW */
+/* RESULTS VIEW - ✅ FIXED WITH CONTAMINATION WARNING */
 function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNext,onDownloadReport }) {
+  // ✅ NEW: Check for severe contamination (Pb>800 OR Cd>15)
+  const contamination = isSoilToxic(st);
+
   const sc = calcScore(st, crops), scC = mc(sc), scBg = mcBg(sc);
   const scLbl = sc>=80 ? "Excellent 🎉" : sc>=60 ? "Needs improvement" : "Difficult";
-  const scored = crops.map(c => ({...c, sc: cropScore(c,st), adj: cropAdj(c,st)})).sort((a,b)=>b.sc-a.sc);
+
+  // ✅ NEW: Soil type compatibility filter (same or tolerated swap only)
+  const isTextureAllowed = (actual, preferred) => {
+    if (!actual || !preferred) return true;
+    if (actual === preferred) return true;
+    const compatible = new Set([
+      "limoneux|sablo-limoneux", "sablo-limoneux|limoneux",
+      "limoneux|limon-argileux", "limon-argileux|limoneux",
+      "sablo-limoneux|sableux", "sableux|sablo-limoneux",
+      "limon-argileux|argileux", "argileux|limon-argileux"
+    ]);
+    return compatible.has(`${actual}|${preferred}`);
+  };
+
+  const scored = crops
+    .map(c => ({...c, sc: cropScore(c,st), adj: cropAdj(c,st)}))
+    .filter(c => isTextureAllowed(st.tex, c.prefTex))
+    .sort((a,b) => b.sc - a.sc);
+
   const tgt  = st.crop ? scored.find(c => c.id===st.crop) : null;
   const bestCrop = scored[0] || null;
   const focusCrop = tgt || scored[0] || null;
@@ -1061,216 +1138,297 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
   const sn   = SN[st.seas], iw = st.seas==="hiver";
 
   return (
-    <div className="sd-results">
-      {!tgt && (
-        <div className="sd-a1">
-          <div className="sd-sec-head">
-            <span className="sd-sec-head-t">🌱 Top recommendation</span>
-            <span className="sd-sec-head-m">Best match</span>
+    <>
+      {/* ✅ SEVERE CONTAMINATION WARNING - Shows when Pb>800 OR Cd>15 */}
+      {contamination.isToxic && (
+        <div className="sd-toxic-alert" style={{
+          background: "linear-gradient(135deg, #1a1a1a, #2d2d2d)",
+          border: "2px solid #000",
+          borderRadius: "12px",
+          padding: "24px",
+          marginBottom: "20px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+          color: "#fff"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M16 2L2 28h28L16 2z" stroke="#ff4444" strokeWidth="3" fill="#2d0000" />
+              <path d="M16 10v8M16 22v2" stroke="#ff4444" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "20px", fontWeight: "700", color: "#ff6b6b" }}>
+                ⚠️ Soil Unusable - Critical Contamination
+              </h3>
+              <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#ccc" }}>
+                Heavy metal levels exceed safe limits for ALL crops
+              </p>
+            </div>
           </div>
-          {bestCrop && (
-            <div className="sd-rec-card sd-rec-card--top">
-              <div className="sd-rec-top">
-                <div className="sd-rec-rank">#1</div>
-                <div className="sd-rec-emoji" style={{background:bestCrop.bg}}>{bestCrop.e}</div>
-                <div className="sd-rec-info">
-                  <div className="sd-rec-name">{bestCrop.n}</div>
-                  <div className="sd-rec-lat">{bestCrop.ar}</div>
-                </div>
-                <div className="sd-rec-score">
-                  <div className="sd-rec-pct" style={{color:mc(bestCrop.sc)}}>{bestCrop.sc}%</div>
-                  <div className="sd-rec-pct-lbl">compatibility</div>
-                  <div className="sd-rec-best-tag">★ Best choice</div>
-                </div>
+
+          <div style={{
+            background: "rgba(255,68,68,0.1)",
+            border: "1px solid rgba(255,68,68,0.3)",
+            borderRadius: "8px",
+            padding: "16px",
+            marginBottom: "16px"
+          }}>
+            <div style={{ fontSize: "14px", marginBottom: "8px" }}>
+              <strong style={{ color: "#ff6b6b" }}>Detected Levels:</strong>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "13px" }}>
+              <div style={{ color: contamination.pbExcess > 0 ? "#ff6b6b" : "#aaa" }}>
+                Lead (Pb): {contamination.pb} mg/kg
+                {contamination.pbExcess > 0 && ` (+${contamination.pbExcess} over limit)`}
               </div>
-              <div className="sd-rec-bottom">
-                <div className="sd-rec-chip-row">
-                  <span className="sd-rec-chip">Top crop</span>
-                  <span className="sd-rec-chip">Season match</span>
-                </div>
-                <div className="sd-rec-note">{bestCrop.note}</div>
+              <div style={{ color: contamination.cdExcess > 0 ? "#ff6b6b" : "#aaa" }}>
+                Cadmium (Cd): {contamination.cd} mg/kg
+                {contamination.cdExcess > 0 && ` (+${contamination.cdExcess} over limit)`}
               </div>
             </div>
+          </div>
+
+          <div style={{
+            background: "rgba(255,255,255,0.05)",
+            borderRadius: "8px",
+            padding: "16px",
+            fontSize: "14px",
+            lineHeight: "1.6"
+          }}>
+            <strong style={{ color: "#ffd700", display: "block", marginBottom: "8px" }}>
+              Required Actions Before Cultivation:
+            </strong>
+            <ul style={{ margin: 0, paddingLeft: "20px", color: "#ddd" }}>
+              <li>Conduct detailed soil testing to confirm contamination sources</li>
+              <li>Implement soil remediation (phytoremediation, soil replacement, or chemical stabilization)</li>
+              <li>Consult environmental authorities for contamination management</li>
+              <li>Do NOT plant edible crops until levels are reduced below safe thresholds</li>
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Only show crop recommendations if soil is NOT toxic */}
+      {!contamination.isToxic && (
+        <div className="sd-results">
+          {/* Top Recommendation */}
+          {!tgt && (
+            <div className="sd-a1">
+              <div className="sd-sec-head">
+                <span className="sd-sec-head-t">🌱 Top recommendation</span>
+                <span className="sd-sec-head-m">Best match</span>
+              </div>
+              {bestCrop && (
+                <div className="sd-rec-card sd-rec-card--top">
+                  <div className="sd-rec-top">
+                    <div className="sd-rec-rank">#1</div>
+                    <div className="sd-rec-emoji" style={{background:bestCrop.bg}}>{bestCrop.e}</div>
+                    <div className="sd-rec-info">
+                      <div className="sd-rec-name">{bestCrop.n}</div>
+                      <div className="sd-rec-lat">{bestCrop.ar}</div>
+                    </div>
+                    <div className="sd-rec-score">
+                      <div className="sd-rec-pct" style={{color:mc(bestCrop.sc)}}>{bestCrop.sc}/100</div>
+                      <div className="sd-rec-pct-lbl">compatibility</div>
+                      <div className="sd-rec-best-tag">★ Best choice</div>
+                    </div>
+                  </div>
+                  <div className="sd-rec-bottom">
+                    <div className="sd-rec-chip-row">
+                      <span className="sd-rec-chip">TOP CROP</span>
+                      {bestCrop?.ss?.includes(st.seas) ? (
+                        <span className="sd-rec-chip">SEASON MATCH</span>
+                      ) : (
+                        <span className="sd-rec-chip" style={{ background: "#ffe0e0", color: "#c02020", border: "1px solid #ffc8c8" }}>
+                          ⚠️ WRONG SEASON · HIGH FAILURE RISK
+                        </span>
+                      )}
+                    </div>
+                    <div className="sd-rec-note">{bestCrop.note}</div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
-        </div>
-      )}
 
-      {/* Season alert */}
-      {sn && (
-        <div className="sd-sea-alert sd-a2"
-          style={{background:iw?"rgba(160,200,255,.18)":"rgba(255,220,120,.18)",borderColor:iw?"rgba(100,160,240,.3)":"rgba(220,160,40,.3)",color:iw?"#1e40af":"#92400e"}}>
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <path d="M8 2L1 14h14L8 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-            <path d="M8 6.5v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            <circle cx="8" cy="12" r=".7" fill="currentColor" />
-          </svg>
-          {sn}
-        </div>
-      )}
+          {/* Season alert */}
+          {sn && (
+            <div className="sd-sea-alert sd-a2"
+              style={{background:iw?"rgba(160,200,255,.18)":"rgba(255,220,120,.18)",borderColor:iw?"rgba(100,160,240,.3)":"rgba(220,160,40,.3)",color:iw?"#1e40af":"#92400e"}}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2L1 14h14L8 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+                <path d="M8 6.5v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                <circle cx="8" cy="12" r=".7" fill="currentColor" />
+              </svg>
+              {sn}
+            </div>
+          )}
 
-      {/* 6 param pills */}
-      <div className="sd-param-pills sd-a2">
-        {PARAM_ROWS.map((row,ri) => (
-          <div key={ri} className="sd-param-pill-row">
-            {row.map(p => {
-              const v = st[p.id];
-              const pct = (((v-p.mn)/(p.mx-p.mn))*100).toFixed(1);
-              const fit = pSt(p.id, v, focusCrop);
-              const [bg2,c2] = {ok:["#c8f5e0","#1a7a50"],lo:["#fff3c8","#b06010"],hi:["#ffc8c8","#c02020"]}[fit];
-              const pill = statusLabel(p.id, v, focusCrop);
-              const isSatPill = (diagMode==="eco" || diagMode==="standard") && SAT_FIELDS[p.id];
-              return (
-                <div key={p.id} className={`sd-param-pill ${isSatPill?"sd-param-pill--sat":""}`} style={{borderBottom:`3px solid ${c2}40`}}>
-                  <div className="sd-param-pill-top">
-                    <span className="sd-param-pill-name">
-                      {p.name}
-                      {isSatPill && <span className="sd-param-sat-dot" />}
-                    </span>
-                    <span className="sd-param-pill-badge" style={{background:bg2,color:c2}}>{pill}</span>
-                  </div>
-                  <div className="sd-param-pill-val">{Number.isInteger(v)?v:v.toFixed(1)}<small>{p.u}</small></div>
-                  <div className="sd-param-bar" style={{background:bg2}}>
-                    <div className="sd-param-bar-inner" style={{width:`${pct}%`,background:c2}} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-
-      {/* Recommendations */}
-      {recs && (
-        <div className="sd-a3">
-          <div className="sd-sec-head">
-            <span className="sd-sec-head-t">🌱 Recommended Crops</span>
-            <span className="sd-sec-head-m">{st.seas} · next 3</span>
-          </div>
-          <div className="sd-rec-cards">
-            {recs.map((c,i) => (
-              <div key={c.id} className={`sd-rec-card ${i===0?"sd-rec-card--top":""}`}>
-                <div className="sd-rec-top">
-                  <div className="sd-rec-rank">#{i + 1}</div>
-                  <div className="sd-rec-emoji" style={{background:c.bg}}>{c.e}</div>
-                  <div className="sd-rec-info">
-                    <div className="sd-rec-name">{c.n}</div>
-                    <div className="sd-rec-lat">{c.ar}</div>
-                  </div>
-                  <div className="sd-rec-score">
-                    <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}%</div>
-                    <div className="sd-rec-pct-lbl">compatibility</div>
-                    {i===0 && <div className="sd-rec-best-tag">★ Best choice</div>}
-                  </div>
-                </div>
-                <div className="sd-rec-bottom">
-                  <div className="sd-rec-chip-row">
-                    <span className="sd-rec-chip">Season match</span>
-                    <span className="sd-rec-chip">Field-ready</span>
-                  </div>
-                  <div className="sd-rec-mini-bars">
-                    {["ph","ce","temp"].map((bid,j) => {
-                      const sv = pSt(bid, st[bid], c);
-                      const bc = {ok:"#5ed4a0",lo:"#f5c040",hi:"#f06060"}[sv];
-                      const [mn,mx] = {ph:[4,9],ce:[0,6],temp:[0,40]}[bid];
-                      const bp = (((st[bid]-mn)/(mx-mn))*100).toFixed(0);
-                      return (
-                        <div key={bid} className="sd-rec-mbar">
-                          <div className="sd-rec-mbar-lbl">{["pH","CE","Temp"][j]}</div>
-                          <div className="sd-rec-mbar-track">
-                            <div className="sd-rec-mbar-fill" style={{width:`${bp}%`,background:bc}} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="sd-rec-note">{c.note}</div>
-                </div>
+          {/* 6 param pills */}
+          <div className="sd-param-pills sd-a2">
+            {PARAM_ROWS.map((row,ri) => (
+              <div key={ri} className="sd-param-pill-row">
+                {row.map(p => {
+                  const v = st[p.id];
+                  const pct = (((v-p.mn)/(p.mx-p.mn))*100).toFixed(1);
+                  const fit = pSt(p.id, v, focusCrop);
+                  const [bg2,c2] = {ok:["#c8f5e0","#1a7a50"],lo:["#fff3c8","#b06010"],hi:["#ffc8c8","#c02020"]}[fit];
+                  const pill = statusLabel(p.id, v, focusCrop);
+                  const isSatPill = (diagMode==="eco" || diagMode==="standard") && SAT_FIELDS[p.id];
+                  return (
+                    <div key={p.id} className={`sd-param-pill ${isSatPill?"sd-param-pill--sat":""}`} style={{borderBottom:`3px solid ${c2}40`}}>
+                      <div className="sd-param-pill-top">
+                        <span className="sd-param-pill-name">
+                          {p.name}
+                          {isSatPill && <span className="sd-param-sat-dot" />}
+                        </span>
+                        <span className="sd-param-pill-badge" style={{background:bg2,color:c2}}>{pill}</span>
+                      </div>
+                      <div className="sd-param-pill-val">{Number.isInteger(v)?v:v.toFixed(1)}<small>{p.u}</small></div>
+                      <div className="sd-param-bar" style={{background:bg2}}>
+                        <div className="sd-param-bar-inner" style={{width:`${pct}%`,background:c2}} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>
+
+          {/* Recommendations */}
+          {recs && (
+            <div className="sd-a3">
+              <div className="sd-sec-head">
+                <span className="sd-sec-head-t">🌱 Recommended Crops</span>
+                <span className="sd-sec-head-m">{st.seas} · next 3</span>
+              </div>
+              <div className="sd-rec-cards">
+                {recs.map((c,i) => (
+                  <div key={c.id} className={`sd-rec-card ${i===0?"sd-rec-card--top":""}`}>
+                    <div className="sd-rec-top">
+                      <div className="sd-rec-rank">#{i + 1}</div>
+                      <div className="sd-rec-emoji" style={{background:c.bg}}>{c.e}</div>
+                      <div className="sd-rec-info">
+                        <div className="sd-rec-name">{c.n}</div>
+                        <div className="sd-rec-lat">{c.ar}</div>
+                      </div>
+                      <div className="sd-rec-score">
+                        <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}/100</div>
+                        <div className="sd-rec-pct-lbl">compatibility</div>
+                        {i===0 && <div className="sd-rec-best-tag">★ Best choice</div>}
+                      </div>
+                    </div>
+                    <div className="sd-rec-bottom">
+                      <div className="sd-rec-chip-row">
+                        <span className="sd-rec-chip">Season match</span>
+                        <span className="sd-rec-chip">Field-ready</span>
+                      </div>
+                      <div className="sd-rec-mini-bars">
+                        {["ph","ce","temp"].map((bid,j) => {
+                          const sv = pSt(bid, st[bid], c);
+                          const bc = {ok:"#5ed4a0",lo:"#f5c040",hi:"#f06060"}[sv];
+                          const [mn,mx] = {ph:[4,9],ce:[0,6],temp:[0,40]}[bid];
+                          const bp = (((st[bid]-mn)/(mx-mn))*100).toFixed(0);
+                          return (
+                            <div key={bid} className="sd-rec-mbar">
+                              <div className="sd-rec-mbar-lbl">{["pH","CE","Temp"][j]}</div>
+                              <div className="sd-rec-mbar-track">
+                                <div className="sd-rec-mbar-fill" style={{width:`${bp}%`,background:bc}} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="sd-rec-note">{c.note}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Verdict */}
+          {tgt && (() => {
+            const vrd = tgt.sc>=80
+              ? {e:"✅",bg:mcBg(tgt.sc),bc:"rgba(30,130,80,.2)",c:mc(tgt.sc),t:"Crop compatible",s:`Your soil is well suited. You can plant ${tgt.n} without major corrections.`}
+              : tgt.sc>=55
+              ? {e:"⚠️",bg:"rgba(255,220,100,.18)",bc:"rgba(220,160,40,.3)",c:"#92400e",t:"Compatible with corrections",s:`${tgt.n} can be grown, but adjustments are recommended.`}
+              : {e:"❌",bg:"rgba(255,150,140,.18)",bc:"rgba(200,60,60,.25)",c:"#991b1b",t:"Crop not recommended",s:`Current conditions are not favorable for ${tgt.n}.`};
+            const altsSection = alts.length > 0;
+            return (
+              <>
+                <div className="sd-a3">
+                  <div className="sd-sec-head"><span className="sd-sec-head-t">🔎 Analysis - {tgt.n}</span></div>
+                  <div className="sd-verd-card">
+                    <div className="sd-verd-top">
+                      <div className="sd-verd-chip">Selected crop</div>
+                      <div className="sd-verd-emoji" style={{background:tgt.bg}}>{tgt.e}</div>
+                      <div className="sd-verd-info">
+                        <div className="sd-verd-name">{tgt.n}</div>
+                        <div className="sd-verd-lat">{tgt.lat}</div>
+                      </div>
+                      <div className="sd-verd-pct-blk">
+                        <div className="sd-verd-pct" style={{color:mc(tgt.sc)}}>{tgt.sc}/100</div>
+                        <div className="sd-verd-pct-lbl">compatibility</div>
+                      </div>
+                    </div>
+                    <div className="sd-verd-status" style={{background:vrd.bg,borderColor:vrd.bc}}>
+                      <div className="sd-verd-status-icon" style={{background:vrd.bg,border:`2px solid ${vrd.bc}`}}>{vrd.e}</div>
+                      <div>
+                        <div className="sd-verd-status-title" style={{color:vrd.c}}>{vrd.t}</div>
+                        <div className="sd-verd-status-sub">{vrd.s}</div>
+                      </div>
+                    </div>
+                    {tgt.adj.length > 0 ? (
+                      <div className="sd-verd-adjs">
+                        <div className="sd-verd-adj-lbl">Required adjustments</div>
+                        {tgt.adj.map((a,i) => (
+                          <div key={i} className="sd-verd-adj">
+                            <div className="sd-verd-adj-pill" style={{background:a.bg}}>⚙</div>
+                            {a.t}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="sd-verd-ok">✓ No major adjustment required - you can plant!</div>
+                    )}
+                  </div>
+                </div>
+                {altsSection && (
+                  <div className="sd-a4">
+                    <div className="sd-sec-head" style={{marginTop:4}}><span className="sd-sec-head-t">💡 Suggested Alternatives</span></div>
+                    <div className="sd-rec-cards">
+                      {alts.map(c => (
+                        <div key={c.id} className="sd-rec-card">
+                          <div className="sd-rec-top">
+                            <div className="sd-rec-rank">Alt</div>
+                            <div className="sd-rec-emoji" style={{background:c.bg}}>{c.e}</div>
+                            <div className="sd-rec-info">
+                              <div className="sd-rec-name">{c.n}</div>
+                              <div className="sd-rec-lat">{c.ar}</div>
+                            </div>
+                            <div className="sd-rec-score">
+                              <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}/100</div>
+                              <div className="sd-rec-pct-lbl">compatibility</div>
+                            </div>
+                          </div>
+                          <div className="sd-rec-bottom">
+                            <div className="sd-rec-chip-row">
+                              <span className="sd-rec-chip">Alternative</span>
+                            </div>
+                            <div className="sd-rec-note">{c.note}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 
-      {/* Verdict */}
-      {tgt && (() => {
-        const vrd = tgt.sc>=80
-          ? {e:"✅",bg:mcBg(tgt.sc),bc:"rgba(30,130,80,.2)",c:mc(tgt.sc),t:"Crop compatible",s:`Your soil is well suited. You can plant ${tgt.n} without major corrections.`}
-          : tgt.sc>=55
-          ? {e:"⚠️",bg:"rgba(255,220,100,.18)",bc:"rgba(220,160,40,.3)",c:"#92400e",t:"Compatible with corrections",s:`${tgt.n} can be grown, but adjustments are recommended.`}
-          : {e:"❌",bg:"rgba(255,150,140,.18)",bc:"rgba(200,60,60,.25)",c:"#991b1b",t:"Crop not recommended",s:`Current conditions are not favorable for ${tgt.n}.`};
-        const altsSection = alts.length > 0;
-        return (
-          <>
-            <div className="sd-a3">
-              <div className="sd-sec-head"><span className="sd-sec-head-t">🔎 Analysis - {tgt.n}</span></div>
-              <div className="sd-verd-card">
-                <div className="sd-verd-top">
-                  <div className="sd-verd-chip">Selected crop</div>
-                  <div className="sd-verd-emoji" style={{background:tgt.bg}}>{tgt.e}</div>
-                  <div className="sd-verd-info">
-                    <div className="sd-verd-name">{tgt.n}</div>
-                    <div className="sd-verd-lat">{tgt.lat}</div>
-                  </div>
-                  <div className="sd-verd-pct-blk">
-                    <div className="sd-verd-pct" style={{color:mc(tgt.sc)}}>{tgt.sc}%</div>
-                    <div className="sd-verd-pct-lbl">compatibility</div>
-                  </div>
-                </div>
-                <div className="sd-verd-status" style={{background:vrd.bg,borderColor:vrd.bc}}>
-                  <div className="sd-verd-status-icon" style={{background:vrd.bg,border:`2px solid ${vrd.bc}`}}>{vrd.e}</div>
-                  <div>
-                    <div className="sd-verd-status-title" style={{color:vrd.c}}>{vrd.t}</div>
-                    <div className="sd-verd-status-sub">{vrd.s}</div>
-                  </div>
-                </div>
-                {tgt.adj.length > 0 ? (
-                  <div className="sd-verd-adjs">
-                    <div className="sd-verd-adj-lbl">Required adjustments</div>
-                    {tgt.adj.map((a,i) => (
-                      <div key={i} className="sd-verd-adj">
-                        <div className="sd-verd-adj-pill" style={{background:a.bg}}>⚙</div>
-                        {a.t}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="sd-verd-ok">✓ No major adjustment required - you can plant!</div>
-                )}
-              </div>
-            </div>
-            {altsSection && (
-              <div className="sd-a4">
-                <div className="sd-sec-head" style={{marginTop:4}}><span className="sd-sec-head-t">💡 Suggested Alternatives</span></div>
-                <div className="sd-rec-cards">
-                  {alts.map(c => (
-                    <div key={c.id} className="sd-rec-card">
-                      <div className="sd-rec-top">
-                        <div className="sd-rec-rank">Alt</div>
-                        <div className="sd-rec-emoji" style={{background:c.bg}}>{c.e}</div>
-                        <div className="sd-rec-info">
-                          <div className="sd-rec-name">{c.n}</div>
-                          <div className="sd-rec-lat">{c.ar}</div>
-                        </div>
-                        <div className="sd-rec-score">
-                          <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}%</div>
-                          <div className="sd-rec-pct-lbl">compatibility</div>
-                        </div>
-                      </div>
-                      <div className="sd-rec-bottom">
-                        <div className="sd-rec-chip-row">
-                          <span className="sd-rec-chip">Alternative</span>
-                        </div>
-                        <div className="sd-rec-note">{c.note}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        );
-      })()}
-
+      {/* ✅ Action buttons ALWAYS show (even when soil is toxic) */}
       <div className="sd-act-row sd-a5">
         <button className="sd-act sd-act-s" onClick={onReset}>
           <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
@@ -1303,7 +1461,7 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
           </button>
         )}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -1321,6 +1479,7 @@ export default function SoilDiagnostic({
   const [activeZone,  setActiveZone]  = useState(0);
   const [analyzing,   setAnalyzing]   = useState(false);
   const [rawCrops,    setRawCrops]    = useState([]);
+  const [windByMonth, setWindByMonth] = useState({});
   const [zoneStates,  setZoneStates]  = useState(() => Array.from({length: Math.max(1,nZones)}, () => freshSt(initialDiagMode)));
   const [zoneResults, setZoneResults] = useState(() => Array(Math.max(1,nZones)).fill(null));
   const n = Math.max(1, nZones);
@@ -1349,6 +1508,37 @@ export default function SoilDiagnostic({
       cancelled = true;
     };
   }, [cultureGroupId]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+
+    const fetchWindExpectations = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/wind-expectations`);
+        if (!response.ok) throw new Error("Failed to load wind expectations");
+        const data = await response.json();
+        if (cancelled) return;
+        const byMonth = {};
+        (Array.isArray(data) ? data : []).forEach(item => {
+          const month = Number(item?.monthId);
+          const speed = Number(item?.avgWindSpeedKmh);
+          if (month >= 1 && month <= 12 && Number.isFinite(speed)) {
+            byMonth[month] = speed;
+          }
+        });
+        setWindByMonth(byMonth);
+      } catch (error) {
+        console.warn("⚠️ Wind expectations fetch failed:", error);
+        if (!cancelled) setWindByMonth({});
+      }
+    };
+
+    fetchWindExpectations();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   /* Reset on open */
   useEffect(() => {
@@ -1441,6 +1631,30 @@ export default function SoilDiagnostic({
       return next;
     });
   }, [activeZone]);
+
+  useEffect(() => {
+    if (!open) return;
+    const currentState = zoneStates[activeZone];
+    if (!currentState) return;
+    const selectedCrop = currentState.crop
+      ? CROPS.find(c => String(c.id) === String(currentState.crop))
+      : null;
+    const criticalStartDays = selectedCrop?.windCriticalStartDays ?? 0;
+    const targetMonth = monthFromDatePlusDays(currentState.date, criticalStartDays);
+    if (!targetMonth) return;
+
+    const expectedWind = Number(windByMonth[targetMonth]);
+    if (!Number.isFinite(expectedWind)) return;
+
+    setZoneStates(prev => {
+      const next = [...prev];
+      const zone = next[activeZone];
+      if (!zone) return prev;
+      if (Math.abs(Number(zone.wind) - expectedWind) < 0.01) return prev;
+      next[activeZone] = { ...zone, wind: expectedWind };
+      return next;
+    });
+  }, [open, activeZone, zoneStates, CROPS, windByMonth]);
 
   /* Analyze */
   const handleAnalyze = useCallback(() => {

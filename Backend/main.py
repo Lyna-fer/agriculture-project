@@ -231,6 +231,13 @@ class CropRequirementOut(BaseModel):
     crop_name: str
 
 
+class WindExpectationOut(BaseModel):
+    monthId: int
+    monthName: Optional[str] = None
+    avgWindSpeedKmh: float
+    season: Optional[str] = None
+
+
 # ─── FASTAPI APP ──────────────────────────────────────────────────────────────
 app = FastAPI(title="AgriTech Auth + Sampling", version="2.0")
 
@@ -727,6 +734,7 @@ def get_crop_requirements(groupId: Optional[int] = None, db: Session = Depends(g
             pollution_accumulation_risk,
             name_ar,
             emoji,
+            season,
             crop_slug,
             COALESCE(temp_min, 10) AS temp_min,
             COALESCE(temp_max, 30) AS temp_max
@@ -756,9 +764,33 @@ def get_crop_requirements(groupId: Optional[int] = None, db: Session = Depends(g
             "maxWindKmh": int(row["max_wind_kmh"]),
             "windCriticalStartDays": int(row["wind_critical_start_days"]),
             "pollutionAccumulationRisk": row["pollution_accumulation_risk"],
+            "season": row["season"],
             "dbId": int(row["id"]),
             "category": row["category"],
             "crop_name": row["crop_name"],
+        }
+        for row in rows
+    ]
+
+
+@app.get("/api/wind-expectations", response_model=list[WindExpectationOut])
+def get_wind_expectations(db: Session = Depends(get_db)):
+    rows = db.execute(text("""
+        SELECT
+            month_id,
+            month_name,
+            avg_wind_speed_kmh,
+            season
+        FROM wind_expectations
+        ORDER BY month_id
+    """)).mappings().all()
+
+    return [
+        {
+            "monthId": int(row["month_id"]),
+            "monthName": row["month_name"],
+            "avgWindSpeedKmh": float(row["avg_wind_speed_kmh"]),
+            "season": row["season"],
         }
         for row in rows
     ]
