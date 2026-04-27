@@ -683,6 +683,13 @@
 .sd-act-s:hover { transform:translateY(-2px); box-shadow:var(--sdsh-sm); border-color:rgba(79,126,247,.2) }
 .sd-act-p { flex:1; justify-content:center; background:linear-gradient(135deg,#2f8ef3,#43d48d); border:none; color:#fff; box-shadow:0 14px 28px rgba(47,142,243,.24) }
 .sd-act-p:hover { transform:translateY(-2px); box-shadow:0 18px 34px rgba(28,143,96,.3); filter:saturate(1.05) }
+.sd-act-p--report {
+  background: linear-gradient(135deg, #0f7bd9 0%, #1d9e75 55%, #43d48d 100%);
+  box-shadow: 0 16px 32px rgba(15, 123, 217, .18), 0 8px 0 rgba(15, 123, 217, .12);
+}
+.sd-act-p--report:hover {
+  box-shadow: 0 20px 38px rgba(15, 123, 217, .24), 0 10px 0 rgba(15, 123, 217, .14);
+}
 
 
 .sd-act-next {

@@ -463,9 +463,80 @@ def _compute_satellite_metrics(geometry: ee.Geometry) -> dict:
     ).getInfo()
     temp_value = temp_result.get("temp_today") if temp_result else None
 
+    # 5) Organic matter proxy (Sentinel-2 vegetation + bare soil signal)
+    # OM is not directly observable from satellite imagery; this is a calibrated proxy.
+    sentinel2 = (
+        ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
+        .filterBounds(geometry)
+        .filterDate(start_1_year, today_str)
+        .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE", 20))
+    )
+
+    def mask_s2_clouds(image):
+        scl = image.select("SCL")
+        cloud_mask = (
+            scl.neq(3)
+            .And(scl.neq(7))
+            .And(scl.neq(8))
+            .And(scl.neq(9))
+            .And(scl.neq(10))
+            .And(scl.neq(11))
+        )
+        return image.updateMask(cloud_mask)
+
+    def scale_s2(image):
+        optical = image.select(["B.*"]).multiply(0.0001)
+        return image.addBands(optical, None, True)
+
+    s2_median = sentinel2.map(mask_s2_clouds).map(scale_s2).median().clip(geometry)
+    ndvi = s2_median.normalizedDifference(["B8", "B4"]).rename("NDVI")
+    ndmi = s2_median.normalizedDifference(["B8", "B11"]).rename("NDMI")
+    bsi = s2_median.expression(
+        "((swir + red) - (nir + blue)) / ((swir + red) + (nir + blue))",
+        {
+            "swir": s2_median.select("B11"),
+            "red": s2_median.select("B4"),
+            "nir": s2_median.select("B8"),
+            "blue": s2_median.select("B2"),
+        },
+    ).rename("BSI")
+
+    om_proxy = (
+        ndvi.multiply(4.5)
+        .add(ndmi.multiply(1.8))
+        .subtract(bsi.multiply(3.2))
+        .add(1.2)
+        .clamp(0.4, 7.5)
+        .rename("OM_percent")
+    )
+    om_result = om_proxy.reduceRegion(
+        reducer=ee.Reducer.mean(),
+        geometry=geometry,
+        scale=20,
+        maxPixels=10 ** 13,
+    ).getInfo()
+    om_value = om_result.get("OM_percent") if om_result else None
+
+    def organic_matter_level(value: float | None) -> str:
+        if value is None:
+            return "moyen"
+        if value < 1:
+            return "tres-bas"
+        if value < 2:
+            return "bas"
+        if value < 4:
+            return "moyen"
+        if value < 6:
+            return "bon"
+        return "excellent"
+
     return {
         "salinity": {"ec_dS_m": round(ec_value, 2) if ec_value is not None else None},
         "ph": {"value": round(ph_value, 2) if ph_value is not None else None},
+        "organicMatter": {
+            "value": round(om_value, 2) if om_value is not None else None,
+            "level": organic_matter_level(om_value),
+        },
         "texture": {
             "class": texture_class,
             "label": USDA_TEXTURE_MAP.get(texture_class, "Unknown") if texture_class else "Unknown",
@@ -474,6 +545,7 @@ def _compute_satellite_metrics(geometry: ee.Geometry) -> dict:
         "sources": {
             "salinity": "LANDSAT/LC08/C02/T1_L2",
             "ph": "projects/soilgrids-isric/phh2o_mean",
+            "organicMatter": "COPERNICUS/S2_SR_HARMONIZED",
             "texture": "OpenLandMap/SOL/SOL_TEXTURE-CLASS_USDA-TT_M/v02",
             "temperature": "MODIS/061/MOD11A1",
         },

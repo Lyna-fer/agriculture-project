@@ -24,6 +24,7 @@ const FIELD_COLORS = [
 ];
 let colorIdx = 0;
 const nextColor = () => FIELD_COLORS[colorIdx++ % FIELD_COLORS.length];
+const MAX_PARCEL_AREA_HA = 50;
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
@@ -97,6 +98,14 @@ export default function Map() {
       showToast("📍 Marker placed - draw a polygon to calculate area");
       return;
     }
+    if (info.type === "oversize") {
+      setActiveTool(null);
+      setPendingParcelleInfo(null);
+      setParcelleInfo(null);
+      setResultsOpen(false);
+      showToast(`⚠️ Parcel too large: max ${MAX_PARCEL_AREA_HA} ha per parcel`);
+      return;
+    }
     const color = nextColor();
     setActiveTool(null);
     setPendingParcelleInfo(info);
@@ -112,8 +121,8 @@ export default function Map() {
   const {
     mapRef, placeSamplePoints, clearSampleMarkers, activateDrawTool, clearAll,
     flyToWilaya, displayZones, clearZones, drawParcelleFromLatLngs,
-    clearSamplingMarkers, drawAllParcelles, clearAllParcelles,
-  } = useMap({ onParcelleChange: handleParcelleChange });
+    clearSamplingMarkers, drawAllParcelles, clearAllParcelles, clearSelectedParcelle,
+  } = useMap({ onParcelleChange: handleParcelleChange, maxParcelAreaHa: MAX_PARCEL_AREA_HA });
 
   useEffect(() => {
     if (parcelles.length > 0) {
@@ -131,6 +140,10 @@ export default function Map() {
 
   const handleSaveParcelle = useCallback(({ name, groupId }) => {
     if (!pendingParcelleInfo) return;
+    if ((pendingParcelleInfo.area || 0) > MAX_PARCEL_AREA_HA) {
+      showToast(`⚠️ Parcel too large: max ${MAX_PARCEL_AREA_HA} ha per parcel`);
+      return;
+    }
     setPendingParcelleInfo({ ...pendingParcelleInfo, name });
     const newP = {
       id: Date.now(), name,
@@ -148,10 +161,15 @@ export default function Map() {
   }, [pendingParcelleInfo, pendingColor, showToast]);
 
   const handleCancelDraw = useCallback(() => {
-    setActiveTool(null); activateDrawTool(null); setPendingParcelleInfo(null);
+    setActiveTool(null);
+    activateDrawTool(null);
+    setPendingParcelleInfo(null);
+    // Always clear any temporary drawn overlay so cancel is immediate
+    clearSelectedParcelle();
+    // If there are no saved parcelles, clear the whole map state
     if (!parcelles.length) { clearAll(); setParcelleInfo(null); }
     showToast("✕ Drawing canceled");
-  }, [activateDrawTool, clearAll, parcelles.length, showToast]);
+  }, [activateDrawTool, clearAll, parcelles.length, showToast, clearSelectedParcelle]);
 
   // ✅ FIXED: Delete single parcelle immediately (UI + Map + DB)
   const handleDeleteParcelle = useCallback(
@@ -160,15 +178,22 @@ export default function Map() {
       const token = localStorage.getItem("token");
 
       // 1. Optimistic UI update
-      setParcelles((prev) => prev.filter((p) => p.id !== id));
+      const next = parcelles.filter((p) => p.id !== id);
+      setParcelles(next);
 
-      // 2. If the deleted parcelle was selected, clear selection AND map drawing
+      // 2. Ensure any overlay for that parcel is removed immediately
+      // If the deleted parcel was the currently selected one, clear selection state
+      const nextSelectedParcelleId = selectedParcelleId === id ? null : selectedParcelleId;
       if (selectedParcelleId === id) {
         setSelectedParcelleId(null);
         setParcelleInfo(null);
         setResultsOpen(false);
-        clearAll(); // ✅ Removes the polygon from the map immediately
       }
+      // Always clear the selected/drawn overlay and redraw remaining parcels
+      clearSelectedParcelle();
+      clearSampleMarkers();
+      clearZones();
+      drawAllParcelles(next, nextSelectedParcelleId);
 
       // 3. Backend deletion
       if (token) {
@@ -195,7 +220,7 @@ export default function Map() {
         showToast("🗑 Parcel deleted (local)");
       }
     },
-    [selectedParcelleId, showToast, clearAll]
+    [selectedParcelleId, showToast, parcelles, clearSelectedParcelle, clearSampleMarkers, drawAllParcelles, clearZones]
   );
 
   // ✅ FIXED: Bulk delete - uses snapshot of IDs to ensure ALL are deleted
@@ -258,6 +283,14 @@ export default function Map() {
   }, [parcelles, clearAll, clearZones, showToast, setNZonesFromBackend]);
 
   const handleSelectParcelle = useCallback((id) => {
+    if (id === selectedParcelleId) {
+      setSelectedParcelleId(null);
+      setParcelleInfo(null);
+      setResultsOpen(false);
+      clearSelectedParcelle();
+      return;
+    }
+
     setSelectedParcelleId(id);
     const p = parcelles.find(x => x.id === id);
     if (p && p.latlngs && p.latlngs.length > 0) {
@@ -266,7 +299,7 @@ export default function Map() {
       if (stats) { setParcelleInfo({ ...stats, name: p.name, type: "polygon" }); }
     }
     setResultsOpen(false);
-  }, [parcelles, selectedGroupId, drawParcelleFromLatLngs, pendingColor]);
+  }, [parcelles, selectedGroupId, drawParcelleFromLatLngs, pendingColor, selectedParcelleId, clearSelectedParcelle]);
 
   const handleGroupChange = useCallback((groupId) => {
     setSelectedGroupId(groupId); setResultsOpen(false);
@@ -303,6 +336,12 @@ export default function Map() {
     const cropGroupId = targetParcelle?.groupId ? Number(targetParcelle.groupId) : selectedGroupId;
     if (!cropGroupId || !CULTURES_TO_STRATEGIES[cropGroupId]) {
       showToast("❌ Crop type not selected"); setIsAnalyzing(false); return;
+    }
+
+    if ((geometry.area || 0) > MAX_PARCEL_AREA_HA) {
+      showToast(`⚠️ Parcel too large: max ${MAX_PARCEL_AREA_HA} ha per parcel`);
+      setIsAnalyzing(false);
+      return;
     }
 
     const culture = CULTURES.find(c => c.id === cropGroupId);
@@ -345,6 +384,38 @@ export default function Map() {
         displayZones(data.zones, samplingMode);
         placeSamplePoints(data.zones, culture.color);
         setResultsOpen(true);
+
+        // Prefetch satellite metrics for the parcel polygon to warm the cache used by SoilDiagnostic
+        (async function prefetchSatelliteMetrics() {
+          try {
+            const safeCoords = polygonPoints;
+            const parcelKey = customName || (parcelleInfo && parcelleInfo.name) || "parcelle";
+            const coordsKey = JSON.stringify(safeCoords);
+            const cacheKey = `sat:${parcelKey}:${coordsKey}`;
+            // Do not block UI - check existing cache first
+            const raw = localStorage.getItem(cacheKey);
+            const CACHE_TTL = 1000 * 60 * 60 * 24;
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed?.ts && (Date.now() - parsed.ts) < CACHE_TTL) return; // fresh enough
+            }
+
+            const token = localStorage.getItem("token");
+            const resp = await fetch(`${API_BASE}/api/satellite/soil-metrics`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                ...(token ? { "Authorization": `Bearer ${token}` } : {})
+              },
+              body: JSON.stringify({ polygonPoints: safeCoords }),
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data })); } catch (e) { /* ignore quota */ }
+          } catch (err) {
+            console.warn('Prefetch satellite failed', err);
+          }
+        })();
 
         const totalPoints = data.zones.reduce((sum, z) => sum + (z.points?.length || 0), 0);
         const modeLabel = "standard";
@@ -457,6 +528,7 @@ export default function Map() {
           onSaveParcelle={handleSaveParcelle}
           onCancelDraw={handleCancelDraw}
           isAnalyzing={isAnalyzing}
+          maxParcelAreaHa={MAX_PARCEL_AREA_HA}
         />
         <MapView
           mapRef={mapRef}

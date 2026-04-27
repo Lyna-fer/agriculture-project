@@ -11,6 +11,8 @@ except ModuleNotFoundError:
     from constants import CROP_STRATEGIES, ECONOMIC_THRESHOLDS, USDA_SOIL
     from utils.geometry import safe_intersect
 
+MAX_PARCEL_AREA_HA = 50
+
 # ─── GEODESIC AREA HELPER (matches Turf.js exactly) ──────────────────────────────
 def calculate_area_hectares(coords: list[list[float]]) -> float:
     """
@@ -223,6 +225,8 @@ def run_sampling_pipeline(polygon_points: list[list[float]], crop_type: str, sam
 
     if total_area_ha < 0.1:
         raise ValueError(f"Area too small ({total_area_ha:.2f} ha) for satellite analysis.")
+    if total_area_ha > MAX_PARCEL_AREA_HA:
+        raise ValueError(f"Area too large ({total_area_ha:.2f} ha). Maximum is {MAX_PARCEL_AREA_HA} ha per parcel.")
 
     drawn_polygon = Polygon(coords)
     ee_polygon = ee.Geometry.Polygon([coords])

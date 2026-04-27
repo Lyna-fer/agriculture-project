@@ -106,6 +106,7 @@ export default function LeftPanel({
   onSaveParcelle,
   onCancelDraw,
   isAnalyzing = false,
+  maxParcelAreaHa = 50,
 }) {
   const canGenerate = !!selectedParcelle && !!selectedGroup;
   const totalArea = parcelles.reduce((s, p) => s + (p.area || 0), 0);
@@ -289,6 +290,7 @@ export default function LeftPanel({
         phase={drawPhase}
         parcelleInfo={pendingParcelleInfo}
         defaultColor={pendingColor}
+        maxParcelAreaHa={maxParcelAreaHa}
         onSave={onSaveParcelle}
         onCancel={onCancelDraw}
         existingNames={existingNames}

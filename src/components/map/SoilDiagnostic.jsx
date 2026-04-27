@@ -1,13 +1,14 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import "./SoilDiagnostic.css";
 import PortalOverlay from "./PortalOverlay";
 
 /* ─── Satellite defaults ─────────────────────────────────────────────────── */
-const SAT_DEFAULTS = { ce: 1.2, temp: 22, tex: "limon-argileux" };
+const SAT_DEFAULTS = { ce: 1.2, temp: 22, tex: "limon-argileux", om: "moyen" };
 const SAT_FIELDS   = {
   ce: "Landsat 8",
   temp: "MODIS (Terra/Aqua)",
   tex: "OpenLandMap / SoilGrids (Global Soil Map)",
+  om: "Sentinel-2 (NDVI / bare-soil proxy)",
 };
 const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
@@ -581,6 +582,8 @@ function buildLabRequestHtml({
   zoneNumber,
   totalZones,
   generatedAt,
+  includeEcTexture = true, // when false (economic tier) omit EC and texture tests
+  includeOrganicMatter = true,
 }) {
   const surface =
     parcelleHa > 0
@@ -747,6 +750,7 @@ function buildLabRequestHtml({
       merci de respecter les methodes d'extraction indiquees.
     </p>
 
+    ${includeEcTexture ? `
     <h2>1. Analyses physiques (texture)</h2>
     <ul class="checklist">
       <li>
@@ -769,14 +773,26 @@ function buildLabRequestHtml({
         <div class="method">Sur extrait de pate saturee (ou extrait 1:5 avec conversion explicite).</div>
       </li>
     </ul>
+    ` : `
+    <h2>1. Analyses chimiques (pH)</h2>
+    <ul class="checklist">
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        pH (potentiel hydrogene)
+        <div class="method">Mesure pH eau sur suspension sol/eau 1:5.</div>
+      </li>
+    </ul>
+    `}
 
     <h2>3. Statut organo-calcique</h2>
     <ul class="checklist">
+      ${includeOrganicMatter ? `
       <li>
         <span class="box" aria-hidden="true"></span>
         Matiere organique (%)
         <div class="method">Methode Anne ou Walkley-Black (oxydation au bichromate de potassium).</div>
       </li>
+      ` : ``}
       <li>
         <span class="box" aria-hidden="true"></span>
         Calcaire actif (%)
@@ -803,6 +819,20 @@ function buildLabRequestHtml({
       </li>
     </ul>
 
+    <h2>5. Risques environnementaux (metaux lourds)</h2>
+    <ul class="checklist">
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        Plomb (Pb) - concentration en mg/kg
+        <div class="method">Extraction acide totale, quantification par ICP-OES ou AAS.</div>
+      </li>
+      <li>
+        <span class="box" aria-hidden="true"></span>
+        Cadmium (Cd) - concentration en mg/kg
+        <div class="method">Extraction acide totale, quantification par ICP-OES ou AAS.</div>
+      </li>
+    </ul>
+
     <div class="foot">
       Merci d'indiquer sur le rapport final les unites de mesure, les methodes analytiques appliquees,
       ainsi que les seuils de reference utilises par le laboratoire.
@@ -811,6 +841,571 @@ function buildLabRequestHtml({
     <div class="sign">
       <div class="sign-box">Signature technicien laboratoire</div>
       <div class="sign-box">Signature demandeur / agriculteur</div>
+    </div>
+  </article>
+</body>
+</html>`;
+}
+
+function buildZoneReportHtml({
+  parcelleName,
+  parcelleHa,
+  cultureLabel,
+  zoneNumber,
+  totalZones,
+  generatedAt,
+  diagMode,
+  st,
+  crops = [],
+}) {
+  const state = st || {};
+  const surface =
+    parcelleHa > 0
+      ? `${parcelleHa < 0.1 ? (parcelleHa * 10000).toFixed(0) + " m2" : parcelleHa.toFixed(2) + " ha"}`
+      : "A renseigner";
+
+  const safeParcelle = escapeHtml(parcelleName || "Parcelle Agricole");
+  const safeCulture = escapeHtml(cultureLabel || "Culture non precisee");
+  const safeDate = escapeHtml(generatedAt);
+  const modeLabel = diagMode === "eco" ? "Eco" : "Standard";
+
+  const scored = Array.isArray(crops)
+    ? crops
+        .map(c => ({ ...c, sc: cropScore(c, state), adj: cropAdj(c, state) }))
+        .sort((a, b) => b.sc - a.sc)
+    : [];
+  const selectedCrop = state.crop ? scored.find(c => String(c.id) === String(state.crop)) : null;
+  const bestCrop = scored[0] || null;
+  const focusCrop = selectedCrop || bestCrop || null;
+  const contamination = isSoilToxic(state);
+  const score = calcScore(state, crops);
+  const scoreAccent = mc(score);
+  const scoreBg = mcBg(score);
+  const scoreLabel = contamination.isToxic
+    ? "Critical contamination"
+    : score >= 80
+    ? "Excellent zone"
+    : score >= 60
+    ? "Needs improvement"
+    : "At-risk zone";
+  const scoreNote = contamination.isToxic
+    ? "Heavy metals exceed safe thresholds and require remediation before cultivation."
+    : score >= 80
+    ? "The zone is structurally favorable and can be used with minor adjustments."
+    : score >= 60
+    ? "The zone can be cultivated after correcting the limiting factors listed below."
+    : "The zone needs corrective actions before it becomes reliable for planting.";
+
+  const metricRows = PARAMS.map((p) => {
+    const value = state[p.id];
+    const fit = pSt(p.id, value, focusCrop);
+    const label = statusLabel(p.id, value, focusCrop);
+    const color = fit === "ok" ? "#1a7a50" : fit === "lo" ? "#b06010" : "#c02020";
+    const bg = fit === "ok" ? "#e3f8ea" : fit === "lo" ? "#fff4d3" : "#ffe0e0";
+    const formatted = Number.isInteger(value) ? value : Number(value || 0).toFixed(1);
+    const target = focusCrop
+      ? `${pSt(p.id, value, focusCrop) === "ok" ? "Within target" : "Outside target"}`
+      : "Reference only";
+    return `
+      <tr>
+        <th>${escapeHtml(p.name)}</th>
+        <td>${escapeHtml(String(formatted))} <span class="unit">${escapeHtml(p.u)}</span></td>
+        <td><span class="pill" style="background:${bg};color:${color}">${escapeHtml(label)}</span></td>
+        <td>${escapeHtml(target)}</td>
+      </tr>
+    `;
+  }).join("");
+
+  const actionRows = (focusCrop?.adj || []).slice(0, 6).map((item) => `
+    <li><span class="bullet">•</span><span>${escapeHtml(item.t)}</span></li>
+  `).join("");
+
+  const cropCards = scored.slice(0, 5).map((crop, index) => {
+    const rank = index + 1;
+    const tone = rank === 1 ? "rank--top" : rank === 2 ? "rank--mid" : "rank--low";
+    const seasonMatch = crop?.ss?.includes(state.seas);
+    return `
+      <article class="crop-card ${tone}">
+        <div class="crop-head">
+          <div class="rank">#${rank}</div>
+          <div class="crop-emoji" style="background:${crop.bg}">${escapeHtml(crop.e)}</div>
+          <div class="crop-info">
+            <h3>${escapeHtml(crop.n)}</h3>
+            <p>${escapeHtml(crop.ar || crop.lat || crop.n)}</p>
+          </div>
+          <div class="crop-score">
+            <strong style="color:${mc(crop.sc)}">${crop.sc}/100</strong>
+            <span>compatibility</span>
+          </div>
+        </div>
+        <div class="crop-body">
+          <div class="tags">
+            <span class="tag">${rank === 1 ? "Best match" : "Alternative"}</span>
+            <span class="tag ${seasonMatch ? "tag--ok" : "tag--warn"}">${seasonMatch ? "Season match" : "Season gap"}</span>
+          </div>
+          <p>${escapeHtml(crop.note || "No note available.")}</p>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  const reportState = contamination.isToxic
+    ? `
+      <section class="alert alert--danger">
+        <div class="alert-icon">⚠</div>
+        <div>
+          <h2>Critical contamination detected</h2>
+          <p>Lead (Pb): ${contamination.pb} mg/kg ${contamination.pbExcess > 0 ? `( +${contamination.pbExcess.toFixed(1)} over limit )` : ""}<br />Cadmium (Cd): ${contamination.cd} mg/kg ${contamination.cdExcess > 0 ? `( +${contamination.cdExcess.toFixed(1)} over limit )` : ""}</p>
+        </div>
+      </section>
+      <ul class="action-list">
+        <li><span class="bullet">•</span><span>Confirm contamination sources with a detailed laboratory analysis.</span></li>
+        <li><span class="bullet">•</span><span>Apply remediation measures such as phytoremediation, soil replacement, or stabilization.</span></li>
+        <li><span class="bullet">•</span><span>Keep edible crops out of the zone until concentrations are reduced below safe thresholds.</span></li>
+        <li><span class="bullet">•</span><span>Document all corrective actions for traceability and future audits.</span></li>
+      </ul>
+    `
+    : `
+      <ul class="action-list">
+        ${actionRows || '<li><span class="bullet">•</span><span>No major correction is required for the current focus crop.</span></li>'}
+      </ul>
+    `;
+
+  return `<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rapport de zone - Analyse de sol</title>
+  <style>
+    :root {
+      --ink: #142235;
+      --ink-soft: #4b5e75;
+      --line: rgba(20, 34, 53, 0.14);
+      --paper: #ffffff;
+      --bg: #eef4f8;
+      --accent: #1d9e75;
+      --accent2: #2f8ef3;
+      --warning: #b06010;
+      --danger: #c02020;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      background:
+        radial-gradient(circle at top left, rgba(47, 142, 243, 0.14), transparent 26%),
+        radial-gradient(circle at 92% 8%, rgba(67, 212, 141, 0.16), transparent 24%),
+        var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", "Calibri", "Arial", sans-serif;
+      line-height: 1.5;
+    }
+    .sheet {
+      max-width: 1160px;
+      margin: 0 auto;
+      background: var(--paper);
+      border: 1px solid rgba(20, 34, 53, 0.08);
+      border-radius: 26px;
+      box-shadow: 0 24px 80px rgba(15, 24, 39, 0.12);
+      overflow: hidden;
+    }
+    .hero {
+      padding: 28px;
+      background:
+        linear-gradient(135deg, rgba(29, 158, 117, 0.16), rgba(47, 142, 243, 0.16)),
+        linear-gradient(180deg, #f9fcfe 0%, #eef8f4 100%);
+      border-bottom: 1px solid rgba(20, 34, 53, 0.08);
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: rgba(29, 158, 117, 0.12);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .hero h1 {
+      margin: 14px 0 10px;
+      font-size: 34px;
+      line-height: 1.08;
+      letter-spacing: -0.04em;
+    }
+    .hero p {
+      margin: 0;
+      max-width: 66ch;
+      color: var(--ink-soft);
+      font-size: 14px;
+    }
+    .meta-grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .meta-card {
+      border: 1px solid rgba(20, 34, 53, 0.08);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.78);
+      padding: 12px 14px;
+      box-shadow: 0 10px 20px rgba(15, 24, 39, 0.05);
+    }
+    .meta-card span { display: block; }
+    .meta-card .label {
+      color: var(--ink-soft);
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+    }
+    .meta-card .value {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .score-card {
+      border-radius: 22px;
+      padding: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.82));
+      border: 1px solid rgba(20, 34, 53, 0.08);
+      box-shadow: 0 18px 34px rgba(15, 24, 39, 0.08);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 100%;
+    }
+    .score-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .score-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: ${scoreBg};
+      color: ${scoreAccent};
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .score-value {
+      margin-top: 10px;
+      font-size: 54px;
+      line-height: 1;
+      font-weight: 900;
+      color: ${scoreAccent};
+      letter-spacing: -0.06em;
+    }
+    .score-subtitle {
+      margin: 4px 0 0;
+      color: var(--ink-soft);
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .score-note {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(20, 34, 53, 0.08);
+      color: var(--ink-soft);
+      font-size: 13px;
+    }
+    .section {
+      margin: 18px 18px 0;
+      border: 1px solid rgba(20, 34, 53, 0.08);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,253,255,0.96));
+      box-shadow: 0 12px 26px rgba(15, 24, 39, 0.05);
+      padding: 18px;
+    }
+    .section h2 {
+      margin: 0 0 12px;
+      font-size: 18px;
+      letter-spacing: -0.03em;
+      color: var(--ink);
+    }
+    .param-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      overflow: hidden;
+      border-radius: 16px;
+    }
+    .param-table th, .param-table td {
+      text-align: left;
+      padding: 12px 10px;
+      border-bottom: 1px solid rgba(20, 34, 53, 0.08);
+      vertical-align: top;
+    }
+    .param-table thead th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--ink-soft);
+      background: rgba(20, 34, 53, 0.03);
+    }
+    .param-table tbody tr:hover { background: rgba(47, 142, 243, 0.03); }
+    .unit { color: var(--ink-soft); font-size: 11px; }
+    .pill, .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .tag { background: rgba(47, 142, 243, 0.1); color: var(--accent2); }
+    .tag--ok { background: rgba(29, 158, 117, 0.12); color: var(--accent); }
+    .tag--warn { background: rgba(176, 96, 16, 0.12); color: var(--warning); }
+    .metric-note {
+      margin-top: 10px;
+      color: var(--ink-soft);
+      font-size: 12px;
+    }
+    .grid-two {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 18px;
+      margin: 18px;
+    }
+    .action-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 10px;
+    }
+    .action-list li {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 11px 12px;
+      border-radius: 14px;
+      background: rgba(47, 142, 243, 0.05);
+      border: 1px solid rgba(47, 142, 243, 0.08);
+      font-size: 13px;
+      color: var(--ink);
+    }
+    .bullet {
+      color: var(--accent);
+      font-weight: 900;
+      line-height: 1.2;
+      flex-shrink: 0;
+    }
+    .alert {
+      display: flex;
+      gap: 14px;
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(192, 32, 32, 0.18);
+      background: linear-gradient(135deg, rgba(192, 32, 32, 0.08), rgba(20, 34, 53, 0.03));
+      margin-bottom: 18px;
+    }
+    .alert--danger h2 {
+      margin: 0 0 6px;
+      color: var(--danger);
+      font-size: 18px;
+    }
+    .alert--danger p {
+      margin: 0;
+      color: var(--ink);
+      font-size: 13px;
+    }
+    .alert-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      background: rgba(192, 32, 32, 0.14);
+      color: var(--danger);
+      font-size: 20px;
+      font-weight: 900;
+    }
+    .crop-grid {
+      display: grid;
+      gap: 12px;
+    }
+    .crop-card {
+      border: 1px solid rgba(20, 34, 53, 0.08);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.94);
+      padding: 14px;
+    }
+    .rank--top { box-shadow: 0 12px 24px rgba(29, 158, 117, 0.08); }
+    .rank--mid { box-shadow: 0 10px 20px rgba(47, 142, 243, 0.05); }
+    .rank--low { box-shadow: 0 8px 18px rgba(20, 34, 53, 0.04); }
+    .crop-head {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .rank {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      font-weight: 900;
+      color: white;
+      background: linear-gradient(135deg, ${scoreAccent}, ${scoreAccent}cc);
+      flex-shrink: 0;
+    }
+    .crop-emoji {
+      width: 46px;
+      height: 46px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+    .crop-info h3 {
+      margin: 0 0 2px;
+      font-size: 15px;
+    }
+    .crop-info p, .crop-body p {
+      margin: 0;
+      color: var(--ink-soft);
+      font-size: 12px;
+    }
+    .crop-score {
+      margin-left: auto;
+      text-align: right;
+    }
+    .crop-score strong {
+      display: block;
+      font-size: 20px;
+      line-height: 1;
+    }
+    .crop-score span {
+      display: block;
+      color: var(--ink-soft);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 3px;
+    }
+    .crop-body {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(20, 34, 53, 0.08);
+    }
+    .tags {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .footer {
+      padding: 20px 28px 26px;
+      color: var(--ink-soft);
+      font-size: 12px;
+      border-top: 1px solid rgba(20, 34, 53, 0.08);
+      background: linear-gradient(180deg, rgba(247,250,253,0.88), rgba(238,246,242,0.95));
+    }
+    .footer strong { color: var(--ink); }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .sheet { border: none; border-radius: 0; box-shadow: none; }
+      .hero, .section, .footer { break-inside: avoid; }
+    }
+    @media (max-width: 900px) {
+      body { padding: 12px; }
+      .hero, .grid-two { grid-template-columns: 1fr; }
+      .meta-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <article class="sheet">
+    <header class="hero">
+      <div class="hero-main">
+        <div class="eyebrow">Zone report · ${escapeHtml(modeLabel)} mode</div>
+        <h1>Full zone report for ${safeParcelle}</h1>
+        <p>
+          This report summarizes the analyzed zone, the measured soil indicators, the crop fit score,
+          and the corrective actions needed before planting.
+        </p>
+
+        <div class="meta-grid">
+          <div class="meta-card"><span class="label">Parcel</span><span class="value">${safeParcelle}</span></div>
+          <div class="meta-card"><span class="label">Zone</span><span class="value">Zone ${zoneNumber} / ${totalZones}</span></div>
+          <div class="meta-card"><span class="label">Area</span><span class="value">${escapeHtml(surface)}</span></div>
+          <div class="meta-card"><span class="label">Target culture</span><span class="value">${safeCulture}</span></div>
+          <div class="meta-card"><span class="label">Season</span><span class="value">${escapeHtml(getSeasonLabel(state.seas))}</span></div>
+          <div class="meta-card"><span class="label">Generated</span><span class="value">${safeDate}</span></div>
+        </div>
+      </div>
+
+      <aside class="score-card">
+        <div>
+          <div class="score-top">
+            <div>
+              <div class="score-badge">Overall zone score</div>
+              <div class="score-value">${score}</div>
+            </div>
+            <div class="score-badge" style="background:${scoreBg};color:${scoreAccent}">${escapeHtml(scoreLabel)}</div>
+          </div>
+          <div class="score-subtitle">${escapeHtml(scoreNote)}</div>
+        </div>
+        <div class="score-note">
+          Focus crop: <strong>${escapeHtml(focusCrop?.n || "No crop selected")}</strong><br />
+          ${focusCrop ? `Compatibility score is calculated from the current zone state and crop requirements.` : `No crop profile was available, so the score reflects the most suitable general fit.`}
+        </div>
+      </aside>
+    </header>
+
+    <section class="section">
+      <h2>Measured parameters</h2>
+      <table class="param-table" aria-label="Zone parameter summary">
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Value</th>
+            <th>Status</th>
+            <th>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${metricRows}
+        </tbody>
+      </table>
+      <div class="metric-note">The status is computed against the current zone crop profile when available, otherwise it uses a general agronomic reference.</div>
+    </section>
+
+    <div class="grid-two">
+      <section class="section" style="margin:0;">
+        <h2>Priority actions</h2>
+        ${reportState}
+      </section>
+
+      <section class="section" style="margin:0;">
+        <h2>Best crop matches</h2>
+        <div class="crop-grid">
+          ${cropCards || '<div class="metric-note">No crop profiles were loaded for this report.</div>'}
+        </div>
+      </section>
+    </div>
+
+    <div class="footer">
+      <strong>Note:</strong> This report is meant to be downloaded, shared, and printed as a field-ready zone summary.
+      It complements the laboratory request and does not replace formal lab results.
     </div>
   </article>
 </body>
@@ -829,7 +1424,7 @@ const freshSt = (mode = "eco") => ({
   pb: 10,
   cd: 5,
   tex: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.tex : "limon-argileux",
-  mo: "moyen",
+  mo: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.om : "moyen",
   seas: seasonFromDate(toDateInputValue()),
   crop: "",
 });
@@ -890,7 +1485,7 @@ function Slider({ id, label, unit, min, max, step, value, onChange, zones, badge
 }
 
 /* ZONE FORM */
-function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultureLabel, onAnalyze, analyzing, hasResult, onPrintLabRequest }) {
+function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultureLabel, onAnalyze, analyzing, hasResult, onPrintLabRequest, onPrintLabRequestEco }) {
   // ✅ LOCK fields ONLY in Eco mode. Standard mode stays fully editable.
   const isSat = id => diagMode === "eco" && id in SAT_FIELDS;
   const seasonLabel = getSeasonLabel(st.seas);
@@ -915,14 +1510,24 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
         </div>
       )}
 
-      {/* Print Lab Request (Standard mode only) */}
+      {/* Print Lab Request */}
       {diagMode === "standard" && (
         <button className="sd-lab-request-btn" onClick={onPrintLabRequest}>
           <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
             <path d="M3 2h7v9H3z" stroke="currentColor" strokeWidth="1.4"/>
             <path d="M4.5 4.3h4M4.5 6.3h4M4.5 8.3h2.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
           </svg>
-          📄 Print Lab Request
+          📄 Download Lab Request
+        </button>
+      )}
+
+      {diagMode === "eco" && onPrintLabRequestEco && (
+        <button className="sd-lab-request-btn" onClick={onPrintLabRequestEco}>
+          <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+            <path d="M3 2h7v9H3z" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M4.5 4.3h4M4.5 6.3h4M4.5 8.3h2.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          </svg>
+          📄 Download Lab Request (Eco)
         </button>
       )}
 
@@ -988,7 +1593,18 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
             </div>
           </div>
           <div>
-            <div className="sd-col-lbl">Organic Matter</div>
+            <div className="sd-col-lbl">
+              Organic Matter
+              {isSat("om") && (
+                <span className="sd-sat-tag" style={{marginLeft:5}}>
+                  <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
+                    <circle cx="3.5" cy="3.5" r="2.8" stroke="currentColor" strokeWidth="1.1" />
+                    <circle cx="3.5" cy="3.5" r="1" fill="currentColor" />
+                  </svg>
+                  {SAT_FIELDS.om}
+                </span>
+              )}
+            </div>
             <div className="sd-opts">
               {[
                 {val:"tres-bas",label:"Very low <1%"},
@@ -998,8 +1614,8 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
                 {val:"excellent",label:"Excellent >6%"},
               ].map(o => (
                 <div key={o.val}
-                  className={`sd-opt ${st.mo===o.val?"sd-opt--on":""}`}
-                  onClick={() => onChange("mo", o.val)}>
+                  className={`sd-opt ${st.mo===o.val?"sd-opt--on":""} ${isSat("om")?"sd-opt--locked":""}`}
+                  onClick={() => !isSat("om") && onChange("mo", o.val)}>
                   <div className="sd-opt-r"><div className="sd-opt-dot" /></div>
                   <div><div className="sd-opt-lbl">{o.label}</div></div>
                 </div>
@@ -1437,11 +2053,13 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
           </svg>
           Edit
         </button>
-        <button className="sd-act sd-act-p" onClick={onDownloadReport}>
+        <button className="sd-act sd-act-p sd-act-p--report" onClick={onDownloadReport}>
           <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
-            <path d="M6.5 1v8M3 7l3.5 3.5L10 7M1 12h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M6.5 1v6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M4 5.5l2.5 2.5L9 5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M2 11.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
-          Download Report
+          Download Full Report
         </button>
         {nZones > 1 && zoneIdx < nZones - 1 && (
           <button
@@ -1482,6 +2100,8 @@ export default function SoilDiagnostic({
   const [windByMonth, setWindByMonth] = useState({});
   const [zoneStates,  setZoneStates]  = useState(() => Array.from({length: Math.max(1,nZones)}, () => freshSt(initialDiagMode)));
   const [zoneResults, setZoneResults] = useState(() => Array(Math.max(1,nZones)).fill(null));
+  // In-memory cache for satellite responses to avoid repeated network calls
+  const satCacheRef = useRef(new Map());
   const n = Math.max(1, nZones);
 
   const CROPS = useMemo(() => rawCrops.map(toCrop), [rawCrops]);
@@ -1554,60 +2174,123 @@ export default function SoilDiagnostic({
   /* ✅ FIXED: Fetch satellite data in BOTH eco AND standard mode */
   useEffect(() => {
     const fetchSatelliteData = async () => {
-      // ✅ FIX: Removed `!parcelle?.id` check.
-      // New parcels don't have an ID yet, but the satellite API only needs coordinates.
       if (!open || (diagMode !== "eco" && diagMode !== "standard") || !parcelle?.latlngs?.length) return;
 
       // Only fetch if values are still defaults (avoids overwriting user edits)
       const currentSt = zoneStates[activeZone];
-      if (currentSt.ce !== SAT_DEFAULTS.ce || currentSt.temp !== SAT_DEFAULTS.temp) return;
+      if (
+        currentSt.ce !== SAT_DEFAULTS.ce ||
+        currentSt.temp !== SAT_DEFAULTS.temp ||
+        currentSt.mo !== SAT_DEFAULTS.om
+      ) return;
 
-      const token = localStorage.getItem("token");
+      // Normalize coordinates
+      const safeCoords = parcelle.latlngs.map(pt => Array.isArray(pt) ? pt : [pt.lat, pt.lng]);
+
+      // Cache strategy: store responses in localStorage with a TTL so we can render instantly
+      const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
+      const parcelKey = (parcelle && parcelle.name) ? parcelle.name : (parcelleName || "parcelle");
+      const coordsKey = JSON.stringify(safeCoords);
+      const cacheKey = `sat:${parcelKey}:${coordsKey}`;
 
       try {
-        // ✅ FIX: Normalize coordinates to prevent 422 errors.
-        // Backend expects [[lat, lng], ...]. New parcels often have [{lat, lng}, ...].
-        const safeCoords = parcelle.latlngs.map(pt => {
-          if (Array.isArray(pt)) return pt; // Already [lat, lng]
-          return [pt.lat, pt.lng];          // Convert {lat, lng} to [lat, lng]
-        });
-
-        const response = await fetch(
-          `${API_BASE}/api/satellite/soil-metrics`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { "Authorization": `Bearer ${token}` } : {})
-            },
-            body: JSON.stringify({
-              polygonPoints: safeCoords
-            })
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log("🛰️ Satellite data fetched:", data);
-
+        // Check in-memory cache first
+        const mem = satCacheRef.current.get(cacheKey);
+        if (mem && mem.ts && (Date.now() - mem.ts) < CACHE_TTL && mem.data) {
+          const data = mem.data;
           setZoneStates(prev => {
             const next = [...prev];
+            const satelliteOmLevel = data.organicMatter?.level ?? next[activeZone].mo;
             next[activeZone] = {
               ...next[activeZone],
               ce: data.salinity?.ec_dS_m ?? next[activeZone].ce,
               temp: data.temperature?.celsius ?? next[activeZone].temp,
               tex: mapSoilTypeToTexture(data.texture?.label) ?? next[activeZone].tex,
+              mo: satelliteOmLevel,
             };
             return next;
           });
+        } else {
+          const raw = localStorage.getItem(cacheKey);
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              if (parsed?.ts && (Date.now() - parsed.ts) < CACHE_TTL && parsed?.data) {
+                const data = parsed.data;
+                // Apply cached data immediately
+                setZoneStates(prev => {
+                  const next = [...prev];
+                  const satelliteOmLevel = data.organicMatter?.level ?? next[activeZone].mo;
+                  next[activeZone] = {
+                    ...next[activeZone],
+                    ce: data.salinity?.ec_dS_m ?? next[activeZone].ce,
+                    temp: data.temperature?.celsius ?? next[activeZone].temp,
+                    tex: mapSoilTypeToTexture(data.texture?.label) ?? next[activeZone].tex,
+                    mo: satelliteOmLevel,
+                  };
+                  return next;
+                });
+                // populate mem cache
+                try { satCacheRef.current.set(cacheKey, { ts: parsed.ts, data: parsed.data }); } catch (e) { /* ignore */ }
+              }
+            } catch (err) {
+              console.warn('sat cache parse failed', err);
+            }
+          }
         }
+
+        const token = localStorage.getItem("token");
+        const controller = new AbortController();
+        const signal = controller.signal;
+
+        const resp = await fetch(`${API_BASE}/api/satellite/soil-metrics`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { "Authorization": `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ polygonPoints: safeCoords }),
+          signal,
+        });
+
+        if (!resp.ok) {
+          // Don't throw for aborted
+          if (resp.status === 0) return;
+          console.warn('Satellite response not ok', resp.statusText);
+          return;
+        }
+
+        const fresh = await resp.json();
+        // store in cache (localStorage + in-memory)
+        try { localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: fresh })); } catch (e) { /* ignore quota errors */ }
+        try { satCacheRef.current.set(cacheKey, { ts: Date.now(), data: fresh }); } catch (e) { /* ignore */ }
+
+        // apply fresh data
+        setZoneStates(prev => {
+          const next = [...prev];
+          const satelliteOmLevel = fresh.organicMatter?.level ?? next[activeZone].mo;
+          next[activeZone] = {
+            ...next[activeZone],
+            ce: fresh.salinity?.ec_dS_m ?? next[activeZone].ce,
+            temp: fresh.temperature?.celsius ?? next[activeZone].temp,
+            tex: mapSoilTypeToTexture(fresh.texture?.label) ?? next[activeZone].tex,
+            mo: satelliteOmLevel,
+          };
+          return next;
+        });
+
+        // cleanup controller on success
+        controller.abort();
       } catch (error) {
+        if (error.name === 'AbortError') return;
         console.warn("⚠️ Satellite fetch failed:", error);
       }
     };
 
     if (open) {
+      const mounted = { v: true };
       fetchSatelliteData();
+      return () => { mounted.v = false; };
     }
   }, [open, parcelle, diagMode, activeZone, zoneStates]);
 
@@ -1705,6 +2388,77 @@ export default function SoilDiagnostic({
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, [activeZone, cultureLabel, n, parcelleHa, parcelleName]);
+
+  const handlePrintLabRequestEco = useCallback(() => {
+    const now = new Date();
+    const dateLabel = now.toLocaleDateString("fr-FR", {
+      year: "numeric",
+      month: "long",
+      day: "2-digit",
+    });
+
+    const html = buildLabRequestHtml({
+      parcelleName,
+      parcelleHa,
+      cultureLabel,
+      zoneNumber: activeZone + 1,
+      totalZones: n,
+      generatedAt: dateLabel,
+      includeEcTexture: false, // economic variant: omit EC and texture
+      includeOrganicMatter: false,
+    });
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const parcelSlug = (parcelleName || "parcelle")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || "parcelle";
+    a.href = url;
+    a.download = `bordereau-analyse-sol-${parcelSlug}-zone-${activeZone + 1}-eco.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [activeZone, cultureLabel, n, parcelleHa, parcelleName]);
+
+  const handleDownloadZoneReport = useCallback(() => {
+    const now = new Date();
+    const dateLabel = now.toLocaleDateString("fr-FR", {
+      year: "numeric",
+      month: "long",
+      day: "2-digit",
+    });
+
+    const zoneState = zoneResults[activeZone] || zoneStates[activeZone] || freshSt(diagMode);
+    const parcelNameForReport = (parcelle && parcelle.name) ? parcelle.name : parcelleName;
+    const html = buildZoneReportHtml({
+      parcelleName: parcelNameForReport,
+      parcelleHa,
+      cultureLabel,
+      zoneNumber: activeZone + 1,
+      totalZones: n,
+      generatedAt: dateLabel,
+      diagMode,
+      st: zoneState,
+      crops: CROPS,
+    });
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const parcelSlug = (parcelNameForReport || parcelleName || "parcelle")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || "parcelle";
+    a.href = url;
+    a.download = `rapport-zone-${parcelSlug}-zone-${activeZone + 1}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [CROPS, activeZone, cultureLabel, diagMode, n, parcelleHa, parcelleName, zoneResults, zoneStates]);
 
   if (!open) return null;
 
@@ -1826,7 +2580,7 @@ export default function SoilDiagnostic({
               analyzing={analyzing}
               hasResult={!!result}
               onPrintLabRequest={handlePrintLabRequest}
-            />
+              onPrintLabRequestEco={handlePrintLabRequestEco} />
 
             <div className="sd-rc">
               {!result ? (
@@ -1855,7 +2609,7 @@ export default function SoilDiagnostic({
                   zoneIdx={activeZone}
                   nZones={n}
                   onNext={() => setActiveZone(prev => Math.min(n - 1, prev + 1))}
-                  onDownloadReport={handlePrintLabRequest}
+                    onDownloadReport={handleDownloadZoneReport}
                 />
               )}
             </div>

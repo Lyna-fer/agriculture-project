@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
-export function useMap({ onParcelleChange }) {
+export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const drawnItemsRef = useRef(null);
@@ -103,6 +103,12 @@ export function useMap({ onParcelleChange }) {
 
       if (e.layerType === "polygon" || e.layerType === "rectangle") {
         const stats = computeStats(e.layer);
+        if (stats.area > maxParcelAreaHa) {
+          drawnItems.clearLayers();
+          parcelleLayerRef.current = null;
+          onParcelleChange({ type: "oversize", limitHa: maxParcelAreaHa, ...stats });
+          return;
+        }
         onParcelleChange({ type: e.layerType, layer: e.layer, ...stats });
         const bounds = e.layer.getBounds();
         let zoom = map.getBoundsZoom(bounds);
@@ -317,6 +323,11 @@ export function useMap({ onParcelleChange }) {
       console.error("❌ Error drawing parcelle from latlngs:", error);
       return null;
     }
+  }, []);
+
+  const clearSelectedParcelle = useCallback(() => {
+    if (drawnItemsRef.current) drawnItemsRef.current.clearLayers();
+    parcelleLayerRef.current = null;
   }, []);
 
   const placeSamplePoints = useCallback((zones, color) => {
@@ -551,6 +562,7 @@ export function useMap({ onParcelleChange }) {
     drawParcelleFromLatLngs,
     drawAllParcelles,
     clearAllParcelles,
+    clearSelectedParcelle,
     setSamplingMarkers,
     clearSamplingMarkers,
   };

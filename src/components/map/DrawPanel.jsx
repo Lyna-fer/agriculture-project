@@ -134,6 +134,7 @@ export default function DrawPanel({
   phase,
   parcelleInfo,
   defaultColor,
+  maxParcelAreaHa = 50,
   onSave,
   onCancel,
   existingNames = [],
@@ -154,7 +155,9 @@ export default function DrawPanel({
     (existingName) => existingName.toLowerCase() === name.trim().toLowerCase()
   );
 
-  const canSave = name.trim().length > 0 && !!groupId && !isNameTaken;
+  const areaHa = parcelleInfo?.area || 0;
+  const isAreaTooLarge = areaHa > maxParcelAreaHa;
+  const canSave = name.trim().length > 0 && !!groupId && !isNameTaken && !isAreaTooLarge;
   const selGroup = CULTURES.find((g) => g.id === groupId);
 
   return (
@@ -212,6 +215,12 @@ export default function DrawPanel({
               {fmtArea(parcelleInfo.areaM2 || parcelleInfo.area * 10000)}
             </div>
           </div>
+
+          {isAreaTooLarge && (
+            <div style={{ color: "#c0392b", fontSize: "12px", fontWeight: 700, marginBottom: "10px" }}>
+              Maximum parcel size is {maxParcelAreaHa} ha. Please draw a smaller parcel.
+            </div>
+          )}
 
           <div className="dp-preview-wrap">
             <ParcellePreview
