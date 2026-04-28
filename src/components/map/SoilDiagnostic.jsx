@@ -2135,11 +2135,11 @@ function zoneGeometryToPoints(zone) {
 }
 
 function getHeatTone(score) {
-  if (score >= 85) return { fill: "rgba(24, 132, 85, 0.76)", stroke: "#0d6b46", label: "Optimal" };
-  if (score >= 70) return { fill: "rgba(77, 182, 101, 0.7)", stroke: "#23854b", label: "Healthy" };
-  if (score >= 55) return { fill: "rgba(249, 190, 62, 0.72)", stroke: "#c8870d", label: "Watch" };
-  if (score >= 40) return { fill: "rgba(242, 130, 52, 0.76)", stroke: "#d1621c", label: "Low" };
-  return { fill: "rgba(214, 58, 47, 0.78)", stroke: "#9e2018", label: "Critical" };
+  if (score >= 85) return { fill: "rgba(132, 214, 155, 0.30)", stroke: "#69b685", label: "Optimal" };
+  if (score >= 70) return { fill: "rgba(181, 230, 188, 0.28)", stroke: "#8bc89b", label: "Healthy" };
+  if (score >= 55) return { fill: "rgba(248, 211, 147, 0.30)", stroke: "#d8ae63", label: "Watch" };
+  if (score >= 40) return { fill: "rgba(246, 187, 120, 0.30)", stroke: "#e09047", label: "Low" };
+  return { fill: "rgba(245, 168, 168, 0.30)", stroke: "#d96e6e", label: "Critical" };
 }
 
 function buildMapExportUrl(bounds, size, service) {
@@ -2222,6 +2222,7 @@ function formatDelta(current, previous, digits = 0) {
 
 function DashboardView({
   parcelle,
+  parcelleHa,
   parcelImageUrls,
   zoneResults,
   zones,
@@ -2237,6 +2238,105 @@ function DashboardView({
   const activeZoneResult = zoneResults[activeZone] || null;
   const currentSnapshot = currentAnalysis || null;
   const previousSnapshot = null;
+  const hasLastAnalysis = Boolean(previousSnapshot);
+  const currentAnalysisMetrics = [
+    {
+      key: "ph",
+      label: "Soil pH",
+      value: activeZoneResult?.ph,
+      unit: "pH",
+      tone: "green",
+      format: (value) => Number(value).toFixed(1),
+    },
+    {
+      key: "ce",
+      label: "Salinity (EC)",
+      value: activeZoneResult?.ce,
+      unit: "dS/m",
+      tone: "green",
+      format: (value) => Number(value).toFixed(1),
+    },
+    {
+      key: "n",
+      label: "Nitrogen",
+      value: activeZoneResult?.n,
+      unit: "kg/ha",
+      tone: "green",
+      format: (value) => Math.round(Number(value)),
+    },
+    {
+      key: "p",
+      label: "Phosphorus",
+      value: activeZoneResult?.p,
+      unit: "kg/ha",
+      tone: "green",
+      format: (value) => Math.round(Number(value)),
+    },
+    {
+      key: "k",
+      label: "Potassium",
+      value: activeZoneResult?.k,
+      unit: "kg/ha",
+      tone: "green",
+      format: (value) => Math.round(Number(value)),
+    },
+    {
+      key: "lime",
+      label: "Active lime",
+      value: activeZoneResult?.lime,
+      unit: "%",
+      tone: "green",
+      format: (value) => Math.round(Number(value)),
+    },
+    {
+      key: "temp",
+      label: "Temperature",
+      value: activeZoneResult?.temp,
+      unit: "°C",
+      tone: "green",
+      format: (value) => Number(value).toFixed(1),
+    },
+    {
+      key: "wind",
+      label: "Wind",
+      value: activeZoneResult?.wind,
+      unit: "km/h",
+      tone: "green",
+      format: (value) => Math.round(Number(value)),
+    },
+    {
+      key: "tex",
+      label: "Texture",
+      value: activeZoneResult?.tex,
+      unit: "",
+      tone: "green",
+      format: (value) => SOIL_TEXTURE_LABEL[value] || value || "—",
+    },
+    {
+      key: "mo",
+      label: "Organic matter",
+      value: activeZoneResult?.mo,
+      unit: "",
+      tone: "green",
+      format: (value) => value || "—",
+    },
+    {
+      key: "pb",
+      label: "Lead (Pb)",
+      value: activeZoneResult?.pb,
+      unit: "mg/kg",
+      tone: "green",
+      format: (value) => Math.round(Number(value)),
+    },
+    {
+      key: "cd",
+      label: "Cadmium (Cd)",
+      value: activeZoneResult?.cd,
+      unit: "mg/kg",
+      tone: "green",
+      format: (value) => Math.round(Number(value)),
+    },
+  ];
   const zoneCards = zoneResults.map((zone, index) => {
     const score = calcScore(zone, crops);
     const tone = getHeatTone(score);
@@ -2253,18 +2353,13 @@ function DashboardView({
   });
   const bestZone = [...zoneCards].sort((a, b) => b.score - a.score)[0];
   const worstZone = [...zoneCards].sort((a, b) => a.score - b.score)[0];
+  const activeZoneScore = activeZoneResult ? calcScore(activeZoneResult, crops) : 0;
+  const maturityLevel = zoneCards[activeZone]?.tone?.label || "Pending";
   const nutrientCards = [
     { key: "avgN", label: "N", value: activeZoneResult?.n, prev: null, unit: "kg/ha" },
     { key: "avgP", label: "P", value: activeZoneResult?.p, prev: null, unit: "kg/ha" },
     { key: "avgK", label: "K", value: activeZoneResult?.k, prev: null, unit: "kg/ha" },
     { key: "avgPh", label: "pH", value: activeZoneResult?.ph, prev: null, unit: "" },
-  ];
-  const historyRows = [
-    { key: "avgP", label: "Phosphorus", color: "#b8d07a", unit: "kg/ha", current: activeZoneResult?.p, previous: null, format: (value) => Number(value || 0).toFixed(1) },
-    { key: "avgK", label: "Potassium", color: "#86b86b", unit: "kg/ha", current: activeZoneResult?.k, previous: null, format: (value) => Number(value || 0).toFixed(1) },
-    { key: "avgN", label: "Nitrogen", color: "#d0e08c", unit: "kg/ha", current: activeZoneResult?.n, previous: null, format: (value) => Number(value || 0).toFixed(1) },
-    { key: "avgPh", label: "Acidity", color: "#f6d96b", unit: "pH", current: activeZoneResult?.ph, previous: null, format: (value) => Number(value || 0).toFixed(1) },
-    { key: "avgScore", label: "Soil Rating", color: "#f0b26d", unit: "/100", current: activeZoneResult ? calcScore(activeZoneResult, crops) : null, previous: null, format: (value) => `${Math.round(Number(value || 0))}` },
   ];
 
   return (
@@ -2381,6 +2476,45 @@ function DashboardView({
         </div>
 
         <div className="sd-dashboard-side">
+          <div className="sd-side-card sd-yield-card">
+            <div className="sd-yield-card-head">
+              <div>
+                <div className="sd-card-kicker">Yield</div>
+                <div className="sd-yield-title">Current zone summary</div>
+              </div>
+              <div className="sd-yield-zone-pill">Zone {activeZone + 1}</div>
+            </div>
+
+            <div className="sd-yield-layout">
+              <div className="sd-yield-ring">
+                <div className="sd-yield-ring-track" />
+                <div
+                  className="sd-yield-ring-progress"
+                  style={{ background: `conic-gradient(#69b685 0deg, #d5e7ac ${Math.max(30, activeZoneScore * 3.6)}deg, rgba(27,34,48,.08) ${Math.max(30, activeZoneScore * 3.6)}deg 360deg)` }}
+                />
+                <div className="sd-yield-ring-inner">
+                  <span>Yield</span>
+                  <strong>{activeZoneScore}/100</strong>
+                </div>
+              </div>
+
+              <div className="sd-yield-info">
+                <div className="sd-yield-info-row">
+                  <span>Phase</span>
+                  <strong>{maturityLevel}</strong>
+                </div>
+                <div className="sd-yield-info-row">
+                  <span>Size</span>
+                  <strong>{parcelleHa ? `${parcelleHa.toFixed(2)} ha` : "—"}</strong>
+                </div>
+                <div className="sd-yield-info-row">
+                  <span>Current analysis</span>
+                  <strong>{activeZoneResult ? "Available" : "Pending"}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="sd-side-card">
             <div className="sd-card-kicker">Insights</div>
             <div className="sd-insight-list">
@@ -2414,30 +2548,33 @@ function DashboardView({
             </div>
 
             <div className="sd-history-list">
-              {historyRows.map((item) => {
-                const currentValue = Number(item.current ?? 0);
-                const previousValue = item.previous == null ? null : Number(item.previous ?? 0);
-                const maxValue = Math.max(currentValue, previousValue ?? 0, item.key === "avgPh" ? 14 : item.key === "avgScore" ? 100 : 1);
-                const currentWidth = Math.max(12, Math.min(100, (currentValue / maxValue) * 100 || 0));
-                const previousWidth = previousValue == null ? 0 : Math.max(12, Math.min(100, (previousValue / maxValue) * 100 || 0));
+              {currentAnalysisMetrics.map((item) => {
+                const displayValue = item.value;
+                const hasValue = displayValue !== null && displayValue !== undefined && displayValue !== "";
 
                 return (
                   <div key={item.key} className="sd-history-row">
                     <div className="sd-history-row-meta">
-                      <div className="sd-history-dot" style={{ background: item.color }} />
+                      <div className={`sd-history-dot sd-history-dot--${item.tone}`} />
                       <div className="sd-history-row-title-wrap">
                         <div className="sd-history-row-title">{item.label}</div>
-                        <div className="sd-history-row-subtitle">per hectare</div>
+                        <div className="sd-history-row-subtitle">per zone</div>
                       </div>
                       <div className="sd-history-row-values">
-                        <strong>{Number.isFinite(currentValue) ? item.format(currentValue) : "—"}</strong>
-                        <small>{previousValue == null ? "" : item.format(previousValue)}</small>
+                        <strong>{hasValue ? item.format(displayValue) : "—"}</strong>
+                        <small></small>
                       </div>
                     </div>
 
                     <div className="sd-history-bars">
-                      <div className="sd-history-bar sd-history-bar--current" style={{ width: `${currentWidth}%`, background: item.color }} />
-                      <div className="sd-history-bar sd-history-bar--last" style={{ width: `${previousWidth}%` }} />
+                      <div className={`sd-history-bar sd-history-bar--current sd-history-bar--${item.tone}`}>
+                        <span>{hasValue ? (item.unit ? `${item.format(displayValue)} ${item.unit}` : item.format(displayValue)) : "—"}</span>
+                      </div>
+                      {hasLastAnalysis && (
+                        <div className="sd-history-bar sd-history-bar--last sd-history-bar--empty">
+                          <span>Last analysis</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
