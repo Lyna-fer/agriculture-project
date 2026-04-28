@@ -549,6 +549,27 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
     [clearZones],
   );
 
+  const getMapSnapshot = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return null;
+    const bounds = map.getBounds();
+    const size = map.getSize();
+    return {
+      bounds: {
+        minLat: bounds.getSouth(),
+        maxLat: bounds.getNorth(),
+        minLng: bounds.getWest(),
+        maxLng: bounds.getEast(),
+      },
+      size: {
+        width: Math.max(640, Math.round(size.x || 0)),
+        height: Math.max(420, Math.round(size.y || 0)),
+      },
+      zoom: map.getZoom(),
+      center: map.getCenter(),
+    };
+  }, []);
+
   return {
     mapRef,
     mapReady,
@@ -558,6 +579,7 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
     clearZones,
     activateDrawTool,
     clearAll,
+    getMapSnapshot,
     flyToWilaya,
     drawParcelleFromLatLngs,
     drawAllParcelles,

@@ -44,6 +44,8 @@ export default function ResultsPanel({
   region     = "",
   samplingMode = "standard",
   parcelle   = null,
+  mapSnapshot = null,
+  zones      = [],
   nZones     = 1,   // received from map.jsx (data.zones.length from backend)
   onStartSampling,
 }) {
@@ -261,10 +263,12 @@ export default function ResultsPanel({
         <SoilDiagnostic
           open={diagOpen}
           onClose={()=>setDiagOpen(false)}
-          parcelleName={region||"Parcel A"}
+          parcelleName={parcelle?.name || region || "Parcel A"}
           parcelleHa={parcelleHa}
           cultureGroupId={cultureId}
           parcelle={parcelle}
+          mapSnapshot={mapSnapshot}
+          zones={zones}
           nZones={effectiveZones}
           initialDiagMode={initialDiagMode}
         />

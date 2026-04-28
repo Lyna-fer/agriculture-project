@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import "./SoilDiagnostic.css";
 import PortalOverlay from "./PortalOverlay";
+import satelliteFallback from "../../assets/satellite.png";
 
 /* ─── Satellite defaults ─────────────────────────────────────────────────── */
 const SAT_DEFAULTS = { ce: 1.2, temp: 22, tex: "limon-argileux", om: "moyen" };
@@ -1721,7 +1722,10 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
 }
 
 /* RESULTS VIEW - ✅ FIXED WITH CONTAMINATION WARNING */
-function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNext,onDownloadReport }) {
+function ResultsView({
+  st, onReset, crops, diagMode, color, zoneIdx, nZones, onNext, onDownloadReport,
+  onOpenDashboard, showDashboardAction = false,
+}) {
   // ✅ NEW: Check for severe contamination (Pb>800 OR Cd>15)
   const contamination = isSoilToxic(st);
 
@@ -2061,6 +2065,17 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
           </svg>
           Download Full Report
         </button>
+        {showDashboardAction && (
+          <button className="sd-act sd-act-s sd-act-dashboard" onClick={onOpenDashboard}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1.2" y="1.2" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
+              <rect x="6.8" y="1.2" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
+              <rect x="1.2" y="6.8" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
+              <rect x="6.8" y="6.8" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
+            </svg>
+            Dashboard
+          </button>
+        )}
         {nZones > 1 && zoneIdx < nZones - 1 && (
           <button
             className="sd-act sd-act-next"
@@ -2083,6 +2098,358 @@ function ResultsView({ st, onReset, crops, diagMode, color ,zoneIdx,nZones,onNex
   );
 }
 
+function normalizeLatLngPoint(point) {
+  if (Array.isArray(point)) return { lat: Number(point[0]), lng: Number(point[1]) };
+  return { lat: Number(point?.lat), lng: Number(point?.lng) };
+}
+
+function getParcelBounds(latlngs = []) {
+  const pts = latlngs.map(normalizeLatLngPoint).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+  if (!pts.length) {
+    return { minLat: 0, maxLat: 1, minLng: 0, maxLng: 1 };
+  }
+  return {
+    minLat: Math.min(...pts.map((p) => p.lat)),
+    maxLat: Math.max(...pts.map((p) => p.lat)),
+    minLng: Math.min(...pts.map((p) => p.lng)),
+    maxLng: Math.max(...pts.map((p) => p.lng)),
+  };
+}
+
+function projectPointToBounds(point, bounds, width, height, padding = 18) {
+  const p = normalizeLatLngPoint(point);
+  const rangeLng = Math.max(bounds.maxLng - bounds.minLng, 0.00001);
+  const rangeLat = Math.max(bounds.maxLat - bounds.minLat, 0.00001);
+  const usableWidth = width - padding * 2;
+  const usableHeight = height - padding * 2;
+  return {
+    x: padding + ((p.lng - bounds.minLng) / rangeLng) * usableWidth,
+    y: height - padding - ((p.lat - bounds.minLat) / rangeLat) * usableHeight,
+  };
+}
+
+function zoneGeometryToPoints(zone) {
+  const ring = zone?.geoJson?.geometry?.coordinates?.[0];
+  if (!Array.isArray(ring)) return [];
+  return ring.map(([lng, lat]) => ({ lat: Number(lat), lng: Number(lng) }));
+}
+
+function getHeatTone(score) {
+  if (score >= 85) return { fill: "rgba(24, 132, 85, 0.76)", stroke: "#0d6b46", label: "Optimal" };
+  if (score >= 70) return { fill: "rgba(77, 182, 101, 0.7)", stroke: "#23854b", label: "Healthy" };
+  if (score >= 55) return { fill: "rgba(249, 190, 62, 0.72)", stroke: "#c8870d", label: "Watch" };
+  if (score >= 40) return { fill: "rgba(242, 130, 52, 0.76)", stroke: "#d1621c", label: "Low" };
+  return { fill: "rgba(214, 58, 47, 0.78)", stroke: "#9e2018", label: "Critical" };
+}
+
+function buildMapExportUrl(bounds, size, service) {
+  if (!bounds) return "";
+  const bbox = [bounds.minLng, bounds.minLat, bounds.maxLng, bounds.maxLat].join(",");
+  const width = Math.max(640, Math.round(size?.width || 1200));
+  const height = Math.max(420, Math.round(size?.height || 900));
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/${service}/MapServer/export?bbox=${bbox}&bboxSR=4326&imageSR=4326&size=${width},${height}&format=png32&transparent=true&f=image`;
+}
+
+function buildParcelImageUrls(latlngs = [], mapSnapshot = null) {
+  const bounds = mapSnapshot?.bounds || getParcelBounds(latlngs);
+  const size = mapSnapshot?.size || { width: 1200, height: 900 };
+  return {
+    imagery: buildMapExportUrl(bounds, size, "World_Imagery"),
+    reference: buildMapExportUrl(bounds, size, "Reference/World_Boundaries_and_Places"),
+  };
+}
+
+function averageMetric(zoneResults, key, parser = Number) {
+  const values = zoneResults
+    .filter(Boolean)
+    .map((zone) => parser(zone[key]))
+    .filter((value) => Number.isFinite(value));
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function getHistoryKey(parcelleName, parcelle, cultureGroupId) {
+  const coords = JSON.stringify((parcelle?.latlngs || []).map((pt) => normalizeLatLngPoint(pt)));
+  return `soil-dashboard-history:${cultureGroupId}:${parcelleName || "parcel"}:${coords}`;
+}
+
+function getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId) {
+  const coords = JSON.stringify((parcelle?.latlngs || []).map((pt) => normalizeLatLngPoint(pt)));
+  return `soil-dashboard-current-analysis:${cultureGroupId}:${parcelleName || "parcel"}:${coords}`;
+}
+
+function buildAnalysisSnapshot({ zoneResults, crops, parcelleName, parcelleHa, cultureLabel }) {
+  const completed = zoneResults.filter(Boolean);
+  const scores = completed.map((zone, index) => ({
+    zone: index + 1,
+    score: calcScore(zone, crops),
+    ph: Number(zone.ph),
+    ce: Number(zone.ce),
+    n: Number(zone.n),
+    p: Number(zone.p),
+    k: Number(zone.k),
+    temp: Number(zone.temp),
+    lime: Number(zone.lime),
+  }));
+  const avgScore = scores.length
+    ? Math.round(scores.reduce((sum, item) => sum + item.score, 0) / scores.length)
+    : 0;
+  const fingerprint = scores.map((item) => `${item.zone}:${item.score}:${item.ph}:${item.n}:${item.p}:${item.k}`).join("|");
+  return {
+    id: `${Date.now()}-${fingerprint}`,
+    timestamp: new Date().toISOString(),
+    parcelleName,
+    parcelleHa,
+    cultureLabel,
+    avgScore,
+    zoneCount: completed.length,
+    scores,
+    avgPh: averageMetric(completed, "ph"),
+    avgCe: averageMetric(completed, "ce"),
+    avgN: averageMetric(completed, "n"),
+    avgP: averageMetric(completed, "p"),
+    avgK: averageMetric(completed, "k"),
+    fingerprint,
+  };
+}
+
+function formatDelta(current, previous, digits = 0) {
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return "New";
+  const delta = current - previous;
+  if (Math.abs(delta) < 0.01) return "Stable";
+  return `${delta > 0 ? "+" : ""}${delta.toFixed(digits)}`;
+}
+
+function DashboardView({
+  parcelle,
+  parcelImageUrls,
+  zoneResults,
+  zones,
+  crops,
+  activeZone,
+  onSelectZone,
+  currentAnalysis,
+}) {
+  const width = 720;
+  const height = 500;
+  const parcelLatLngs = (parcelle?.latlngs || []).map(normalizeLatLngPoint);
+  const bounds = getParcelBounds(parcelLatLngs);
+  const activeZoneResult = zoneResults[activeZone] || null;
+  const currentSnapshot = currentAnalysis || null;
+  const previousSnapshot = null;
+  const zoneCards = zoneResults.map((zone, index) => {
+    const score = calcScore(zone, crops);
+    const tone = getHeatTone(score);
+    const zoneGeometry = zones[index] ? zoneGeometryToPoints(zones[index]) : [];
+    const projected = zoneGeometry.map((point) => projectPointToBounds(point, bounds, width, height));
+    const polygon = projected.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+    const centroid = projected.length
+      ? {
+          x: projected.reduce((sum, point) => sum + point.x, 0) / projected.length,
+          y: projected.reduce((sum, point) => sum + point.y, 0) / projected.length,
+        }
+      : null;
+    return { zone, index, score, tone, polygon, centroid };
+  });
+  const bestZone = [...zoneCards].sort((a, b) => b.score - a.score)[0];
+  const worstZone = [...zoneCards].sort((a, b) => a.score - b.score)[0];
+  const nutrientCards = [
+    { key: "avgN", label: "N", value: activeZoneResult?.n, prev: null, unit: "kg/ha" },
+    { key: "avgP", label: "P", value: activeZoneResult?.p, prev: null, unit: "kg/ha" },
+    { key: "avgK", label: "K", value: activeZoneResult?.k, prev: null, unit: "kg/ha" },
+    { key: "avgPh", label: "pH", value: activeZoneResult?.ph, prev: null, unit: "" },
+  ];
+  const historyRows = [
+    { key: "avgP", label: "Phosphorus", color: "#b8d07a", unit: "kg/ha", current: activeZoneResult?.p, previous: null, format: (value) => Number(value || 0).toFixed(1) },
+    { key: "avgK", label: "Potassium", color: "#86b86b", unit: "kg/ha", current: activeZoneResult?.k, previous: null, format: (value) => Number(value || 0).toFixed(1) },
+    { key: "avgN", label: "Nitrogen", color: "#d0e08c", unit: "kg/ha", current: activeZoneResult?.n, previous: null, format: (value) => Number(value || 0).toFixed(1) },
+    { key: "avgPh", label: "Acidity", color: "#f6d96b", unit: "pH", current: activeZoneResult?.ph, previous: null, format: (value) => Number(value || 0).toFixed(1) },
+    { key: "avgScore", label: "Soil Rating", color: "#f0b26d", unit: "/100", current: activeZoneResult ? calcScore(activeZoneResult, crops) : null, previous: null, format: (value) => `${Math.round(Number(value || 0))}` },
+  ];
+
+  return (
+    <section className="sd-dashboard">
+      <div className="sd-dashboard-head">
+        <div>
+          <div className="sd-dashboard-eyebrow">Yield Heatmap Dashboard</div>
+          <h2 className="sd-dashboard-title">Vue globale de la parcelle après analyse complète</h2>
+          <p className="sd-dashboard-subtitle">
+            La carte thermique réutilise la géométrie réelle de la parcelle et des zones générées. Clique sur une zone pour ouvrir son détail.
+          </p>
+        </div>
+        <div className="sd-dashboard-score">
+          <span>Current analysis</span>
+          <strong>{activeZoneResult ? calcScore(activeZoneResult, crops) : 0}/100</strong>
+          <small>Zone {activeZone + 1}</small>
+        </div>
+      </div>
+
+      <div className="sd-dashboard-grid">
+        <div className="sd-heatmap-card">
+          <div className="sd-heatmap-topbar">
+            <div>
+              <div className="sd-card-kicker">Carte thermique</div>
+              <div className="sd-card-title">Potentiel de rendement par zone</div>
+            </div>
+            <div className="sd-heatmap-badge">Heatmap</div>
+          </div>
+
+          <div className="sd-heatmap-frame">
+            <img
+              className="sd-heatmap-image"
+              src={parcelImageUrls?.imagery || satelliteFallback}
+              alt={`Vue satellite de ${parcelle?.name || "la parcelle"}`}
+              onError={(e) => {
+                if (e.currentTarget.src !== new URL(satelliteFallback, window.location.href).href) {
+                  e.currentTarget.src = satelliteFallback;
+                }
+              }}
+            />
+            {parcelImageUrls?.reference && (
+              <img
+                className="sd-heatmap-image sd-heatmap-image--reference"
+                src={parcelImageUrls.reference}
+                alt=""
+                aria-hidden="true"
+              />
+            )}
+            <svg className="sd-heatmap-overlay" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+              <defs>
+                <filter id="sdGlow">
+                  <feGaussianBlur stdDeviation="10" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+
+              {zoneCards.map((item) => (
+                <g
+                  key={item.index}
+                  className={`sd-heatmap-zone ${activeZone === item.index ? "sd-heatmap-zone--active" : ""}`}
+                  onClick={() => onSelectZone(item.index)}
+                >
+                  {item.polygon && (
+                    <>
+                      <polygon points={item.polygon} fill={item.tone.fill} stroke={item.tone.stroke} strokeWidth="3" filter="url(#sdGlow)" />
+                      <polygon points={item.polygon} fill="url(#sdHeatNoise)" opacity="0.18" />
+                    </>
+                  )}
+                  {item.centroid && (
+                    <g transform={`translate(${item.centroid.x}, ${item.centroid.y})`}>
+                      <rect x="-54" y="-19" width="108" height="38" rx="18" fill="rgba(19, 28, 24, 0.55)" />
+                      <text textAnchor="middle" y="-2" className="sd-heatmap-zone-label">Zone {item.index + 1}</text>
+                      <text textAnchor="middle" y="12" className="sd-heatmap-zone-score">{item.score}/100</text>
+                    </g>
+                  )}
+                </g>
+              ))}
+
+              <defs>
+                <pattern id="sdHeatNoise" width="120" height="120" patternUnits="userSpaceOnUse">
+                  <circle cx="20" cy="22" r="20" fill="rgba(255,255,255,0.16)" />
+                  <circle cx="86" cy="50" r="24" fill="rgba(255,255,255,0.14)" />
+                  <circle cx="56" cy="90" r="18" fill="rgba(255,255,255,0.12)" />
+                </pattern>
+              </defs>
+            </svg>
+
+            <div className="sd-heatmap-legend">
+              <div className="sd-heatmap-legend-title">Estimated Yield Potential</div>
+              <div className="sd-heatmap-legend-scale" />
+              <div className="sd-heatmap-legend-labels">
+                <span>Critical</span>
+                <span>Optimal</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="sd-zone-dashboard-list">
+            {zoneCards.map((item) => (
+              <button
+                key={item.index}
+                className={`sd-zone-dashboard-pill ${activeZone === item.index ? "sd-zone-dashboard-pill--active" : ""}`}
+                onClick={() => onSelectZone(item.index)}
+              >
+                <span className="sd-zone-dashboard-dot" style={{ background: item.tone.stroke }} />
+                <span>Zone {item.index + 1}</span>
+                <strong>{item.score}</strong>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="sd-dashboard-side">
+          <div className="sd-side-card">
+            <div className="sd-card-kicker">Insights</div>
+            <div className="sd-insight-list">
+              <div className="sd-insight-item">
+                <span className="sd-insight-ring sd-insight-ring--good" />
+                <div>
+                  <strong>Meilleure zone</strong>
+                  <span>Zone {bestZone?.index + 1} avec {bestZone?.score ?? 0}/100</span>
+                </div>
+              </div>
+              <div className="sd-insight-item">
+                <span className="sd-insight-ring sd-insight-ring--bad" />
+                <div>
+                  <strong>Zone critique</strong>
+                  <span>Zone {worstZone?.index + 1} avec {worstZone?.score ?? 0}/100</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="sd-side-card sd-history-card">
+            <div className="sd-history-head">
+              <div>
+                <div className="sd-card-kicker">Historical comparison</div>
+                <div className="sd-history-title">Soil analysis (per hectare)</div>
+              </div>
+              <div className="sd-history-legend">
+                <span><i className="sd-history-legend-swatch sd-history-legend-swatch--current" />Current analysis</span>
+                <span><i className="sd-history-legend-swatch sd-history-legend-swatch--last" />Last analysis</span>
+              </div>
+            </div>
+
+            <div className="sd-history-list">
+              {historyRows.map((item) => {
+                const currentValue = Number(item.current ?? 0);
+                const previousValue = item.previous == null ? null : Number(item.previous ?? 0);
+                const maxValue = Math.max(currentValue, previousValue ?? 0, item.key === "avgPh" ? 14 : item.key === "avgScore" ? 100 : 1);
+                const currentWidth = Math.max(12, Math.min(100, (currentValue / maxValue) * 100 || 0));
+                const previousWidth = previousValue == null ? 0 : Math.max(12, Math.min(100, (previousValue / maxValue) * 100 || 0));
+
+                return (
+                  <div key={item.key} className="sd-history-row">
+                    <div className="sd-history-row-meta">
+                      <div className="sd-history-dot" style={{ background: item.color }} />
+                      <div className="sd-history-row-title-wrap">
+                        <div className="sd-history-row-title">{item.label}</div>
+                        <div className="sd-history-row-subtitle">per hectare</div>
+                      </div>
+                      <div className="sd-history-row-values">
+                        <strong>{Number.isFinite(currentValue) ? item.format(currentValue) : "—"}</strong>
+                        <small>{previousValue == null ? "" : item.format(previousValue)}</small>
+                      </div>
+                    </div>
+
+                    <div className="sd-history-bars">
+                      <div className="sd-history-bar sd-history-bar--current" style={{ width: `${currentWidth}%`, background: item.color }} />
+                      <div className="sd-history-bar sd-history-bar--last" style={{ width: `${previousWidth}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /* MAIN COMPONENT */
 export default function SoilDiagnostic({
   open, onClose,
@@ -2090,6 +2457,8 @@ export default function SoilDiagnostic({
   parcelleHa     = 0,
   cultureGroupId = 1,
   parcelle       = null,
+  mapSnapshot    = null,
+  zones          = [],
   nZones         = 1,
   initialDiagMode = "eco",
 }) {
@@ -2100,8 +2469,12 @@ export default function SoilDiagnostic({
   const [windByMonth, setWindByMonth] = useState({});
   const [zoneStates,  setZoneStates]  = useState(() => Array.from({length: Math.max(1,nZones)}, () => freshSt(initialDiagMode)));
   const [zoneResults, setZoneResults] = useState(() => Array(Math.max(1,nZones)).fill(null));
+  const [analysisHistory, setAnalysisHistory] = useState([]);
+  const [currentAnalysis, setCurrentAnalysis] = useState(null);
+  const [showDashboard, setShowDashboard] = useState(false);
   // In-memory cache for satellite responses to avoid repeated network calls
   const satCacheRef = useRef(new Map());
+  const lastStoredFingerprintRef = useRef("");
   const n = Math.max(1, nZones);
 
   const CROPS = useMemo(() => rawCrops.map(toCrop), [rawCrops]);
@@ -2168,8 +2541,29 @@ export default function SoilDiagnostic({
       setAnalyzing(false);
       setZoneStates(Array.from({length:n}, () => freshSt(initialDiagMode)));
       setZoneResults(Array(n).fill(null));
+      setAnalysisHistory([]);
+      setCurrentAnalysis(null);
+      setShowDashboard(false);
+      lastStoredFingerprintRef.current = "";
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    try {
+      const currentStored = localStorage.getItem(getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId));
+      setCurrentAnalysis(currentStored ? JSON.parse(currentStored) : null);
+      const stored = localStorage.getItem(getHistoryKey(parcelleName, parcelle, cultureGroupId));
+      const parsed = stored ? JSON.parse(stored) : [];
+      setAnalysisHistory(Array.isArray(parsed) ? parsed : []);
+      lastStoredFingerprintRef.current = Array.isArray(parsed) && parsed[0]?.fingerprint ? parsed[0].fingerprint : "";
+    } catch (error) {
+      console.warn("History load failed:", error);
+      setAnalysisHistory([]);
+      setCurrentAnalysis(null);
+      lastStoredFingerprintRef.current = "";
+    }
+  }, [open, parcelleName, parcelle, cultureGroupId]);
 
   /* ✅ FIXED: Fetch satellite data in BOTH eco AND standard mode */
   useEffect(() => {
@@ -2300,6 +2694,7 @@ export default function SoilDiagnostic({
     if (!canToggleMode) return;
     setDiagMode(newMode);
     setZoneStates(Array.from({length:n}, () => freshSt(newMode)));
+    setShowDashboard(false);
   }, [n, canToggleMode]);
 
   /* Field change for active zone */
@@ -2355,6 +2750,7 @@ export default function SoilDiagnostic({
 
   const resetZone = useCallback(idx => {
     setZoneResults(prev => { const next=[...prev]; next[idx]=null; return next; });
+    setShowDashboard(false);
   }, []);
 
   const handlePrintLabRequest = useCallback(() => {
@@ -2460,12 +2856,46 @@ export default function SoilDiagnostic({
     URL.revokeObjectURL(url);
   }, [CROPS, activeZone, cultureLabel, diagMode, n, parcelleHa, parcelleName, zoneResults, zoneStates]);
 
+  useEffect(() => {
+    if (!open) return;
+    if (zoneResults.some((item) => !item)) return;
+    const snapshot = buildAnalysisSnapshot({
+      zoneResults,
+      crops: CROPS,
+      parcelleName: (parcelle && parcelle.name) || parcelleName,
+      parcelleHa,
+      cultureLabel,
+    });
+    if (!snapshot.fingerprint || lastStoredFingerprintRef.current === snapshot.fingerprint) return;
+
+    setCurrentAnalysis(snapshot);
+    try {
+      localStorage.setItem(getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId), JSON.stringify(snapshot));
+    } catch (error) {
+      console.warn("Current analysis save failed:", error);
+    }
+
+    setAnalysisHistory((prev) => {
+      const next = [snapshot, ...prev.filter((item) => item.fingerprint !== snapshot.fingerprint)].slice(0, 8);
+      try {
+        localStorage.setItem(getHistoryKey(parcelleName, parcelle, cultureGroupId), JSON.stringify(next));
+      } catch (error) {
+        console.warn("History save failed:", error);
+      }
+      return next;
+    });
+    lastStoredFingerprintRef.current = snapshot.fingerprint;
+  }, [open, zoneResults, CROPS, parcelleName, parcelle, cultureGroupId, parcelleHa, cultureLabel]);
+
+  const parcelImageUrls = buildParcelImageUrls(parcelle?.latlngs || [], mapSnapshot);
+
   if (!open) return null;
 
   const color  = ZONE_COLORS[activeZone % ZONE_COLORS.length];
   const light  = ZONE_LIGHTS[activeZone % ZONE_LIGHTS.length];
   const result = zoneResults[activeZone];
   const doneCount = zoneResults.filter(Boolean).length;
+  const allZonesDone = doneCount === n && n > 0;
 
   console.log("zoneResults:", zoneResults);
   console.log("activeZone:", activeZone);
@@ -2609,11 +3039,39 @@ export default function SoilDiagnostic({
                   zoneIdx={activeZone}
                   nZones={n}
                   onNext={() => setActiveZone(prev => Math.min(n - 1, prev + 1))}
-                    onDownloadReport={handleDownloadZoneReport}
+                  onDownloadReport={handleDownloadZoneReport}
+                  onOpenDashboard={() => setShowDashboard(true)}
+                  showDashboardAction={allZonesDone && activeZone === n - 1}
                 />
               )}
             </div>
           </div>
+
+          {showDashboard && allZonesDone && (
+            <div className="sd-dashboard-sheet">
+              <div className="sd-dashboard-sheet-head">
+                <div>
+                  <div className="sd-dashboard-eyebrow">Yield Heatmap Dashboard</div>
+                  <div className="sd-card-title">Vue détaillée de la parcelle</div>
+                </div>
+                <button className="sd-dashboard-sheet-close" onClick={() => setShowDashboard(false)}>
+                  Retour
+                </button>
+              </div>
+              <div className="sd-dashboard-sheet-body">
+                <DashboardView
+                  parcelle={parcelle}
+                  parcelImageUrls={parcelImageUrls}
+                  zoneResults={zoneResults}
+                  zones={zones}
+                  crops={CROPS}
+                  activeZone={activeZone}
+                  onSelectZone={setActiveZone}
+                  currentAnalysis={currentAnalysis}
+                />
+              </div>
+            </div>
+          )}
 
         </div>
       </div>

@@ -47,6 +47,8 @@ export default function Map() {
   //  number of zones returned by the backend after analysis
   const [nZonesFromBackend,  setNZonesFromBackend]   = useState(1);
   const [analyzedZones,      setAnalyzedZones]       = useState([]);
+  const [analyzedParcelle,   setAnalyzedParcelle]    = useState(null);
+  const [analysisMapSnapshot,setAnalysisMapSnapshot] = useState(null);
   const [samplingColor,      setSamplingColor]       = useState("#2ecc71");
 
   const toastTimer = useRef(null);
@@ -112,6 +114,8 @@ export default function Map() {
     setPendingColor(color);
     setParcelleInfo(info);
     setAnalyzedZones([]);
+    setAnalyzedParcelle(null);
+    setAnalysisMapSnapshot(null);
     setSamplingColor(color);
     setResultsOpen(false);
     const ha = info.area || 0;
@@ -121,7 +125,7 @@ export default function Map() {
   const {
     mapRef, placeSamplePoints, clearSampleMarkers, activateDrawTool, clearAll,
     flyToWilaya, displayZones, clearZones, drawParcelleFromLatLngs,
-    clearSamplingMarkers, drawAllParcelles, clearAllParcelles, clearSelectedParcelle,
+    clearSamplingMarkers, drawAllParcelles, clearAllParcelles, clearSelectedParcelle, getMapSnapshot,
   } = useMap({ onParcelleChange: handleParcelleChange, maxParcelAreaHa: MAX_PARCEL_AREA_HA });
 
   useEffect(() => {
@@ -156,6 +160,8 @@ export default function Map() {
     setSelectedParcelleId(newP.id);
     setSelectedGroupId(groupId);
     setPendingParcelleInfo(null);
+    setAnalyzedParcelle(null);
+    setAnalysisMapSnapshot(null);
     setResultsOpen(false);
     showToast(`✅ ${name} saved`);
   }, [pendingParcelleInfo, pendingColor, showToast]);
@@ -279,6 +285,8 @@ export default function Map() {
     setResultsOpen(false);
     setNZonesFromBackend(1);
     setAnalyzedZones([]);
+    setAnalyzedParcelle(null);
+    setAnalysisMapSnapshot(null);
     setSamplingColor("#2ecc71");
   }, [parcelles, clearAll, clearZones, showToast, setNZonesFromBackend]);
 
@@ -379,6 +387,14 @@ export default function Map() {
       if (data.zones?.length > 0) {
         setNZonesFromBackend(data.zones.length);
         setAnalyzedZones(data.zones);
+        setAnalyzedParcelle({
+          ...(targetParcelle || {}),
+          name: customName || targetParcelle?.name || parcelleInfo?.name || "Parcelle",
+          latlngs: geometry.latlngs,
+          area: (geometry.area || 0) * 10000,
+          groupId: cropGroupId,
+        });
+        setAnalysisMapSnapshot(getMapSnapshot());
         setSamplingColor(culture.color);
         clearSamplingMarkers();
         displayZones(data.zones, samplingMode);
@@ -426,6 +442,8 @@ export default function Map() {
       } else {
         showToast("⚠️ No zone generated");
         setAnalyzedZones([]);
+        setAnalyzedParcelle(null);
+        setAnalysisMapSnapshot(null);
         clearSamplingMarkers();
         clearSampleMarkers();
         showToast("⚠️ No zone generated");
@@ -439,7 +457,7 @@ export default function Map() {
   }, [
     parcelleInfo, selectedGroupId, samplingMode, pendingParcelleInfo,
     selectedParcelleId, parcelles, displayZones, placeSamplePoints,
-    showToast, isAnalyzing, clearSampleMarkers, clearSamplingMarkers,
+    showToast, isAnalyzing, clearSampleMarkers, clearSamplingMarkers, getMapSnapshot,
   ]);
 
   const exportSamplingKml = useCallback(async () => {
@@ -546,7 +564,9 @@ export default function Map() {
         parcelleHa={parcelleInfo?.area}
         region={selectedWilaya?.name}
         samplingMode={samplingMode}
-        parcelle={selectedParcelle}
+        parcelle={analyzedParcelle || selectedParcelle}
+        mapSnapshot={analysisMapSnapshot}
+        zones={analyzedZones}
         nZones={nZonesFromBackend}
         onStartSampling={handleStartSampling}
       />
