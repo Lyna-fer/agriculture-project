@@ -2220,6 +2220,26 @@ function formatDelta(current, previous, digits = 0) {
   return `${delta > 0 ? "+" : ""}${delta.toFixed(digits)}`;
 }
 
+const HISTORY_METRIC_RANGES = {
+  ph: { min: 0, max: 14 },
+  ce: { min: 0, max: 8 },
+  n: { min: 0, max: 400 },
+  p: { min: 0, max: 400 },
+  k: { min: 0, max: 400 },
+  lime: { min: 0, max: 30 },
+  wind: { min: 0, max: 80 },
+  pb: { min: 0, max: 100 },
+  cd: { min: 0, max: 100 },
+};
+
+function getHistoryBarWidth(metricKey, value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return "8%";
+  const range = HISTORY_METRIC_RANGES[metricKey] || { min: 0, max: 100 };
+  const pct = ((numericValue - range.min) / Math.max(1, range.max - range.min)) * 100;
+  return `${Math.max(8, Math.min(100, pct))}%`;
+}
+
 function DashboardView({
   parcelle,
   parcelleHa,
@@ -2555,6 +2575,7 @@ function DashboardView({
               {currentAnalysisMetrics.map((item) => {
                 const displayValue = item.value;
                 const hasValue = displayValue !== null && displayValue !== undefined && displayValue !== "";
+                const currentWidth = getHistoryBarWidth(item.key, displayValue);
 
                 return (
                   <div key={item.key} className="sd-history-row">
@@ -2571,7 +2592,7 @@ function DashboardView({
                     </div>
 
                     <div className="sd-history-bars">
-                      <div className={`sd-history-bar sd-history-bar--current sd-history-bar--${item.tone}`}>
+                      <div className={`sd-history-bar sd-history-bar--current sd-history-bar--${item.tone}`} style={{ width: currentWidth }}>
                         <span>{hasValue ? (item.unit ? `${item.format(displayValue)} ${item.unit}` : item.format(displayValue)) : "—"}</span>
                       </div>
                       {hasLastAnalysis && (
