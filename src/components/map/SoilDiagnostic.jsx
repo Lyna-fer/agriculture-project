@@ -2396,23 +2396,10 @@ function DashboardView({
             La carte thermique réutilise la géométrie réelle de la parcelle et des zones générées. Clique sur une zone pour ouvrir son détail.
           </p>
         </div>
-        <div className="sd-dashboard-score">
-          <span>Current analysis</span>
-          <strong>{activeZoneResult ? calcScore(activeZoneResult, crops) : 0}/100</strong>
-          <small>Zone {activeZone + 1}</small>
-        </div>
       </div>
 
       <div className="sd-dashboard-grid">
         <div className="sd-heatmap-card">
-          <div className="sd-heatmap-topbar">
-            <div>
-              <div className="sd-card-kicker">Carte thermique</div>
-              <div className="sd-card-title">Potentiel de rendement par zone</div>
-            </div>
-            <div className="sd-heatmap-badge">Heatmap</div>
-          </div>
-
           <div className="sd-heatmap-frame" style={{ aspectRatio: frameRatio }}>
             <img
               className="sd-heatmap-image"
@@ -2459,7 +2446,6 @@ function DashboardView({
                     <g transform={`translate(${item.centroid.x}, ${item.centroid.y})`}>
                       <rect x="-54" y="-19" width="108" height="38" rx="18" fill="rgba(19, 28, 24, 0.55)" />
                       <text textAnchor="middle" y="-2" className="sd-heatmap-zone-label">Zone {item.index + 1}</text>
-                      <text textAnchor="middle" y="12" className="sd-heatmap-zone-score">{item.score}/100</text>
                     </g>
                   )}
                 </g>
@@ -2474,14 +2460,6 @@ function DashboardView({
               </defs>
             </svg>
 
-            <div className="sd-heatmap-legend">
-              <div className="sd-heatmap-legend-title">Estimated Yield Potential</div>
-              <div className="sd-heatmap-legend-scale" />
-              <div className="sd-heatmap-legend-labels">
-                <span>Critical</span>
-                <span>Optimal</span>
-              </div>
-            </div>
           </div>
 
           <div className="sd-zone-dashboard-list">
@@ -2583,23 +2561,16 @@ function DashboardView({
                       <div className={`sd-history-dot sd-history-dot--${item.tone}`} />
                       <div className="sd-history-row-title-wrap">
                         <div className="sd-history-row-title">{item.label}</div>
-                        <div className="sd-history-row-subtitle">per zone</div>
-                      </div>
-                      <div className="sd-history-row-values">
-                        <strong>{hasValue ? item.format(displayValue) : "—"}</strong>
-                        <small></small>
                       </div>
                     </div>
 
                     <div className="sd-history-bars">
                       <div className={`sd-history-bar sd-history-bar--current sd-history-bar--${item.tone}`} style={{ width: currentWidth }}>
-                        <span>{hasValue ? (item.unit ? `${item.format(displayValue)} ${item.unit}` : item.format(displayValue)) : "—"}</span>
+                        <span>{hasValue ? (item.unit ? `${item.format(displayValue)} ${item.unit}` : item.format(displayValue)) : ""}</span>
                       </div>
-                      {hasLastAnalysis && (
-                        <div className="sd-history-bar sd-history-bar--last sd-history-bar--empty">
-                          <span>Last analysis</span>
-                        </div>
-                      )}
+                      <div className="sd-history-bar sd-history-bar--last sd-history-bar--empty" style={{ width: currentWidth }}>
+                        <span />
+                      </div>
                     </div>
                   </div>
                 );

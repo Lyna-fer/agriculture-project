@@ -1417,12 +1417,12 @@
 .sd-history-row {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .sd-history-row-meta {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
   align-items: center;
 }
@@ -1452,65 +1452,43 @@
 }
 
 .sd-history-row-title {
-  font-size: .8rem;
+  font-size: .78rem;
   font-weight: 900;
   color: var(--sd-ink);
-}
-
-.sd-history-row-subtitle {
-  margin-top: 2px;
-  font-size: .58rem;
-  font-weight: 800;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--sd-ink3);
-}
-
-.sd-history-row-values {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  min-width: 44px;
-}
-
-.sd-history-row-values strong {
-  font-size: .94rem;
-  line-height: 1;
-  color: var(--sd-ink);
-  letter-spacing: -.03em;
-}
-
-.sd-history-row-values small {
-  font-size: .55rem;
-  color: var(--sd-ink3);
-  font-weight: 800;
 }
 
 .sd-history-bars {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  margin-left: 40px;
+  gap: 4px;
+  margin-left: 36px;
 }
 
 .sd-history-bar {
-  min-height: 16px;
+  min-height: 18px;
   border-radius: 999px;
   box-shadow: 0 1px 0 rgba(255,255,255,.6) inset;
   display: flex;
   align-items: center;
-  padding: 0 12px;
-  font-size: .56rem;
+  padding: 0 10px;
+  font-size: .54rem;
   font-weight: 900;
-  letter-spacing: .08em;
+  letter-spacing: .06em;
   text-transform: uppercase;
+  overflow: hidden;
+}
+
+.sd-history-bar span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
 }
 
 .sd-history-bar--current {
   color: #1d2d17;
-  background: linear-gradient(90deg, rgba(94, 154, 69, .14), rgba(213, 231, 172, .66));
-  border: 1px solid rgba(94, 154, 69, .16);
+  background: linear-gradient(90deg, rgba(94, 154, 69, .18), rgba(213, 231, 172, .72));
+  border: 1px solid rgba(94, 154, 69, .14);
 }
 
 .sd-history-bar--last {
@@ -1520,8 +1498,10 @@
 }
 
 .sd-history-bar--empty {
-  min-height: 10px;
-  opacity: .86;
+  min-height: 18px;
+  background: transparent;
+  border: 1px dashed rgba(27,34,48,.08);
+  opacity: .12;
 }
 
 .sd-history-bar--green {
