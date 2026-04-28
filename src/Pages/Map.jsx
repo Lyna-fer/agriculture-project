@@ -353,7 +353,7 @@ export default function Map() {
     const customName = pendingParcelleInfo?.name || targetParcelle?.name || null;
     const polygonPoints = normalizeLatLngs(geometry.latlngs);
 
-    const payload = { polygonPoints, cropType, samplingMode, parcelleName: customName };
+    const payload = { polygonPoints, cropType, samplingMode, parcelleName: customName,groupId: cropGroupId };
     showToast("⏳ Calculating + saving...");
 
     try {

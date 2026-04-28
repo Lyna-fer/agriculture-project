@@ -86,7 +86,7 @@ class Parcelle(Base):
     nom = Column(String)
     surface = Column(Numeric)
     location = Column(Geometry("POLYGON", srid=4326))
-
+    group_id = Column(Integer, nullable=True, default=1)  # ✅ NEW
     soil_samples = relationship("SoilSample", back_populates="parcelle")
 
 
@@ -197,6 +197,7 @@ class SamplingRequest(BaseModel):
     cropType: str
     samplingMode: str
     parcelleName: Optional[str] = None
+    groupId: Optional[int] = None  # ✅ NEW
 
 
 class SatelliteSoilRequest(BaseModel):
@@ -618,7 +619,9 @@ async def run_and_save(
             farmerid=farmer_id_for_parcelle,
             nom=parcelle_name,
             surface=result['totalAreaHa'],
-            location=location_wkt
+            location=location_wkt,
+            group_id=request.groupId or 1  # ✅ SAVE SELECTED CATEGORY
+
         )
         db.add(new_parcelle)
         db.flush()
@@ -738,7 +741,7 @@ def get_parcels(current_user: AuthUser = Depends(get_current_user), db: Session 
             "name": p.nom or f"Parcelle #{p.id}",
             "area": float(p.surface) * 10000 if p.surface else 0,
             "color": "#2ecc71",
-            "groupId": 1,
+            "groupId": p.group_id or 1,  # ✅ DYNAMIC instead of hardcoded 1
             "latlngs": latlngs,
             "bounds": None,
             "user_id": p.user_id,
