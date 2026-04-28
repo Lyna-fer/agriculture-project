@@ -2224,6 +2224,7 @@ function DashboardView({
   parcelle,
   parcelleHa,
   parcelImageUrls,
+  mapSnapshot,
   zoneResults,
   zones,
   crops,
@@ -2233,6 +2234,9 @@ function DashboardView({
 }) {
   const width = 720;
   const height = 500;
+  const frameRatio = mapSnapshot?.size?.width && mapSnapshot?.size?.height
+    ? `${mapSnapshot.size.width} / ${mapSnapshot.size.height}`
+    : "4 / 3";
   const parcelLatLngs = (parcelle?.latlngs || []).map(normalizeLatLngPoint);
   const bounds = getParcelBounds(parcelLatLngs);
   const activeZoneResult = zoneResults[activeZone] || null;
@@ -2389,7 +2393,7 @@ function DashboardView({
             <div className="sd-heatmap-badge">Heatmap</div>
           </div>
 
-          <div className="sd-heatmap-frame">
+          <div className="sd-heatmap-frame" style={{ aspectRatio: frameRatio }}>
             <img
               className="sd-heatmap-image"
               src={parcelImageUrls?.imagery || satelliteFallback}
@@ -3131,60 +3135,7 @@ export default function SoilDiagnostic({
           )}
 
           {/* TWO-COLUMN LAYOUT */}
-          <div className="sd-layout">
-            <ZoneForm
-              key={`${activeZone}-${diagMode}`}
-              zoneIdx={activeZone}
-              nZones={n}
-              color={color}
-              light={light}
-              diagMode={diagMode}
-              st={zoneStates[activeZone]}
-              onChange={handleFieldChange}
-              crops={CROPS}
-              cultureLabel={cultureLabel}
-              onAnalyze={handleAnalyze}
-              analyzing={analyzing}
-              hasResult={!!result}
-              onPrintLabRequest={handlePrintLabRequest}
-              onPrintLabRequestEco={handlePrintLabRequestEco} />
-
-            <div className="sd-rc">
-              {!result ? (
-                <div className="sd-idle">
-                  <div className="sd-idle-blob" style={{background:`linear-gradient(135deg,${light},#d0f4e8)`}}>
-                    <svg width="40" height="40" viewBox="0 0 44 44" fill="none">
-                      <path d="M22 6L6 15l16 9 16-9L22 6zM6 29l16 9 16-9M6 22l16 9 16-9"
-                        stroke={color} strokeWidth="2.2" strokeLinejoin="round" opacity=".6" />
-                    </svg>
-                  </div>
-                  <div className="sd-idle-zone-pill" style={{background:color}}>Zone {activeZone + 1}</div>
-                  <div className="sd-idle-t">Results here</div>
-                  <div className="sd-idle-s">
-                    {(diagMode==="eco" || diagMode==="standard")
-                        ? "Mode active. EC and Texture are preloaded from satellite. Enter NPK and start analysis."
-                      : "Enter soil parameters and start analysis to get recommendations."}
-                  </div>
-                </div>
-              ) : (
-                <ResultsView
-                  st={result}
-                  onReset={() => resetZone(activeZone)}
-                  crops={CROPS}
-                  diagMode={diagMode}
-                  color={color}
-                  zoneIdx={activeZone}
-                  nZones={n}
-                  onNext={() => setActiveZone(prev => Math.min(n - 1, prev + 1))}
-                  onDownloadReport={handleDownloadZoneReport}
-                  onOpenDashboard={() => setShowDashboard(true)}
-                  showDashboardAction={allZonesDone && activeZone === n - 1}
-                />
-              )}
-            </div>
-          </div>
-
-          {showDashboard && allZonesDone && (
+          {showDashboard && allZonesDone ? (
             <div className="sd-dashboard-sheet">
               <div className="sd-dashboard-sheet-head">
                 <div>
@@ -3198,7 +3149,9 @@ export default function SoilDiagnostic({
               <div className="sd-dashboard-sheet-body">
                 <DashboardView
                   parcelle={parcelle}
+                  parcelleHa={parcelleHa}
                   parcelImageUrls={parcelImageUrls}
+                  mapSnapshot={mapSnapshot}
                   zoneResults={zoneResults}
                   zones={zones}
                   crops={CROPS}
@@ -3206,6 +3159,59 @@ export default function SoilDiagnostic({
                   onSelectZone={setActiveZone}
                   currentAnalysis={currentAnalysis}
                 />
+              </div>
+            </div>
+          ) : (
+            <div className="sd-layout">
+              <ZoneForm
+                key={`${activeZone}-${diagMode}`}
+                zoneIdx={activeZone}
+                nZones={n}
+                color={color}
+                light={light}
+                diagMode={diagMode}
+                st={zoneStates[activeZone]}
+                onChange={handleFieldChange}
+                crops={CROPS}
+                cultureLabel={cultureLabel}
+                onAnalyze={handleAnalyze}
+                analyzing={analyzing}
+                hasResult={!!result}
+                onPrintLabRequest={handlePrintLabRequest}
+                onPrintLabRequestEco={handlePrintLabRequestEco} />
+
+              <div className="sd-rc">
+                {!result ? (
+                  <div className="sd-idle">
+                    <div className="sd-idle-blob" style={{background:`linear-gradient(135deg,${light},#d0f4e8)`}}>
+                      <svg width="40" height="40" viewBox="0 0 44 44" fill="none">
+                        <path d="M22 6L6 15l16 9 16-9L22 6zM6 29l16 9 16-9M6 22l16 9 16-9"
+                          stroke={color} strokeWidth="2.2" strokeLinejoin="round" opacity=".6" />
+                      </svg>
+                    </div>
+                    <div className="sd-idle-zone-pill" style={{background:color}}>Zone {activeZone + 1}</div>
+                    <div className="sd-idle-t">Results here</div>
+                    <div className="sd-idle-s">
+                      {(diagMode==="eco" || diagMode==="standard")
+                          ? "Mode active. EC and Texture are preloaded from satellite. Enter NPK and start analysis."
+                        : "Enter soil parameters and start analysis to get recommendations."}
+                    </div>
+                  </div>
+                ) : (
+                  <ResultsView
+                    st={result}
+                    onReset={() => resetZone(activeZone)}
+                    crops={CROPS}
+                    diagMode={diagMode}
+                    color={color}
+                    zoneIdx={activeZone}
+                    nZones={n}
+                    onNext={() => setActiveZone(prev => Math.min(n - 1, prev + 1))}
+                    onDownloadReport={handleDownloadZoneReport}
+                    onOpenDashboard={() => setShowDashboard(true)}
+                    showDashboardAction={allZonesDone && activeZone === n - 1}
+                  />
+                )}
               </div>
             </div>
           )}
