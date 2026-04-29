@@ -19,6 +19,165 @@ function PatternDiagram({ type, color, size = 110 }) {
   return diagrams[type] || diagrams.zigzag;
 }
 
+function normalizeLatLngPoint(point) {
+  if (Array.isArray(point)) {
+    return { lat: Number(point[0]), lng: Number(point[1]) };
+  }
+  return { lat: Number(point?.lat), lng: Number(point?.lng) };
+}
+
+function getParcelCentroid(latlngs = []) {
+  const pts = latlngs
+    .map(normalizeLatLngPoint)
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+
+  if (!pts.length) return null;
+
+  const sums = pts.reduce(
+    (acc, point) => ({ lat: acc.lat + point.lat, lng: acc.lng + point.lng }),
+    { lat: 0, lng: 0 }
+  );
+
+  return {
+    lat: sums.lat / pts.length,
+    lng: sums.lng / pts.length,
+  };
+}
+
+function monthToSeason(month) {
+  if (month === 12 || month <= 2) return "winter";
+  if (month <= 5) return "spring";
+  if (month <= 8) return "summer";
+  return "autumn";
+}
+
+function getWeatherCodeMeta(code) {
+  const map = {
+    0: { label: "Clear sky", icon: "☀️" },
+    1: { label: "Mostly clear", icon: "🌤️" },
+    2: { label: "Partly cloudy", icon: "⛅" },
+    3: { label: "Overcast", icon: "☁️" },
+    45: { label: "Fog", icon: "🌫️" },
+    48: { label: "Rime fog", icon: "🌫️" },
+    51: { label: "Light drizzle", icon: "🌦️" },
+    53: { label: "Drizzle", icon: "🌦️" },
+    55: { label: "Dense drizzle", icon: "🌧️" },
+    61: { label: "Light rain", icon: "🌦️" },
+    63: { label: "Rain", icon: "🌧️" },
+    65: { label: "Heavy rain", icon: "⛈️" },
+    71: { label: "Light snow", icon: "🌨️" },
+    73: { label: "Snow", icon: "🌨️" },
+    75: { label: "Heavy snow", icon: "❄️" },
+    80: { label: "Rain showers", icon: "🌦️" },
+    81: { label: "Rain showers", icon: "🌧️" },
+    82: { label: "Violent showers", icon: "⛈️" },
+    95: { label: "Thunderstorm", icon: "⛈️" },
+    96: { label: "Storm with hail", icon: "⛈️" },
+    99: { label: "Severe storm", icon: "⛈️" },
+  };
+  return map[Number(code)] || { label: "Weather update", icon: "🌤️" };
+}
+
+function getForecastDayMeta(dateValue, index) {
+  if (index === 0) {
+    return {
+      dayNumber: new Date(`${dateValue}T12:00:00`).getDate(),
+      label: "Aujourd'hui",
+    };
+  }
+
+  const date = new Date(`${dateValue}T12:00:00`);
+  return {
+    dayNumber: date.getDate(),
+    label: date.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "") + ".",
+  };
+}
+
+function buildSamplingWeatherAdvice(weather) {
+  if (!weather) return [];
+
+  const advice = [];
+  const recentRain = Number(weather.recentRainMm || 0);
+  const maxRecentRain = Number(weather.maxRecentRainMm || 0);
+  const nextRainMm = Number(weather.nextRainMm || 0);
+  const nextRainProb = Number(weather.nextRainProbability || 0);
+  const todayMax = Number(weather.todayMaxTemp ?? weather.currentTemp ?? 0);
+
+  if (recentRain >= 6 || maxRecentRain >= 4) {
+    advice.push({
+      tone: "danger",
+      title: "Rain detected recently",
+      text: "Wait 3 days before sampling. Wet soil can shift pH, move NPK, and produce non-homogeneous samples.",
+    });
+  } else if (nextRainMm >= 3 || nextRainProb >= 60) {
+    advice.push({
+      tone: "warn",
+      title: "Rain expected soon",
+      text: "Avoid sampling before or during rain. Soil humidity can distort nutrient and texture readings.",
+    });
+  } else {
+    advice.push({
+      tone: "good",
+      title: "Ideal sampling conditions",
+      text: "Conditions look stable for sampling. The soil should be easier to homogenize and interpret.",
+    });
+  }
+
+  if (todayMax >= 32) {
+    advice.push({
+      tone: "warn",
+      title: "High temperature",
+      text: "Temperature is high. Sample early in the morning to reduce heat and evaporation effects.",
+    });
+  } else if (todayMax <= 8) {
+    advice.push({
+      tone: "soft",
+      title: "Cool field window",
+      text: "The soil may stay compact and wet longer. Prefer late morning if the surface is still cold.",
+    });
+  } else {
+    advice.push({
+      tone: "soft",
+      title: "Stable temperature window",
+      text: "Temperature is moderate. Keep a consistent depth and avoid atypical wet spots.",
+    });
+  }
+
+  return advice;
+}
+
+function buildSeasonalSamplingTips(season, cultureName) {
+  const culture = String(cultureName || "").toLowerCase();
+  const isPermanent = culture.includes("permanent");
+  const isCereal = culture.includes("cereal");
+  const seasonTips = {
+    spring: [
+      "Spring is a good time to sample before fertilizer and planting decisions.",
+      "Prefer a dry 48-72 hour window to avoid washed nutrient readings.",
+    ],
+    summer: [
+      "In hot periods, sample early in the morning and keep bags away from direct sun.",
+      "Dry topsoil can be variable, so keep the same depth at every point.",
+    ],
+    autumn: [
+      "Autumn is useful for post-harvest sampling and correction planning.",
+      "Avoid sampling right after strong rain because the surface can become sticky and uneven.",
+    ],
+    winter: [
+      "Winter sampling is possible only during stable dry windows.",
+      "Do not sample saturated or muddy soil because the composite sample will be biased.",
+    ],
+  };
+
+  const cropTip = isPermanent
+    ? "For permanent crops, separate each depth and avoid points directly influenced by localized irrigation."
+    : isCereal
+    ? "For cereals, post-harvest or pre-sowing windows usually give the cleanest fertility baseline."
+    : "For vegetables, sample before major fertilization so recommendations reflect the real soil state.";
+
+  return [...(seasonTips[season] || seasonTips.spring), cropTip];
+}
+
 function buildKpis(data, parcelleHa) {
   const fmtHa = ha => ha < 0.1 ? `${(ha*10000).toFixed(0)} m²` : `${ha.toFixed(2)} ha`;
   return [
@@ -51,6 +210,8 @@ export default function ResultsPanel({
 }) {
   const [tab,      setTab]      = useState("schema");
   const [diagOpen, setDiagOpen] = useState(false);
+  const [weather, setWeather] = useState(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
 
   const data = CULTURES.find(c => c.id === cultureId);
 
@@ -66,13 +227,97 @@ export default function ResultsPanel({
 
   const effectiveZones = nZones > 1 ? nZones : calcZones;
   const fmtHa = ha => ha < 0.1 ? `${(ha*10000).toFixed(0)} m²` : `${ha.toFixed(2)} ha`;
-
-  if (!data) return null;
-
-  const A = data.color, AB = data.colorLight, Icon = data.icon;
-  const kpis = buildKpis(data, parcelleHa);
+  const parcelCentroid = useMemo(() => getParcelCentroid(parcelle?.latlngs || []), [parcelle]);
+  const cultureName = data?.nameShort || "";
+  const A = data?.color || "#4a7c2f";
+  const AB = data?.colorLight || "rgba(74,124,47,0.1)";
+  const Icon = data?.icon;
+  const kpis = data ? buildKpis(data, parcelleHa) : [];
+  const seasonalTips = buildSeasonalSamplingTips(monthToSeason(new Date().getMonth() + 1), cultureName);
+  const weatherAdvice = buildSamplingWeatherAdvice(weather);
+  const todayWeather = weather?.forecastSummary?.[0] || null;
 
   const initialDiagMode = samplingMode==="economic" ? "eco" : "standard";
+
+  useEffect(() => {
+    if (!open || !Number.isFinite(parcelCentroid?.lat) || !Number.isFinite(parcelCentroid?.lng)) {
+      setWeather(null);
+      setWeatherLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const fetchWeather = async () => {
+      setWeatherLoading(true);
+      try {
+        const params = new URLSearchParams({
+          latitude: String(parcelCentroid.lat),
+          longitude: String(parcelCentroid.lng),
+          current: "temperature_2m,weather_code",
+          daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max",
+          past_days: "3",
+          forecast_days: "3",
+          timezone: "auto",
+        });
+
+        const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Weather request failed");
+
+        const payload = await response.json();
+        const daily = payload?.daily || {};
+        const today = new Date().toISOString().slice(0, 10);
+        const dates = Array.isArray(daily.time) ? daily.time : [];
+        const rain = Array.isArray(daily.precipitation_sum) ? daily.precipitation_sum : [];
+        const probs = Array.isArray(daily.precipitation_probability_max) ? daily.precipitation_probability_max : [];
+        const maxTemps = Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max : [];
+        const minTemps = Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min : [];
+        const codes = Array.isArray(daily.weather_code) ? daily.weather_code : [];
+        const recentIndexes = dates.map((date, index) => ({ date, index })).filter((item) => item.date < today);
+        const forecastIndexes = dates.map((date, index) => ({ date, index })).filter((item) => item.date >= today);
+        const nextRainDay = forecastIndexes.find((item) => Number(rain[item.index] || 0) > 0.5 || Number(probs[item.index] || 0) >= 40);
+        const todayIndex = dates.findIndex((date) => date === today);
+        const currentMeta = getWeatherCodeMeta(payload?.current?.weather_code ?? codes[todayIndex]);
+
+        setWeather({
+          currentTemp: payload?.current?.temperature_2m,
+          currentLabel: currentMeta.label,
+          currentIcon: currentMeta.icon,
+          todayMaxTemp: todayIndex >= 0 ? Number(maxTemps[todayIndex] || 0) : null,
+          todayRainMm: todayIndex >= 0 ? Number(rain[todayIndex] || 0) : 0,
+          recentRainMm: recentIndexes.reduce((sum, item) => sum + Number(rain[item.index] || 0), 0),
+          maxRecentRainMm: recentIndexes.reduce((max, item) => Math.max(max, Number(rain[item.index] || 0)), 0),
+          nextRainDate: nextRainDay?.date || null,
+          nextRainMm: nextRainDay ? Number(rain[nextRainDay.index] || 0) : 0,
+          nextRainProbability: nextRainDay ? Number(probs[nextRainDay.index] || 0) : 0,
+          forecastSummary: forecastIndexes.slice(0, 3).map((item) => ({
+            date: item.date,
+            rain: Number(rain[item.index] || 0),
+            probability: Number(probs[item.index] || 0),
+            maxTemp: Number(maxTemps[item.index] || 0),
+            minTemp: Number(minTemps[item.index] || 0),
+            ...getWeatherCodeMeta(codes[item.index]),
+          })),
+        });
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          console.warn("Weather fetch failed:", error);
+          setWeather(null);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setWeatherLoading(false);
+        }
+      }
+    };
+
+    fetchWeather();
+    return () => controller.abort();
+  }, [open, parcelCentroid]);
+
+  if (!data || !Icon) return null;
 
   return (
     <div className={`cy-root ${open?"cy-root--open":""}`} style={{"--a":A,"--ab":AB}}>
@@ -124,6 +369,150 @@ export default function ResultsPanel({
             <div className="cy-tag-row">
               <span className="cy-tag" style={{background:`${PALETTE[0]}30`,color:"#4a6080"}}>⏱ {data.timing}</span>
               <span className="cy-tag" style={{background:`${PALETTE[1]}30`,color:"#2d6a4f"}}>🔁 {data.freq}</span>
+            </div>
+            <div className="cy-weather-shell">
+              <div className="cy-weather-hero" style={{borderColor:`${A}24`}}>
+                <div>
+                  <div className="cy-weather-kicker">Weather-aware sampling</div>
+                  <div className="cy-weather-title">Forecast, alerts, and seasonal recommendations</div>
+                  <div className="cy-weather-subtitle">
+                    Weather affects soil moisture, nutrient leaching, temporary pH shifts, and sample homogeneity.
+                  </div>
+                </div>
+                <div className="cy-weather-now">
+                  <strong>{weatherLoading ? "Loading forecast..." : weather?.currentLabel || "Forecast unavailable"}</strong>
+                  <span>
+                    {weatherLoading
+                      ? "Checking this parcel"
+                      : weather?.currentTemp != null
+                      ? `${Number(weather.currentTemp).toFixed(1)} degC now`
+                      : "No live parcel weather"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="cy-weather-strip">
+                {(weather?.forecastSummary || []).length > 0 ? (
+                  weather.forecastSummary.map((day, index) => {
+                    const meta = getForecastDayMeta(day.date, index);
+                    return (
+                      <article key={day.date} className={`cy-forecast-card ${index === 0 ? "cy-forecast-card--today" : ""}`}>
+                        <div className="cy-forecast-top">
+                          <span className="cy-forecast-date">{meta.dayNumber}</span>
+                          <span className="cy-forecast-name">{meta.label}</span>
+                        </div>
+                        <div className="cy-forecast-mid">
+                          <div className="cy-forecast-icon">{day.icon}</div>
+                          <div className="cy-forecast-temps">
+                            <strong>{Math.round(day.maxTemp)}°</strong>
+                            <span>{Math.round(day.minTemp)}°</span>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })
+                ) : (
+                  <div className="cy-weather-strip-empty">No forecast available yet for this parcel.</div>
+                )}
+              </div>
+
+              <div className="cy-weather-grid">
+                <div className="cy-weather-card">
+                  <div className="cy-weather-card-head">
+                    <span>Sampling impact</span>
+                    <strong>Why weather matters</strong>
+                  </div>
+                  <div className="cy-weather-forecast-list">
+                    <div className="cy-weather-day">
+                      <div className="cy-weather-day-main">
+                        <div>
+                          <strong>Rainfall</strong>
+                          <span>Recent or upcoming rain can make the soil too wet and non-uniform.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="cy-weather-day">
+                      <div className="cy-weather-day-main">
+                        <div>
+                          <strong>NPK and pH</strong>
+                          <span>Water can leach nutrients and temporarily modify pH, leading to biased lab results.</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="cy-weather-day">
+                      <div className="cy-weather-day-main">
+                        <div>
+                          <strong>Texture and handling</strong>
+                          <span>Sticky wet soil is harder to homogenize, so composite samples become less reliable.</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="cy-weather-card cy-weather-card--accent">
+                  <div className="cy-weather-card-head">
+                    <span>Sampling alert</span>
+                    <strong>Field decision</strong>
+                  </div>
+                  <div className="cy-weather-highlight">
+                    {weatherAdvice[0] ? (
+                      <>
+                        <div className={`cy-weather-pill cy-weather-pill--${weatherAdvice[0].tone}`}>{weatherAdvice[0].title}</div>
+                        <p>{weatherAdvice[0].text}</p>
+                      </>
+                    ) : (
+                      <p>Weather-based guidance will appear here once the parcel forecast loads.</p>
+                    )}
+                  </div>
+                  <div className="cy-weather-mini-stats">
+                    <div>
+                      <span>Recent rain</span>
+                      <strong>{weather ? `${Math.round(weather.recentRainMm)} mm / 3 d` : "--"}</strong>
+                    </div>
+                    <div>
+                      <span>Today max</span>
+                      <strong>{todayWeather ? `${Math.round(todayWeather.maxTemp)} degC` : "--"}</strong>
+                    </div>
+                    <div>
+                      <span>Next rain</span>
+                      <strong>
+                        {weather?.nextRainDate
+                          ? new Date(`${weather.nextRainDate}T12:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })
+                          : "Clear"}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="cy-weather-alert-stack">
+                {weatherAdvice.slice(1).map((item, index) => (
+                  <div key={`${item.title}-${index}`} className={`cy-weather-alert cy-weather-alert--${item.tone}`}>
+                    <strong>{item.title}</strong>
+                    <span>{item.text}</span>
+                  </div>
+                ))}
+                <div className="cy-weather-alert cy-weather-alert--info">
+                  <strong>Avoid sampling after rain</strong>
+                  <span>Wet soil can leach NPK, change pH temporarily, and become sticky so the final sample is less reliable.</span>
+                </div>
+              </div>
+
+              <div className="cy-weather-season-card">
+                <div className="cy-weather-card-head">
+                  <span>Seasonal recommendations</span>
+                  <strong>Sampling by season</strong>
+                </div>
+                <div className="cy-weather-season-list">
+                  {seasonalTips.map((tip, index) => (
+                    <div key={`${tip}-${index}`} className="cy-weather-season-item">
+                      <span className="cy-weather-season-dot" />
+                      <p>{tip}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="cy-slab cy-slab--formula" style={{borderColor:`${A}30`}}>
               <div className="cy-slab-left" style={{background:`${A}10`}}>
