@@ -1429,7 +1429,7 @@ function buildDepthState(mode = "eco") {
     k: 180,
     lime: 8,
     pb: 10,
-    cd: 5,
+    cd: 0.5,
     tex: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.tex : "limon-argileux",
     mo: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.om : "moyen",
   };
@@ -1611,7 +1611,7 @@ function PermanentDepthSection({ depth, sectionColor, isSat, st, onChange }) {
       <div className="sd-sec">
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:sectionColor}}>4</span>Environmental Risks</div>
         <Slider id="pb" label="Lead (Pb)" unit="mg/kg" min={0} max={100} step={1} value={st.pb} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Clean" m="25 Alert" r="100 Critical" />
-        <Slider id="cd" label="Cadmium (Cd)" unit="mg/kg" min={0} max={100} step={1} value={st.cd} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Clean" m="25 Alert" r="100 Critical" />
+        <Slider id="cd" label="Cadmium (Cd)" unit="mg/kg" min={0} max={20} step={0.1} value={st.cd} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Clean" m="25 Alert" r="100 Critical" />
       </div>
     </div>
   );
@@ -1779,8 +1779,8 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
 
           <div className="sd-sec">
             <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>4</span>Environmental Risks</div>
-            <Slider id="pb" label="Lead (Pb)" unit="mg/kg" min={0} max={100} step={1} value={st.pb} onChange={onChange} zones l="0 Clean" m="25 Alert" r="100 Critical" />
-            <Slider id="cd" label="Cadmium (Cd)" unit="mg/kg" min={0} max={100} step={1} value={st.cd} onChange={onChange} zones l="0 Clean" m="25 Alert" r="100 Critical" />
+            <Slider id="pb" label="Lead (Pb)" unit="mg/kg" min={0} max={900} step={1} value={st.pb} onChange={onChange} zones l="0 Clean" m="25 Alert" r="900 Critical" />
+            <Slider id="cd" label="Cadmium (Cd)" unit="mg/kg" min={0} max={20} step={0.1} value={st.cd} onChange={onChange} zones l="0 Clean" m="25 Alert" r="20 Critical" />
           </div>
         </>
       )}
@@ -1805,6 +1805,7 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
           <div className="sd-season-card" style={{background:`${color}10`, borderColor:`${color}22`}}>
             <span className="sd-season-card-lbl">Derived season</span>
             <div className="sd-season-card-val" style={{color}}>{seasonEmoji} {seasonLabel}</div>
+            <span className="sd-season-card-hint">Used in the analysis and recommendations.</span>
           </div>
         </div>
       </div>
