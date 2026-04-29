@@ -301,7 +301,7 @@ function toCrop(c) {
     ss: c.season
       ? c.season.split(",").map(s => s.trim()).filter(Boolean)
       : inferSeasons(c),
-    note: `Soil ${c.soilType}. N: ${c.nReq} kg/ha Â· P: ${c.pReq} kg/ha Â· K: ${c.kReq} kg/ha Â· OM >= ${limits.omMin}% Â· Active lime <= ${limits.activeLimeMax}%`,
+    note: `Soil ${c.soilType}. N: ${c.nReq} kg/ha · P: ${c.pReq} kg/ha · K: ${c.kReq} kg/ha · OM >= ${limits.omMin}% · Active lime <= ${limits.activeLimeMax}%`,
   };
 }
 
@@ -328,7 +328,7 @@ const PARAMS = [
   {id:"n",   name:"Azote N",    u:"kg/ha",mn:0, mx:400},
   {id:"p",   name:"Phosphore P",u:"kg/ha",mn:0, mx:400},
   {id:"k",   name:"Potassium K",u:"kg/ha",mn:0, mx:400},
-  {id:"temp",name:"Temp. sol",  u:"Â°C",   mn:0, mx:40 },
+  {id:"temp",name:"Temp. sol",  u:"°C",   mn:0, mx:40 },
   {id:"lime",name:"Active Lime",u:"%",    mn:0, mx:30 },
   {id:"wind",name:"Wind",       u:"km/h", mn:0, mx:80 },
   {id:"pb",  name:"Lead (Pb)",   u:"mg/kg",mn:0, mx:100},
@@ -342,10 +342,10 @@ const PARAM_ROWS = [
 ];
 
 const SN = {
-  ete:"â˜€ï¸ Algerian summer: verify irrigation. Intense heat is possible.",
-  hiver:"â„ï¸ Winter: frost risk in high plateaus. Mulching is recommended.",
-  printemps:"ðŸŒ± Spring: excellent window for summer crops.",
-  automne:"ðŸ‚ Autumn: favorable for Mediterranean crops.",
+  ete:"☀️ Algerian summer: verify irrigation. Intense heat is possible.",
+  hiver:"❄️ Winter: frost risk in high plateaus. Mulching is recommended.",
+  printemps:"🌱 Spring: excellent window for summer crops.",
+  automne:"🍂 Autumn: favorable for Mediterranean crops.",
 };
 
 const SEASON_LABELS = {
@@ -356,10 +356,10 @@ const SEASON_LABELS = {
 };
 
 const SEASON_EMOJIS = {
-  printemps: "ðŸŒ±",
-  ete: "â˜€ï¸",
-  automne: "ðŸ‚",
-  hiver: "â„ï¸",
+  printemps: "🌱",
+  ete: "☀️",
+  automne: "🍂",
+  hiver: "❄️",
 };
 
 function toDateInputValue(date = new Date()) {
@@ -464,43 +464,43 @@ function statusLabel(id, v, crop = null) {
     if (id === "ph") {
       if (v < crop.ph[0]) return "Too low";
       if (v > crop.ph[1]) return "Too high";
-      return "âœ“ OK";
+      return "✓ OK";
     }
 
     if (id === "ce") {
-      if (v > crop.ce) return v <= crop.ce + 0.5 ? "âš  Near" : "Too high";
-      return "âœ“ OK";
+      if (v > crop.ce) return v <= crop.ce + 0.5 ? "⚠ Near" : "Too high";
+      return "✓ OK";
     }
 
     if (id === "n" || id === "p" || id === "k") {
       const req = Number(crop[`${id}Req`] || 0);
       const val = Number(v || 0);
-      if (!req || val >= req) return "âœ“ OK";
-      return val >= req * 0.9 ? "âš  Near" : "Too low";
+      if (!req || val >= req) return "✓ OK";
+      return val >= req * 0.9 ? "⚠ Near" : "Too low";
     }
 
     if (id === "temp") {
-      if (v < crop.tMn) return crop.tMn - v <= 2 ? "âš  Near" : "Too low";
-      if (v > crop.tMx) return v - crop.tMx <= 2 ? "âš  Near" : "Too high";
-      return "âœ“ OK";
+      if (v < crop.tMn) return crop.tMn - v <= 2 ? "⚠ Near" : "Too low";
+      if (v > crop.tMx) return v - crop.tMx <= 2 ? "⚠ Near" : "Too high";
+      return "✓ OK";
     }
 
     if (id === "lime") {
-      if (v > crop.limeMx) return v <= crop.limeMx + 2 ? "âš  Near" : "Too high";
-      return "âœ“ OK";
+      if (v > crop.limeMx) return v <= crop.limeMx + 2 ? "⚠ Near" : "Too high";
+      return "✓ OK";
     }
 
     if (id === "wind") {
-      if (v > crop.maxWindKmh) return v <= crop.maxWindKmh + 10 ? "âš  Near" : "Too high";
-      return "âœ“ OK";
+      if (v > crop.maxWindKmh) return v <= crop.maxWindKmh + 10 ? "⚠ Near" : "Too high";
+      return "✓ OK";
     }
 
     if (HEAVY_METAL_PARAMS.has(id)) {
-      if (v <= 50) return "âœ“ OK";
-      if (v <= 80) return "âš  Warning";
-      if (crop.category === "vegetables") return "ðŸš¨ Health alert";
-      if (crop.category === "cereals") return "âš  Warning";
-      return "â„¹ Advice";
+      if (v <= 50) return "✓ OK";
+      if (v <= 80) return "⚠ Warning";
+      if (crop.category === "vegetables") return "🚨 Health alert";
+      if (crop.category === "cereals") return "⚠ Warning";
+      return "ℹ Advice";
     }
 
     if (id === "tex") {
@@ -508,17 +508,17 @@ function statusLabel(id, v, crop = null) {
       const actualIndex = TEXTURE_ORDER.indexOf(v);
       if (preferredIndex === -1 || actualIndex === -1) return "Too high";
       const distance = Math.abs(preferredIndex - actualIndex);
-      if (distance === 0) return "âœ“ OK";
-      return distance === 1 ? "âš  Near" : "Too far";
+      if (distance === 0) return "✓ OK";
+      return distance === 1 ? "⚠ Near" : "Too far";
     }
 
     if (id === "mo") {
-      return (OM_LEVEL_VALUES[v] ?? 0) >= crop.omMin ? "âœ“ OK" : ((crop.omMin - (OM_LEVEL_VALUES[v] ?? 0)) <= 0.5 ? "âš  Near" : "Too low");
+      return (OM_LEVEL_VALUES[v] ?? 0) >= crop.omMin ? "✓ OK" : ((crop.omMin - (OM_LEVEL_VALUES[v] ?? 0)) <= 0.5 ? "⚠ Near" : "Too low");
     }
   }
 
-  const fallback = { ok: "âœ“ OK", lo: "âš  Near", hi: "Too high" };
-  return fallback[pSt(id, v)] || "âœ“ OK";
+  const fallback = { ok: "✓ OK", lo: "⚠ Near", hi: "Too high" };
+  return fallback[pSt(id, v)] || "✓ OK";
 }
 
 function calcScore(st, crops = []) {
@@ -544,7 +544,7 @@ function cropAdj(c, st) {
   if (st.n < c.nReq) adj.push({t:`Add Nitrogen (N) - need at least ${c.nReq} kg/ha, current ${st.n} kg/ha`,bg:"#fff3c0"});
   if (st.p < c.pReq) adj.push({t:`Add Phosphorus (P) - need at least ${c.pReq} kg/ha, current ${st.p} kg/ha`,bg:"#fff3c0"});
   if (st.k < c.kReq) adj.push({t:`Add Potassium (K) - need at least ${c.kReq} kg/ha, current ${st.k} kg/ha`,bg:"#fff3c0"});
-  if (temp<c.tMn) adj.push({t:`Soil too cold - wait for >= ${c.tMn}Â°C`,bg:"#c0d8ff"});
+  if (temp<c.tMn) adj.push({t:`Soil too cold - wait for >= ${c.tMn}°C`,bg:"#c0d8ff"});
   if (lime>c.limeMx) adj.push({t:`Active lime too high - use tolerant crops or acidifying strategy (target <= ${c.limeMx}%)`,bg:"#fff3c0"});
   if (wind>35) adj.push({t:"Strong wind risk - add windbreaks and adjust irrigation scheduling",bg:"#ffe8c0"});
   [
@@ -918,7 +918,7 @@ function buildZoneReportHtml({
   }).join("");
 
   const actionRows = (focusCrop?.adj || []).slice(0, 6).map((item) => `
-    <li><span class="bullet">â€¢</span><span>${escapeHtml(item.t)}</span></li>
+    <li><span class="bullet">•</span><span>${escapeHtml(item.t)}</span></li>
   `).join("");
 
   const cropCards = scored.slice(0, 5).map((crop, index) => {
@@ -953,22 +953,22 @@ function buildZoneReportHtml({
   const reportState = contamination.isToxic
     ? `
       <section class="alert alert--danger">
-        <div class="alert-icon">âš </div>
+        <div class="alert-icon">⚠</div>
         <div>
           <h2>Critical contamination detected</h2>
           <p>Lead (Pb): ${contamination.pb} mg/kg ${contamination.pbExcess > 0 ? `( +${contamination.pbExcess.toFixed(1)} over limit )` : ""}<br />Cadmium (Cd): ${contamination.cd} mg/kg ${contamination.cdExcess > 0 ? `( +${contamination.cdExcess.toFixed(1)} over limit )` : ""}</p>
         </div>
       </section>
       <ul class="action-list">
-        <li><span class="bullet">â€¢</span><span>Confirm contamination sources with a detailed laboratory analysis.</span></li>
-        <li><span class="bullet">â€¢</span><span>Apply remediation measures such as phytoremediation, soil replacement, or stabilization.</span></li>
-        <li><span class="bullet">â€¢</span><span>Keep edible crops out of the zone until concentrations are reduced below safe thresholds.</span></li>
-        <li><span class="bullet">â€¢</span><span>Document all corrective actions for traceability and future audits.</span></li>
+        <li><span class="bullet">•</span><span>Confirm contamination sources with a detailed laboratory analysis.</span></li>
+        <li><span class="bullet">•</span><span>Apply remediation measures such as phytoremediation, soil replacement, or stabilization.</span></li>
+        <li><span class="bullet">•</span><span>Keep edible crops out of the zone until concentrations are reduced below safe thresholds.</span></li>
+        <li><span class="bullet">•</span><span>Document all corrective actions for traceability and future audits.</span></li>
       </ul>
     `
     : `
       <ul class="action-list">
-        ${actionRows || '<li><span class="bullet">â€¢</span><span>No major correction is required for the current focus crop.</span></li>'}
+        ${actionRows || '<li><span class="bullet">•</span><span>No major correction is required for the current focus crop.</span></li>'}
       </ul>
     `;
 
@@ -1337,7 +1337,7 @@ function buildZoneReportHtml({
   <article class="sheet">
     <header class="hero">
       <div class="hero-main">
-        <div class="eyebrow">Zone report Â· ${escapeHtml(modeLabel)} mode</div>
+        <div class="eyebrow">Zone report · ${escapeHtml(modeLabel)} mode</div>
         <h1>Full zone report for ${safeParcelle}</h1>
         <p>
           This report summarizes the analyzed zone, the measured soil indicators, the crop fit score,
@@ -1621,6 +1621,7 @@ function PermanentDepthSection({ depth, sectionColor, isSat, st, onChange }) {
 function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultureLabel, onAnalyze, analyzing, hasResult, onPrintLabRequest, onPrintLabRequestEco }) {
   const isSat = id => diagMode === "eco" && id in SAT_FIELDS;
   const seasonLabel = getSeasonLabel(st.seas);
+  const seasonEmoji = SEASON_EMOJIS[st.seas] || "📅";
   const isPermanentCulture = cultureLabel === "Permanent";
 
   return (
@@ -1803,7 +1804,7 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
           </label>
           <div className="sd-season-card" style={{background:`${color}10`, borderColor:`${color}22`}}>
             <span className="sd-season-card-lbl">Derived season</span>
-            <div className="sd-season-card-val" style={{color}}>{seasonLabel}</div>
+            <div className="sd-season-card-val" style={{color}}>{seasonEmoji} {seasonLabel}</div>
           </div>
         </div>
       </div>
@@ -1877,7 +1878,7 @@ function ResultsView({
   const contamination = isSoilToxic(st);
 
   const sc = calcScore(st, crops), scC = mc(sc), scBg = mcBg(sc);
-  const scLbl = sc>=80 ? "Excellent ðŸŽ‰" : sc>=60 ? "Needs improvement" : "Difficult";
+  const scLbl = sc>=80 ? "Excellent 🎉" : sc>=60 ? "Needs improvement" : "Difficult";
 
   // âœ… NEW: Soil type compatibility filter (same or tolerated swap only)
   const isTextureAllowed = (actual, preferred) => {
@@ -1924,7 +1925,7 @@ function ResultsView({
             </svg>
             <div>
               <h3 style={{ margin: 0, fontSize: "20px", fontWeight: "700", color: "#ff6b6b" }}>
-                âš ï¸ Soil Unusable - Critical Contamination
+                ⚠️ Soil Unusable - Critical Contamination
               </h3>
               <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#ccc" }}>
                 Heavy metal levels exceed safe limits for ALL crops
@@ -1981,7 +1982,7 @@ function ResultsView({
           {!tgt && (
             <div className="sd-a1">
               <div className="sd-sec-head">
-                <span className="sd-sec-head-t">ðŸŒ± Top recommendation</span>
+                <span className="sd-sec-head-t">🌱 Top recommendation</span>
                 <span className="sd-sec-head-m">Best match</span>
               </div>
               {bestCrop && (
@@ -1996,7 +1997,7 @@ function ResultsView({
                     <div className="sd-rec-score">
                       <div className="sd-rec-pct" style={{color:mc(bestCrop.sc)}}>{bestCrop.sc}/100</div>
                       <div className="sd-rec-pct-lbl">compatibility</div>
-                      <div className="sd-rec-best-tag">â˜… Best choice</div>
+                      <div className="sd-rec-best-tag">★ Best choice</div>
                     </div>
                   </div>
                   <div className="sd-rec-bottom">
@@ -2006,7 +2007,7 @@ function ResultsView({
                         <span className="sd-rec-chip">SEASON MATCH</span>
                       ) : (
                         <span className="sd-rec-chip" style={{ background: "#ffe0e0", color: "#c02020", border: "1px solid #ffc8c8" }}>
-                          âš ï¸ WRONG SEASON Â· HIGH FAILURE RISK
+                          ⚠️ WRONG SEASON · HIGH FAILURE RISK
                         </span>
                       )}
                     </div>
@@ -2065,8 +2066,8 @@ function ResultsView({
           {recs && (
             <div className="sd-a3">
               <div className="sd-sec-head">
-                <span className="sd-sec-head-t">ðŸŒ± Recommended Crops</span>
-                <span className="sd-sec-head-m">{st.seas} Â· next 3</span>
+                <span className="sd-sec-head-t">🌱 Recommended Crops</span>
+                <span className="sd-sec-head-m">{st.seas} · next 3</span>
               </div>
               <div className="sd-rec-cards">
                 {recs.map((c,i) => (
@@ -2081,7 +2082,7 @@ function ResultsView({
                       <div className="sd-rec-score">
                         <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}/100</div>
                         <div className="sd-rec-pct-lbl">compatibility</div>
-                        {i===0 && <div className="sd-rec-best-tag">â˜… Best choice</div>}
+                        {i===0 && <div className="sd-rec-best-tag">★ Best choice</div>}
                       </div>
                     </div>
                     <div className="sd-rec-bottom">
@@ -2116,15 +2117,15 @@ function ResultsView({
           {/* Verdict */}
           {tgt && (() => {
             const vrd = tgt.sc>=80
-              ? {e:"âœ…",bg:mcBg(tgt.sc),bc:"rgba(30,130,80,.2)",c:mc(tgt.sc),t:"Crop compatible",s:`Your soil is well suited. You can plant ${tgt.n} without major corrections.`}
+              ? {e:"✅",bg:mcBg(tgt.sc),bc:"rgba(30,130,80,.2)",c:mc(tgt.sc),t:"Crop compatible",s:`Your soil is well suited. You can plant ${tgt.n} without major corrections.`}
               : tgt.sc>=55
-              ? {e:"âš ï¸",bg:"rgba(255,220,100,.18)",bc:"rgba(220,160,40,.3)",c:"#92400e",t:"Compatible with corrections",s:`${tgt.n} can be grown, but adjustments are recommended.`}
-              : {e:"âŒ",bg:"rgba(255,150,140,.18)",bc:"rgba(200,60,60,.25)",c:"#991b1b",t:"Crop not recommended",s:`Current conditions are not favorable for ${tgt.n}.`};
+              ? {e:"⚠️",bg:"rgba(255,220,100,.18)",bc:"rgba(220,160,40,.3)",c:"#92400e",t:"Compatible with corrections",s:`${tgt.n} can be grown, but adjustments are recommended.`}
+              : {e:"❌",bg:"rgba(255,150,140,.18)",bc:"rgba(200,60,60,.25)",c:"#991b1b",t:"Crop not recommended",s:`Current conditions are not favorable for ${tgt.n}.`};
             const altsSection = alts.length > 0;
             return (
               <>
                 <div className="sd-a3">
-                  <div className="sd-sec-head"><span className="sd-sec-head-t">ðŸ”Ž Analysis - {tgt.n}</span></div>
+                  <div className="sd-sec-head"><span className="sd-sec-head-t">🔎 Analysis - {tgt.n}</span></div>
                   <div className="sd-verd-card">
                     <div className="sd-verd-top">
                       <div className="sd-verd-chip">Selected crop</div>
@@ -2150,19 +2151,19 @@ function ResultsView({
                         <div className="sd-verd-adj-lbl">Required adjustments</div>
                         {tgt.adj.map((a,i) => (
                           <div key={i} className="sd-verd-adj">
-                            <div className="sd-verd-adj-pill" style={{background:a.bg}}>âš™</div>
+                            <div className="sd-verd-adj-pill" style={{background:a.bg}}>⚙</div>
                             {a.t}
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="sd-verd-ok">âœ“ No major adjustment required - you can plant!</div>
+                      <div className="sd-verd-ok">✓ No major adjustment required - you can plant!</div>
                     )}
                   </div>
                 </div>
                 {altsSection && (
                   <div className="sd-a4">
-                    <div className="sd-sec-head" style={{marginTop:4}}><span className="sd-sec-head-t">ðŸ’¡ Suggested Alternatives</span></div>
+                    <div className="sd-sec-head" style={{marginTop:4}}><span className="sd-sec-head-t">💡 Suggested Alternatives</span></div>
                     <div className="sd-rec-cards">
                       {alts.map(c => (
                         <div key={c.id} className="sd-rec-card">
@@ -3151,7 +3152,7 @@ export default function SoilDiagnostic({
             <div className="sd-tb-chip">
               <div className="sd-tb-dot" />
               <span className="sd-tb-cname">{parcelleName}</span>
-              <span className="sd-tb-csub">Â· {cultureLabel}</span>
+              <span className="sd-tb-csub">· {cultureLabel}</span>
             </div>
 
             {/* MODE TOGGLE */}
@@ -3182,7 +3183,7 @@ export default function SoilDiagnostic({
             <div className="sd-tb-right">
               {doneCount > 0 && (
                 <div className="sd-tb-progress">
-                  {doneCount}/{n} zone{n>1?"s":""} âœ“
+                  {doneCount}/{n} zone{n>1?"s":""} ✓
                 </div>
               )}
               <button className="sd-tb-close" onClick={onClose}>
