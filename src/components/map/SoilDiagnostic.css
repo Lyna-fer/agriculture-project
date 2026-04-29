@@ -1684,3 +1684,368 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Studio dashboard redesign */
+.sd-dashboard--studio {
+  padding: 28px;
+  background: #ededeb;
+}
+
+.sd-studio-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border-radius: 28px;
+  background: rgba(255,255,255,.9);
+  border: 1px solid rgba(18,24,38,.08);
+  box-shadow: 0 26px 70px rgba(34, 40, 30, .10);
+  overflow: hidden;
+}
+
+.sd-studio-main {
+  padding: 26px;
+}
+
+.sd-studio-topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.sd-studio-title {
+  margin: 0;
+  font-size: 1.9rem;
+  font-weight: 900;
+  color: #191b18;
+  letter-spacing: -.05em;
+}
+
+.sd-studio-subtitle {
+  margin: 6px 0 0;
+  font-size: .78rem;
+  color: #737672;
+  font-family: var(--sd-font2);
+}
+
+.sd-studio-grid {
+  display: grid;
+  grid-template-columns: minmax(390px, .86fr) minmax(420px, 1.14fr);
+  gap: 16px;
+}
+
+.sd-studio-left,
+.sd-studio-right {
+  display: grid;
+  gap: 12px;
+}
+
+.sd-studio-weather-card,
+.sd-studio-mini-card,
+.sd-studio-wide-card,
+.sd-studio-growth-card,
+.sd-studio-map-card,
+.sd-studio-history-card {
+  border-radius: 20px;
+  border: 1px solid rgba(18,24,38,.08);
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 12px 28px rgba(34, 40, 30, .06);
+}
+
+.sd-studio-weather-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  gap: 14px;
+  padding: 16px;
+}
+
+.sd-studio-weather-label {
+  font-size: .8rem;
+  color: #2d302d;
+}
+
+.sd-studio-weather-emoji {
+  margin-top: 12px;
+  font-size: 4rem;
+  line-height: 1;
+}
+
+.sd-studio-weather-date {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sd-studio-weather-date strong {
+  font-size: 3.2rem;
+  line-height: 1;
+  font-weight: 900;
+  color: #1a1d19;
+}
+
+.sd-studio-weather-date span {
+  font-size: 1rem;
+  color: #343833;
+}
+
+.sd-studio-weather-metrics {
+  display: grid;
+  gap: 12px;
+}
+
+.sd-studio-weather-pill {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  min-height: 58px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: #f4f3f0;
+}
+
+.sd-studio-weather-pill span {
+  font-size: .72rem;
+  color: #2b302b;
+}
+
+.sd-studio-weather-pill strong {
+  font-size: 1rem;
+  font-weight: 900;
+  color: #181c18;
+}
+
+.sd-studio-stat-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sd-studio-mini-card,
+.sd-studio-wide-card,
+.sd-studio-growth-card,
+.sd-studio-history-card {
+  padding: 16px;
+}
+
+.sd-studio-mini-head span,
+.sd-studio-wide-head strong,
+.sd-studio-growth-head strong,
+.sd-studio-history-head strong {
+  font-size: .82rem;
+  color: #1f231f;
+}
+
+.sd-studio-mini-value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.sd-studio-mini-value strong {
+  font-size: 2.3rem;
+  line-height: 1;
+  font-weight: 900;
+  color: #111;
+}
+
+.sd-studio-mini-value span {
+  font-size: .8rem;
+  color: #7a7f79;
+}
+
+.sd-studio-wide-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.sd-studio-wide-head span,
+.sd-studio-growth-head span,
+.sd-studio-history-head span {
+  display: block;
+  margin-top: 4px;
+  font-size: .68rem;
+  color: #7d817d;
+}
+
+.sd-studio-wide-head em {
+  font-style: normal;
+  font-size: .78rem;
+  font-weight: 900;
+  color: #1a9b5b;
+}
+
+.sd-studio-nutrient-wave {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  height: 44px;
+  margin-top: 16px;
+}
+
+.sd-studio-nutrient-segment {
+  height: 12px;
+  border-radius: 999px;
+}
+
+.sd-studio-growth-gauge {
+  position: relative;
+  width: 280px;
+  height: 170px;
+  margin: 18px auto 0;
+  overflow: hidden;
+}
+
+.sd-studio-growth-arc {
+  position: absolute;
+  inset: 0;
+  border-radius: 280px 280px 0 0;
+  mask: radial-gradient(circle at 50% 100%, transparent 58%, #000 59%);
+}
+
+.sd-studio-growth-inner {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.sd-studio-growth-inner strong {
+  display: block;
+  font-size: 3.3rem;
+  line-height: 1;
+  font-weight: 900;
+  color: #111;
+}
+
+.sd-studio-growth-inner span {
+  display: block;
+  margin-top: 8px;
+  font-size: .82rem;
+  color: #7c807a;
+}
+
+.sd-studio-growth-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.sd-studio-growth-stats div {
+  text-align: center;
+}
+
+.sd-studio-growth-stats strong {
+  display: block;
+  font-size: 1.4rem;
+  color: #111;
+}
+
+.sd-studio-growth-stats span {
+  font-size: .72rem;
+  color: #7d817d;
+}
+
+.sd-studio-map-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.sd-heatmap-frame--studio {
+  min-height: 460px;
+  margin-top: 0;
+  border-radius: 20px;
+}
+
+.sd-studio-history-card {
+  margin-top: 12px;
+}
+
+.sd-studio-history-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.sd-studio-history-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.sd-studio-history-row {
+  display: grid;
+  gap: 6px;
+}
+
+.sd-studio-history-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.sd-studio-history-meta span {
+  font-size: .68rem;
+  color: #535953;
+}
+
+.sd-studio-history-meta strong {
+  font-size: .72rem;
+  color: #121612;
+}
+
+.sd-studio-history-bars {
+  display: grid;
+  gap: 5px;
+}
+
+.sd-dashboard--studio .sd-history-bar {
+  min-height: 10px;
+  padding: 0;
+}
+
+.sd-dashboard--studio .sd-history-bar span {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  .sd-studio-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sd-studio-weather-card {
+    grid-template-columns: 1fr;
+  }
+
+  .sd-studio-history-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .sd-dashboard--studio {
+    padding: 12px;
+  }
+
+  .sd-studio-main {
+    padding: 14px;
+  }
+
+  .sd-studio-topbar {
+    display: grid;
+  }
+
+  .sd-studio-stat-row {
+    grid-template-columns: 1fr;
+  }
+
+}

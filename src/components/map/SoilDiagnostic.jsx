@@ -1,9 +1,9 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+﻿import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import "./SoilDiagnostic.css";
 import PortalOverlay from "./PortalOverlay";
 import satelliteFallback from "../../assets/satellite.png";
 
-/* ─── Satellite defaults ─────────────────────────────────────────────────── */
+/* â”€â”€â”€ Satellite defaults â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const SAT_DEFAULTS = { ce: 1.2, temp: 22, tex: "limon-argileux", om: "moyen" };
 const SAT_FIELDS   = {
   ce: "Landsat 8",
@@ -13,17 +13,17 @@ const SAT_FIELDS   = {
 };
 const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
-/* ─── Zone colour palette ────────────────────────────────────────────────── */
+/* â”€â”€â”€ Zone colour palette â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const ZONE_COLORS = ["#7F77DD","#1D9E75","#E07850","#C05090","#3090C0","#8060A0","#C0A020"];
 const ZONE_LIGHTS = ["#EEEDFE","#E1F5EE","#FEF0E8","#FCE8F4","#E8F4FC","#F0E8FC","#FEF8E0"];
 
-/* ─── Crop helpers ───────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Crop helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const EMOJI_BG = {
-  "🍅":"#ffd8d0","🥔":"#f5e6cc","🧅":"#f0e0c0","🧄":"#f0e8c0","🫑":"#d0f0d0",
-  "🌶️":"#ffd0c0","🥒":"#d0f0e0","🍆":"#e0c8f8","🥕":"#ffe0c0","🥦":"#d0ecd0",
-  "🥬":"#c8f0d0","🫘":"#f0e8d0","🍉":"#ffd0d8","🌾":"#f5f0d8","🌽":"#fff0c8",
-  "🍈":"#e8f6cc","🫒":"#d8ecd0","🌴":"#d0e8c0","🍊":"#ffe0c0","🍋":"#fff8c8","🍇":"#e0d0f8",
-  "🍑":"#ffdcc8","🍎":"#ffd0d0","🍒":"#ffc8cc","🍐":"#e0f0d0",
+  "ðŸ…":"#ffd8d0","ðŸ¥”":"#f5e6cc","ðŸ§…":"#f0e0c0","ðŸ§„":"#f0e8c0","ðŸ«‘":"#d0f0d0",
+  "ðŸŒ¶ï¸":"#ffd0c0","ðŸ¥’":"#d0f0e0","ðŸ†":"#e0c8f8","ðŸ¥•":"#ffe0c0","ðŸ¥¦":"#d0ecd0",
+  "ðŸ¥¬":"#c8f0d0","ðŸ«˜":"#f0e8d0","ðŸ‰":"#ffd0d8","ðŸŒ¾":"#f5f0d8","ðŸŒ½":"#fff0c8",
+  "ðŸˆ":"#e8f6cc","ðŸ«’":"#d8ecd0","ðŸŒ´":"#d0e8c0","ðŸŠ":"#ffe0c0","ðŸ‹":"#fff8c8","ðŸ‡":"#e0d0f8",
+  "ðŸ‘":"#ffdcc8","ðŸŽ":"#ffd0d0","ðŸ’":"#ffc8cc","ðŸ":"#e0f0d0",
 };
 
 const SOIL_TEXTURE_TO_KEY = {
@@ -200,7 +200,7 @@ function pollutionMultiplier(st, crop) {
   return Math.max(0, Math.min(cdFactor, pbFactor));
 }
 
-// ✅ NEW: Severe contamination check (Pb > 800 OR Cd > 15 blocks ALL crops)
+// âœ… NEW: Severe contamination check (Pb > 800 OR Cd > 15 blocks ALL crops)
 function isSoilToxic(st) {
   const pb = Number(st?.pb || 0);
   const cd = Number(st?.cd || 0);
@@ -301,11 +301,11 @@ function toCrop(c) {
     ss: c.season
       ? c.season.split(",").map(s => s.trim()).filter(Boolean)
       : inferSeasons(c),
-    note: `Soil ${c.soilType}. N: ${c.nReq} kg/ha · P: ${c.pReq} kg/ha · K: ${c.kReq} kg/ha · OM >= ${limits.omMin}% · Active lime <= ${limits.activeLimeMax}%`,
+    note: `Soil ${c.soilType}. N: ${c.nReq} kg/ha Â· P: ${c.pReq} kg/ha Â· K: ${c.kReq} kg/ha Â· OM >= ${limits.omMin}% Â· Active lime <= ${limits.activeLimeMax}%`,
   };
 }
 
-/* ─── Scoring ────────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Scoring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const ZC = {
   ph:   [{c:"#ff8a80",f:14},{c:"#ffcc80",f:14},{c:"#a5d6a7",f:36},{c:"#ffcc80",f:20},{c:"#ff8a80",f:16}],
   ce:   [{c:"#a5d6a7",f:35},{c:"#ffcc80",f:25},{c:"#ff8a80",f:40}],
@@ -328,7 +328,7 @@ const PARAMS = [
   {id:"n",   name:"Azote N",    u:"kg/ha",mn:0, mx:400},
   {id:"p",   name:"Phosphore P",u:"kg/ha",mn:0, mx:400},
   {id:"k",   name:"Potassium K",u:"kg/ha",mn:0, mx:400},
-  {id:"temp",name:"Temp. sol",  u:"°C",   mn:0, mx:40 },
+  {id:"temp",name:"Temp. sol",  u:"Â°C",   mn:0, mx:40 },
   {id:"lime",name:"Active Lime",u:"%",    mn:0, mx:30 },
   {id:"wind",name:"Wind",       u:"km/h", mn:0, mx:80 },
   {id:"pb",  name:"Lead (Pb)",   u:"mg/kg",mn:0, mx:100},
@@ -342,10 +342,10 @@ const PARAM_ROWS = [
 ];
 
 const SN = {
-  ete:"☀️ Algerian summer: verify irrigation. Intense heat is possible.",
-  hiver:"❄️ Winter: frost risk in high plateaus. Mulching is recommended.",
-  printemps:"🌱 Spring: excellent window for summer crops.",
-  automne:"🍂 Autumn: favorable for Mediterranean crops.",
+  ete:"â˜€ï¸ Algerian summer: verify irrigation. Intense heat is possible.",
+  hiver:"â„ï¸ Winter: frost risk in high plateaus. Mulching is recommended.",
+  printemps:"ðŸŒ± Spring: excellent window for summer crops.",
+  automne:"ðŸ‚ Autumn: favorable for Mediterranean crops.",
 };
 
 const SEASON_LABELS = {
@@ -356,10 +356,10 @@ const SEASON_LABELS = {
 };
 
 const SEASON_EMOJIS = {
-  printemps: "🌱",
-  ete: "☀️",
-  automne: "🍂",
-  hiver: "❄️",
+  printemps: "ðŸŒ±",
+  ete: "â˜€ï¸",
+  automne: "ðŸ‚",
+  hiver: "â„ï¸",
 };
 
 function toDateInputValue(date = new Date()) {
@@ -464,43 +464,43 @@ function statusLabel(id, v, crop = null) {
     if (id === "ph") {
       if (v < crop.ph[0]) return "Too low";
       if (v > crop.ph[1]) return "Too high";
-      return "✓ OK";
+      return "âœ“ OK";
     }
 
     if (id === "ce") {
-      if (v > crop.ce) return v <= crop.ce + 0.5 ? "⚠ Near" : "Too high";
-      return "✓ OK";
+      if (v > crop.ce) return v <= crop.ce + 0.5 ? "âš  Near" : "Too high";
+      return "âœ“ OK";
     }
 
     if (id === "n" || id === "p" || id === "k") {
       const req = Number(crop[`${id}Req`] || 0);
       const val = Number(v || 0);
-      if (!req || val >= req) return "✓ OK";
-      return val >= req * 0.9 ? "⚠ Near" : "Too low";
+      if (!req || val >= req) return "âœ“ OK";
+      return val >= req * 0.9 ? "âš  Near" : "Too low";
     }
 
     if (id === "temp") {
-      if (v < crop.tMn) return crop.tMn - v <= 2 ? "⚠ Near" : "Too low";
-      if (v > crop.tMx) return v - crop.tMx <= 2 ? "⚠ Near" : "Too high";
-      return "✓ OK";
+      if (v < crop.tMn) return crop.tMn - v <= 2 ? "âš  Near" : "Too low";
+      if (v > crop.tMx) return v - crop.tMx <= 2 ? "âš  Near" : "Too high";
+      return "âœ“ OK";
     }
 
     if (id === "lime") {
-      if (v > crop.limeMx) return v <= crop.limeMx + 2 ? "⚠ Near" : "Too high";
-      return "✓ OK";
+      if (v > crop.limeMx) return v <= crop.limeMx + 2 ? "âš  Near" : "Too high";
+      return "âœ“ OK";
     }
 
     if (id === "wind") {
-      if (v > crop.maxWindKmh) return v <= crop.maxWindKmh + 10 ? "⚠ Near" : "Too high";
-      return "✓ OK";
+      if (v > crop.maxWindKmh) return v <= crop.maxWindKmh + 10 ? "âš  Near" : "Too high";
+      return "âœ“ OK";
     }
 
     if (HEAVY_METAL_PARAMS.has(id)) {
-      if (v <= 50) return "✓ OK";
-      if (v <= 80) return "⚠ Warning";
-      if (crop.category === "vegetables") return "🚨 Health alert";
-      if (crop.category === "cereals") return "⚠ Warning";
-      return "ℹ Advice";
+      if (v <= 50) return "âœ“ OK";
+      if (v <= 80) return "âš  Warning";
+      if (crop.category === "vegetables") return "ðŸš¨ Health alert";
+      if (crop.category === "cereals") return "âš  Warning";
+      return "â„¹ Advice";
     }
 
     if (id === "tex") {
@@ -508,17 +508,17 @@ function statusLabel(id, v, crop = null) {
       const actualIndex = TEXTURE_ORDER.indexOf(v);
       if (preferredIndex === -1 || actualIndex === -1) return "Too high";
       const distance = Math.abs(preferredIndex - actualIndex);
-      if (distance === 0) return "✓ OK";
-      return distance === 1 ? "⚠ Near" : "Too far";
+      if (distance === 0) return "âœ“ OK";
+      return distance === 1 ? "âš  Near" : "Too far";
     }
 
     if (id === "mo") {
-      return (OM_LEVEL_VALUES[v] ?? 0) >= crop.omMin ? "✓ OK" : ((crop.omMin - (OM_LEVEL_VALUES[v] ?? 0)) <= 0.5 ? "⚠ Near" : "Too low");
+      return (OM_LEVEL_VALUES[v] ?? 0) >= crop.omMin ? "âœ“ OK" : ((crop.omMin - (OM_LEVEL_VALUES[v] ?? 0)) <= 0.5 ? "âš  Near" : "Too low");
     }
   }
 
-  const fallback = { ok: "✓ OK", lo: "⚠ Near", hi: "Too high" };
-  return fallback[pSt(id, v)] || "✓ OK";
+  const fallback = { ok: "âœ“ OK", lo: "âš  Near", hi: "Too high" };
+  return fallback[pSt(id, v)] || "âœ“ OK";
 }
 
 function calcScore(st, crops = []) {
@@ -544,7 +544,7 @@ function cropAdj(c, st) {
   if (st.n < c.nReq) adj.push({t:`Add Nitrogen (N) - need at least ${c.nReq} kg/ha, current ${st.n} kg/ha`,bg:"#fff3c0"});
   if (st.p < c.pReq) adj.push({t:`Add Phosphorus (P) - need at least ${c.pReq} kg/ha, current ${st.p} kg/ha`,bg:"#fff3c0"});
   if (st.k < c.kReq) adj.push({t:`Add Potassium (K) - need at least ${c.kReq} kg/ha, current ${st.k} kg/ha`,bg:"#fff3c0"});
-  if (temp<c.tMn) adj.push({t:`Soil too cold - wait for >= ${c.tMn}°C`,bg:"#c0d8ff"});
+  if (temp<c.tMn) adj.push({t:`Soil too cold - wait for >= ${c.tMn}Â°C`,bg:"#c0d8ff"});
   if (lime>c.limeMx) adj.push({t:`Active lime too high - use tolerant crops or acidifying strategy (target <= ${c.limeMx}%)`,bg:"#fff3c0"});
   if (wind>35) adj.push({t:"Strong wind risk - add windbreaks and adjust irrigation scheduling",bg:"#ffe8c0"});
   [
@@ -918,7 +918,7 @@ function buildZoneReportHtml({
   }).join("");
 
   const actionRows = (focusCrop?.adj || []).slice(0, 6).map((item) => `
-    <li><span class="bullet">•</span><span>${escapeHtml(item.t)}</span></li>
+    <li><span class="bullet">â€¢</span><span>${escapeHtml(item.t)}</span></li>
   `).join("");
 
   const cropCards = scored.slice(0, 5).map((crop, index) => {
@@ -953,22 +953,22 @@ function buildZoneReportHtml({
   const reportState = contamination.isToxic
     ? `
       <section class="alert alert--danger">
-        <div class="alert-icon">⚠</div>
+        <div class="alert-icon">âš </div>
         <div>
           <h2>Critical contamination detected</h2>
           <p>Lead (Pb): ${contamination.pb} mg/kg ${contamination.pbExcess > 0 ? `( +${contamination.pbExcess.toFixed(1)} over limit )` : ""}<br />Cadmium (Cd): ${contamination.cd} mg/kg ${contamination.cdExcess > 0 ? `( +${contamination.cdExcess.toFixed(1)} over limit )` : ""}</p>
         </div>
       </section>
       <ul class="action-list">
-        <li><span class="bullet">•</span><span>Confirm contamination sources with a detailed laboratory analysis.</span></li>
-        <li><span class="bullet">•</span><span>Apply remediation measures such as phytoremediation, soil replacement, or stabilization.</span></li>
-        <li><span class="bullet">•</span><span>Keep edible crops out of the zone until concentrations are reduced below safe thresholds.</span></li>
-        <li><span class="bullet">•</span><span>Document all corrective actions for traceability and future audits.</span></li>
+        <li><span class="bullet">â€¢</span><span>Confirm contamination sources with a detailed laboratory analysis.</span></li>
+        <li><span class="bullet">â€¢</span><span>Apply remediation measures such as phytoremediation, soil replacement, or stabilization.</span></li>
+        <li><span class="bullet">â€¢</span><span>Keep edible crops out of the zone until concentrations are reduced below safe thresholds.</span></li>
+        <li><span class="bullet">â€¢</span><span>Document all corrective actions for traceability and future audits.</span></li>
       </ul>
     `
     : `
       <ul class="action-list">
-        ${actionRows || '<li><span class="bullet">•</span><span>No major correction is required for the current focus crop.</span></li>'}
+        ${actionRows || '<li><span class="bullet">â€¢</span><span>No major correction is required for the current focus crop.</span></li>'}
       </ul>
     `;
 
@@ -1337,7 +1337,7 @@ function buildZoneReportHtml({
   <article class="sheet">
     <header class="hero">
       <div class="hero-main">
-        <div class="eyebrow">Zone report · ${escapeHtml(modeLabel)} mode</div>
+        <div class="eyebrow">Zone report Â· ${escapeHtml(modeLabel)} mode</div>
         <h1>Full zone report for ${safeParcelle}</h1>
         <p>
           This report summarizes the analyzed zone, the measured soil indicators, the crop fit score,
@@ -1413,7 +1413,7 @@ function buildZoneReportHtml({
 </html>`;
 }
 
-/* ─── Default state factory ──────────────────────────────────────────────── */
+/* â”€â”€â”€ Default state factory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const PERMANENT_DEPTHS = [
   { key: "depth0_20", label: "0-20 cm", note: "Surface layer" },
   { key: "depth20_40", label: "20-40 cm", note: "Root zone" },
@@ -1621,7 +1621,6 @@ function PermanentDepthSection({ depth, sectionColor, isSat, st, onChange }) {
 function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultureLabel, onAnalyze, analyzing, hasResult, onPrintLabRequest, onPrintLabRequestEco }) {
   const isSat = id => diagMode === "eco" && id in SAT_FIELDS;
   const seasonLabel = getSeasonLabel(st.seas);
-  const seasonEmoji = SEASON_EMOJIS[st.seas] || "??";
   const isPermanentCulture = cultureLabel === "Permanent";
 
   return (
@@ -1638,7 +1637,7 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
             <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2" />
             <circle cx="5" cy="5" r="1.5" fill="currentColor" />
           </svg>
-          CE: Landsat 8 � Texture: OpenLandMap / SoilGrids (Global Soil Map)
+          CE: Landsat 8 · Texture: OpenLandMap / SoilGrids (Global Soil Map)
         </div>
       )}
 
@@ -1804,8 +1803,7 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
           </label>
           <div className="sd-season-card" style={{background:`${color}10`, borderColor:`${color}22`}}>
             <span className="sd-season-card-lbl">Derived season</span>
-            <div className="sd-season-card-val" style={{color}}>{seasonEmoji} {seasonLabel}</div>
-            <span className="sd-season-card-hint">Used in the analysis result and recommendations.</span>
+            <div className="sd-season-card-val" style={{color}}>{seasonLabel}</div>
           </div>
         </div>
       </div>
@@ -1817,7 +1815,7 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
           <span className="sd-sec-opt"> - optional</span>
         </div>
         <div className="sd-crops-count">
-          <span>{crops.length} crops � {cultureLabel}</span>
+          <span>{crops.length} crops · {cultureLabel}</span>
         </div>
         <div className="sd-select-wrap">
           <select className="sd-sel" value={st.crop} onChange={e => onChange("crop", e.target.value)}>
@@ -1870,18 +1868,18 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
   );
 }
 
-/* RESULTS VIEW - ✅ FIXED WITH CONTAMINATION WARNING */
+/* RESULTS VIEW - âœ… FIXED WITH CONTAMINATION WARNING */
 function ResultsView({
   st, onReset, crops, diagMode, color, zoneIdx, nZones, onNext, onDownloadReport,
   onOpenDashboard, showDashboardAction = false,
 }) {
-  // ✅ NEW: Check for severe contamination (Pb>800 OR Cd>15)
+  // âœ… NEW: Check for severe contamination (Pb>800 OR Cd>15)
   const contamination = isSoilToxic(st);
 
   const sc = calcScore(st, crops), scC = mc(sc), scBg = mcBg(sc);
-  const scLbl = sc>=80 ? "Excellent 🎉" : sc>=60 ? "Needs improvement" : "Difficult";
+  const scLbl = sc>=80 ? "Excellent ðŸŽ‰" : sc>=60 ? "Needs improvement" : "Difficult";
 
-  // ✅ NEW: Soil type compatibility filter (same or tolerated swap only)
+  // âœ… NEW: Soil type compatibility filter (same or tolerated swap only)
   const isTextureAllowed = (actual, preferred) => {
     if (!actual || !preferred) return true;
     if (actual === preferred) return true;
@@ -1908,7 +1906,7 @@ function ResultsView({
 
   return (
     <>
-      {/* ✅ SEVERE CONTAMINATION WARNING - Shows when Pb>800 OR Cd>15 */}
+      {/* âœ… SEVERE CONTAMINATION WARNING - Shows when Pb>800 OR Cd>15 */}
       {contamination.isToxic && (
         <div className="sd-toxic-alert" style={{
           background: "linear-gradient(135deg, #1a1a1a, #2d2d2d)",
@@ -1926,7 +1924,7 @@ function ResultsView({
             </svg>
             <div>
               <h3 style={{ margin: 0, fontSize: "20px", fontWeight: "700", color: "#ff6b6b" }}>
-                ⚠️ Soil Unusable - Critical Contamination
+                âš ï¸ Soil Unusable - Critical Contamination
               </h3>
               <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#ccc" }}>
                 Heavy metal levels exceed safe limits for ALL crops
@@ -1976,14 +1974,14 @@ function ResultsView({
         </div>
       )}
 
-      {/* ✅ Only show crop recommendations if soil is NOT toxic */}
+      {/* âœ… Only show crop recommendations if soil is NOT toxic */}
       {!contamination.isToxic && (
         <div className="sd-results">
           {/* Top Recommendation */}
           {!tgt && (
             <div className="sd-a1">
               <div className="sd-sec-head">
-                <span className="sd-sec-head-t">🌱 Top recommendation</span>
+                <span className="sd-sec-head-t">ðŸŒ± Top recommendation</span>
                 <span className="sd-sec-head-m">Best match</span>
               </div>
               {bestCrop && (
@@ -1998,7 +1996,7 @@ function ResultsView({
                     <div className="sd-rec-score">
                       <div className="sd-rec-pct" style={{color:mc(bestCrop.sc)}}>{bestCrop.sc}/100</div>
                       <div className="sd-rec-pct-lbl">compatibility</div>
-                      <div className="sd-rec-best-tag">★ Best choice</div>
+                      <div className="sd-rec-best-tag">â˜… Best choice</div>
                     </div>
                   </div>
                   <div className="sd-rec-bottom">
@@ -2008,7 +2006,7 @@ function ResultsView({
                         <span className="sd-rec-chip">SEASON MATCH</span>
                       ) : (
                         <span className="sd-rec-chip" style={{ background: "#ffe0e0", color: "#c02020", border: "1px solid #ffc8c8" }}>
-                          ⚠️ WRONG SEASON · HIGH FAILURE RISK
+                          âš ï¸ WRONG SEASON Â· HIGH FAILURE RISK
                         </span>
                       )}
                     </div>
@@ -2067,8 +2065,8 @@ function ResultsView({
           {recs && (
             <div className="sd-a3">
               <div className="sd-sec-head">
-                <span className="sd-sec-head-t">🌱 Recommended Crops</span>
-                <span className="sd-sec-head-m">{st.seas} · next 3</span>
+                <span className="sd-sec-head-t">ðŸŒ± Recommended Crops</span>
+                <span className="sd-sec-head-m">{st.seas} Â· next 3</span>
               </div>
               <div className="sd-rec-cards">
                 {recs.map((c,i) => (
@@ -2083,7 +2081,7 @@ function ResultsView({
                       <div className="sd-rec-score">
                         <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}/100</div>
                         <div className="sd-rec-pct-lbl">compatibility</div>
-                        {i===0 && <div className="sd-rec-best-tag">★ Best choice</div>}
+                        {i===0 && <div className="sd-rec-best-tag">â˜… Best choice</div>}
                       </div>
                     </div>
                     <div className="sd-rec-bottom">
@@ -2118,15 +2116,15 @@ function ResultsView({
           {/* Verdict */}
           {tgt && (() => {
             const vrd = tgt.sc>=80
-              ? {e:"✅",bg:mcBg(tgt.sc),bc:"rgba(30,130,80,.2)",c:mc(tgt.sc),t:"Crop compatible",s:`Your soil is well suited. You can plant ${tgt.n} without major corrections.`}
+              ? {e:"âœ…",bg:mcBg(tgt.sc),bc:"rgba(30,130,80,.2)",c:mc(tgt.sc),t:"Crop compatible",s:`Your soil is well suited. You can plant ${tgt.n} without major corrections.`}
               : tgt.sc>=55
-              ? {e:"⚠️",bg:"rgba(255,220,100,.18)",bc:"rgba(220,160,40,.3)",c:"#92400e",t:"Compatible with corrections",s:`${tgt.n} can be grown, but adjustments are recommended.`}
-              : {e:"❌",bg:"rgba(255,150,140,.18)",bc:"rgba(200,60,60,.25)",c:"#991b1b",t:"Crop not recommended",s:`Current conditions are not favorable for ${tgt.n}.`};
+              ? {e:"âš ï¸",bg:"rgba(255,220,100,.18)",bc:"rgba(220,160,40,.3)",c:"#92400e",t:"Compatible with corrections",s:`${tgt.n} can be grown, but adjustments are recommended.`}
+              : {e:"âŒ",bg:"rgba(255,150,140,.18)",bc:"rgba(200,60,60,.25)",c:"#991b1b",t:"Crop not recommended",s:`Current conditions are not favorable for ${tgt.n}.`};
             const altsSection = alts.length > 0;
             return (
               <>
                 <div className="sd-a3">
-                  <div className="sd-sec-head"><span className="sd-sec-head-t">🔎 Analysis - {tgt.n}</span></div>
+                  <div className="sd-sec-head"><span className="sd-sec-head-t">ðŸ”Ž Analysis - {tgt.n}</span></div>
                   <div className="sd-verd-card">
                     <div className="sd-verd-top">
                       <div className="sd-verd-chip">Selected crop</div>
@@ -2152,19 +2150,19 @@ function ResultsView({
                         <div className="sd-verd-adj-lbl">Required adjustments</div>
                         {tgt.adj.map((a,i) => (
                           <div key={i} className="sd-verd-adj">
-                            <div className="sd-verd-adj-pill" style={{background:a.bg}}>⚙</div>
+                            <div className="sd-verd-adj-pill" style={{background:a.bg}}>âš™</div>
                             {a.t}
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="sd-verd-ok">✓ No major adjustment required - you can plant!</div>
+                      <div className="sd-verd-ok">âœ“ No major adjustment required - you can plant!</div>
                     )}
                   </div>
                 </div>
                 {altsSection && (
                   <div className="sd-a4">
-                    <div className="sd-sec-head" style={{marginTop:4}}><span className="sd-sec-head-t">💡 Suggested Alternatives</span></div>
+                    <div className="sd-sec-head" style={{marginTop:4}}><span className="sd-sec-head-t">ðŸ’¡ Suggested Alternatives</span></div>
                     <div className="sd-rec-cards">
                       {alts.map(c => (
                         <div key={c.id} className="sd-rec-card">
@@ -2197,7 +2195,7 @@ function ResultsView({
         </div>
       )}
 
-      {/* ✅ Action buttons ALWAYS show (even when soil is toxic) */}
+      {/* âœ… Action buttons ALWAYS show (even when soil is toxic) */}
       <div className="sd-act-row sd-a5">
         <button className="sd-act sd-act-s" onClick={onReset}>
           <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
@@ -2389,6 +2387,17 @@ function getHistoryBarWidth(metricKey, value) {
   return `${Math.max(8, Math.min(100, pct))}%`;
 }
 
+function formatHistoryDateLabel(timestamp) {
+  if (!timestamp) return "Unknown";
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 function DashboardView({
   parcelle,
   parcelleHa,
@@ -2400,6 +2409,7 @@ function DashboardView({
   activeZone,
   onSelectZone,
   currentAnalysis,
+  analysisHistory = [],
 }) {
   const width = 720;
   const height = 500;
@@ -2410,106 +2420,20 @@ function DashboardView({
   const bounds = getParcelBounds(parcelLatLngs);
   const activeZoneResult = zoneResults[activeZone] || null;
   const currentSnapshot = currentAnalysis || null;
-  const previousSnapshot = null;
-  const hasLastAnalysis = Boolean(previousSnapshot);
+  const previousSnapshot = analysisHistory.find((item) => item?.fingerprint && item.fingerprint !== currentSnapshot?.fingerprint) || null;
+  const selectedCrop = activeZoneResult?.crop ? crops.find((crop) => String(crop.id) === String(activeZoneResult.crop)) : null;
+
   const currentAnalysisMetrics = [
-    {
-      key: "ph",
-      label: "Soil pH",
-      value: activeZoneResult?.ph,
-      unit: "pH",
-      tone: "green",
-      format: (value) => Number(value).toFixed(1),
-    },
-    {
-      key: "ce",
-      label: "Salinity (EC)",
-      value: activeZoneResult?.ce,
-      unit: "dS/m",
-      tone: "green",
-      format: (value) => Number(value).toFixed(1),
-    },
-    {
-      key: "n",
-      label: "Nitrogen",
-      value: activeZoneResult?.n,
-      unit: "kg/ha",
-      tone: "green",
-      format: (value) => Math.round(Number(value)),
-    },
-    {
-      key: "p",
-      label: "Phosphorus",
-      value: activeZoneResult?.p,
-      unit: "kg/ha",
-      tone: "green",
-      format: (value) => Math.round(Number(value)),
-    },
-    {
-      key: "k",
-      label: "Potassium",
-      value: activeZoneResult?.k,
-      unit: "kg/ha",
-      tone: "green",
-      format: (value) => Math.round(Number(value)),
-    },
-    {
-      key: "lime",
-      label: "Active lime",
-      value: activeZoneResult?.lime,
-      unit: "%",
-      tone: "green",
-      format: (value) => Math.round(Number(value)),
-    },
-    {
-      key: "temp",
-      label: "Temperature",
-      value: activeZoneResult?.temp,
-      unit: "°C",
-      tone: "green",
-      format: (value) => Number(value).toFixed(1),
-    },
-    {
-      key: "wind",
-      label: "Wind",
-      value: activeZoneResult?.wind,
-      unit: "km/h",
-      tone: "green",
-      format: (value) => Math.round(Number(value)),
-    },
-    {
-      key: "tex",
-      label: "Texture",
-      value: activeZoneResult?.tex,
-      unit: "",
-      tone: "green",
-      format: (value) => SOIL_TEXTURE_LABEL[value] || value || "—",
-    },
-    {
-      key: "mo",
-      label: "Organic matter",
-      value: activeZoneResult?.mo,
-      unit: "",
-      tone: "green",
-      format: (value) => value || "—",
-    },
-    {
-      key: "pb",
-      label: "Lead (Pb)",
-      value: activeZoneResult?.pb,
-      unit: "mg/kg",
-      tone: "green",
-      format: (value) => Math.round(Number(value)),
-    },
-    {
-      key: "cd",
-      label: "Cadmium (Cd)",
-      value: activeZoneResult?.cd,
-      unit: "mg/kg",
-      tone: "green",
-      format: (value) => Math.round(Number(value)),
-    },
+    { key: "ph", label: "Soil pH", value: activeZoneResult?.ph, previous: previousSnapshot?.avgPh, unit: "pH", format: (value) => Number(value).toFixed(1) },
+    { key: "ce", label: "Salinity", value: activeZoneResult?.ce, previous: previousSnapshot?.avgCe, unit: "dS/m", format: (value) => Number(value).toFixed(1) },
+    { key: "n", label: "Nitrogen", value: activeZoneResult?.n, previous: previousSnapshot?.avgN, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
+    { key: "p", label: "Phosphorus", value: activeZoneResult?.p, previous: previousSnapshot?.avgP, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
+    { key: "k", label: "Potassium", value: activeZoneResult?.k, previous: previousSnapshot?.avgK, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
+    { key: "lime", label: "Active lime", value: activeZoneResult?.lime, previous: null, unit: "%", format: (value) => Math.round(Number(value)) },
+    { key: "pb", label: "Lead (Pb)", value: activeZoneResult?.pb, previous: null, unit: "mg/kg", format: (value) => Math.round(Number(value)) },
+    { key: "cd", label: "Cadmium (Cd)", value: activeZoneResult?.cd, previous: null, unit: "mg/kg", format: (value) => Math.round(Number(value)) },
   ];
+
   const zoneCards = zoneResults.map((zone, index) => {
     const score = calcScore(zone, crops);
     const tone = getHeatTone(score);
@@ -2524,206 +2448,214 @@ function DashboardView({
       : null;
     return { zone, index, score, tone, polygon, centroid };
   });
+
   const bestZone = [...zoneCards].sort((a, b) => b.score - a.score)[0];
-  const worstZone = [...zoneCards].sort((a, b) => a.score - b.score)[0];
   const activeZoneScore = activeZoneResult ? calcScore(activeZoneResult, crops) : 0;
-  const maturityLevel = zoneCards[activeZone]?.tone?.label || "Pending";
-  const nutrientCards = [
-    { key: "avgN", label: "N", value: activeZoneResult?.n, prev: null, unit: "kg/ha" },
-    { key: "avgP", label: "P", value: activeZoneResult?.p, prev: null, unit: "kg/ha" },
-    { key: "avgK", label: "K", value: activeZoneResult?.k, prev: null, unit: "kg/ha" },
-    { key: "avgPh", label: "pH", value: activeZoneResult?.ph, prev: null, unit: "" },
+  const growthLevel = Math.max(48, Math.min(96, Math.round(activeZoneScore + 8)));
+  const growthMax = Math.min(100, growthLevel + 5);
+  const growthMin = Math.max(0, growthLevel - 15);
+  const weatherDate = activeZoneResult?.date || currentSnapshot?.timestamp;
+  const weatherDay = weatherDate ? new Date(weatherDate).getDate() : new Date().getDate();
+  const weatherMonth = weatherDate
+    ? new Date(weatherDate).toLocaleDateString("en-GB", { month: "long", year: "numeric" })
+    : new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  const nutrientMix = [
+    { id: "n", value: Number(activeZoneResult?.n || 0), color: "#ff5b45" },
+    { id: "p", value: Number(activeZoneResult?.p || 0), color: "#f89e3d" },
+    { id: "k", value: Number(activeZoneResult?.k || 0), color: "#2ab36b" },
   ];
 
   return (
-    <section className="sd-dashboard">
-      <div className="sd-dashboard-head">
-        <div>
-          <div className="sd-dashboard-eyebrow">Yield Heatmap Dashboard</div>
-          <h2 className="sd-dashboard-title">Vue globale de la parcelle après analyse complète</h2>
-          <p className="sd-dashboard-subtitle">
-            La carte thermique réutilise la géométrie réelle de la parcelle et des zones générées. Clique sur une zone pour ouvrir son détail.
-          </p>
-        </div>
-      </div>
-
-      <div className="sd-dashboard-grid">
-        <div className="sd-heatmap-card">
-          <div className="sd-heatmap-frame" style={{ aspectRatio: frameRatio }}>
-            <img
-              className="sd-heatmap-image"
-              src={parcelImageUrls?.imagery || satelliteFallback}
-              alt={`Vue satellite de ${parcelle?.name || "la parcelle"}`}
-              onError={(e) => {
-                if (e.currentTarget.src !== new URL(satelliteFallback, window.location.href).href) {
-                  e.currentTarget.src = satelliteFallback;
-                }
-              }}
-            />
-            {parcelImageUrls?.reference && (
-              <img
-                className="sd-heatmap-image sd-heatmap-image--reference"
-                src={parcelImageUrls.reference}
-                alt=""
-                aria-hidden="true"
-              />
-            )}
-            <svg className="sd-heatmap-overlay" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-              <defs>
-                <filter id="sdGlow">
-                  <feGaussianBlur stdDeviation="10" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-
-              {zoneCards.map((item) => (
-                <g
-                  key={item.index}
-                  className={`sd-heatmap-zone ${activeZone === item.index ? "sd-heatmap-zone--active" : ""}`}
-                  onClick={() => onSelectZone(item.index)}
-                >
-                  {item.polygon && (
-                    <>
-                      <polygon points={item.polygon} fill={item.tone.fill} stroke={item.tone.stroke} strokeWidth="3" filter="url(#sdGlow)" />
-                      <polygon points={item.polygon} fill="url(#sdHeatNoise)" opacity="0.18" />
-                    </>
-                  )}
-                  {item.centroid && (
-                    <g transform={`translate(${item.centroid.x}, ${item.centroid.y})`}>
-                      <rect x="-54" y="-19" width="108" height="38" rx="18" fill="rgba(19, 28, 24, 0.55)" />
-                      <text textAnchor="middle" y="-2" className="sd-heatmap-zone-label">Zone {item.index + 1}</text>
-                    </g>
-                  )}
-                </g>
-              ))}
-
-              <defs>
-                <pattern id="sdHeatNoise" width="120" height="120" patternUnits="userSpaceOnUse">
-                  <circle cx="20" cy="22" r="20" fill="rgba(255,255,255,0.16)" />
-                  <circle cx="86" cy="50" r="24" fill="rgba(255,255,255,0.14)" />
-                  <circle cx="56" cy="90" r="18" fill="rgba(255,255,255,0.12)" />
-                </pattern>
-              </defs>
-            </svg>
-
-          </div>
-
-          <div className="sd-zone-dashboard-list">
-            {zoneCards.map((item) => (
-              <button
-                key={item.index}
-                className={`sd-zone-dashboard-pill ${activeZone === item.index ? "sd-zone-dashboard-pill--active" : ""}`}
-                onClick={() => onSelectZone(item.index)}
-              >
-                <span className="sd-zone-dashboard-dot" style={{ background: item.tone.stroke }} />
-                <span>Zone {item.index + 1}</span>
-                <strong>{item.score}</strong>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="sd-dashboard-side">
-          <div className="sd-side-card sd-yield-card">
-            <div className="sd-yield-card-head">
-              <div>
-                <div className="sd-card-kicker">Yield</div>
-                <div className="sd-yield-title">Current zone summary</div>
-              </div>
-              <div className="sd-yield-zone-pill">Zone {activeZone + 1}</div>
-            </div>
-
-            <div className="sd-yield-layout">
-              <div className="sd-yield-ring">
-                <div className="sd-yield-ring-track" />
-                <div
-                  className="sd-yield-ring-progress"
-                  style={{ background: `conic-gradient(#69b685 0deg, #d5e7ac ${Math.max(30, activeZoneScore * 3.6)}deg, rgba(27,34,48,.08) ${Math.max(30, activeZoneScore * 3.6)}deg 360deg)` }}
-                />
-                <div className="sd-yield-ring-inner">
-                  <span>Yield</span>
-                  <strong>{activeZoneScore}/100</strong>
-                </div>
-              </div>
-
-              <div className="sd-yield-info">
-                <div className="sd-yield-info-row">
-                  <span>Phase</span>
-                  <strong>{maturityLevel}</strong>
-                </div>
-                <div className="sd-yield-info-row">
-                  <span>Size</span>
-                  <strong>{parcelleHa ? `${parcelleHa.toFixed(2)} ha` : "—"}</strong>
-                </div>
-                <div className="sd-yield-info-row">
-                  <span>Current analysis</span>
-                  <strong>{activeZoneResult ? "Available" : "Pending"}</strong>
-                </div>
-              </div>
+    <section className="sd-dashboard sd-dashboard--studio">
+      <div className="sd-studio-board">
+        <div className="sd-studio-main">
+          <div className="sd-studio-topbar">
+            <div>
+              <h2 className="sd-studio-title">{parcelle?.name || "Parcel"}</h2>
+              <p className="sd-studio-subtitle">Your farm performance is stable. Here's today's overview.</p>
             </div>
           </div>
 
-          <div className="sd-side-card">
-            <div className="sd-card-kicker">Insights</div>
-            <div className="sd-insight-list">
-              <div className="sd-insight-item">
-                <span className="sd-insight-ring sd-insight-ring--good" />
-                <div>
-                  <strong>Meilleure zone</strong>
-                  <span>Zone {bestZone?.index + 1} avec {bestZone?.score ?? 0}/100</span>
-                </div>
-              </div>
-              <div className="sd-insight-item">
-                <span className="sd-insight-ring sd-insight-ring--bad" />
-                <div>
-                  <strong>Zone critique</strong>
-                  <span>Zone {worstZone?.index + 1} avec {worstZone?.score ?? 0}/100</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="sd-side-card sd-history-card">
-            <div className="sd-history-head">
-              <div>
-                <div className="sd-card-kicker">Historical comparison</div>
-                <div className="sd-history-title">Soil analysis (per hectare)</div>
-              </div>
-              <div className="sd-history-legend">
-                <span><i className="sd-history-legend-swatch sd-history-legend-swatch--current" />Current analysis</span>
-                <span><i className="sd-history-legend-swatch sd-history-legend-swatch--last" />Last analysis</span>
-              </div>
-            </div>
-
-            <div className="sd-history-list">
-              {currentAnalysisMetrics.map((item) => {
-                const displayValue = item.value;
-                const hasValue = displayValue !== null && displayValue !== undefined && displayValue !== "";
-                const currentWidth = getHistoryBarWidth(item.key, displayValue);
-
-                return (
-                  <div key={item.key} className="sd-history-row">
-                    <div className="sd-history-row-meta">
-                      <div className={`sd-history-dot sd-history-dot--${item.tone}`} />
-                      <div className="sd-history-row-title-wrap">
-                        <div className="sd-history-row-title">{item.label}</div>
-                      </div>
-                    </div>
-
-                    <div className="sd-history-bars">
-                      <div className={`sd-history-bar sd-history-bar--current sd-history-bar--${item.tone}`} style={{ width: currentWidth }}>
-                        <span>{hasValue ? (item.unit ? `${item.format(displayValue)} ${item.unit}` : item.format(displayValue)) : ""}</span>
-                      </div>
-                      <div className="sd-history-bar sd-history-bar--last sd-history-bar--empty" style={{ width: currentWidth }}>
-                        <span />
-                      </div>
-                    </div>
+          <div className="sd-studio-grid">
+            <div className="sd-studio-left">
+              <div className="sd-studio-weather-card">
+                <div className="sd-studio-weather-main">
+                  <span className="sd-studio-weather-label">Partly Cloudy</span>
+                  <div className="sd-studio-weather-emoji">⛅</div>
+                  <div className="sd-studio-weather-date">
+                    <strong>{weatherDay}</strong>
+                    <span>{weatherMonth}</span>
                   </div>
-                );
-              })}
+                </div>
+                <div className="sd-studio-weather-metrics">
+                  <div className="sd-studio-weather-pill">
+                    <span>Temperature</span>
+                    <strong>{Number(activeZoneResult?.temp || 0).toFixed(1)} °C</strong>
+                  </div>
+                  <div className="sd-studio-weather-pill">
+                    <span>Wind</span>
+                    <strong>{Math.round(Number(activeZoneResult?.wind || 0))} km/h</strong>
+                  </div>
+                  <div className="sd-studio-weather-pill">
+                    <span>Salinity</span>
+                    <strong>{Number(activeZoneResult?.ce || 0).toFixed(1)} dS/m</strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="sd-studio-stat-row">
+                <article className="sd-studio-mini-card">
+                  <div className="sd-studio-mini-head"><span>Plant Health</span></div>
+                  <div className="sd-studio-mini-value">
+                    <strong>{activeZoneScore}%</strong>
+                    <span>{activeZoneScore >= 80 ? "Excellent" : activeZoneScore >= 60 ? "Stable" : "Watch"}</span>
+                  </div>
+                </article>
+
+                <article className="sd-studio-mini-card">
+                  <div className="sd-studio-mini-head"><span>Active Crop Zones</span></div>
+                  <div className="sd-studio-mini-value">
+                    <strong>{zoneResults.filter(Boolean).length}</strong>
+                    <span>{bestZone ? `Best zone: ${bestZone.index + 1}` : "Zones analyzed"}</span>
+                  </div>
+                </article>
+              </div>
+
+              <article className="sd-studio-wide-card">
+                <div className="sd-studio-wide-head">
+                  <div>
+                    <strong>Soil Nutrient Status</strong>
+                    <span>Balanced nutrient composition</span>
+                  </div>
+                  <em>{activeZoneScore >= 75 ? "Optimal" : "Monitor"}</em>
+                </div>
+                <div className="sd-studio-nutrient-wave">
+                  {nutrientMix.map((item) => (
+                    <div key={item.id} className="sd-studio-nutrient-segment" style={{ width: `${Math.max(18, Math.min(100, item.value / 4))}%`, background: item.color }} />
+                  ))}
+                </div>
+              </article>
+
+              <div className="sd-studio-growth-card">
+                <div className="sd-studio-growth-head">
+                  <div>
+                    <strong>Growth Analytics</strong>
+                    <span>Strong nutrient balance</span>
+                  </div>
+                </div>
+                <div className="sd-studio-growth-gauge">
+                  <div className="sd-studio-growth-arc" style={{ background: `conic-gradient(#5dc89d 0deg, #4cbf93 ${growthLevel * 2.4}deg, rgba(93,200,157,.18) ${growthLevel * 2.4}deg 360deg)` }} />
+                  <div className="sd-studio-growth-inner">
+                    <strong>{growthLevel}%</strong>
+                    <span>Growth Level</span>
+                  </div>
+                </div>
+                <div className="sd-studio-growth-stats">
+                  <div><strong>{growthMax}</strong><span>Max</span></div>
+                  <div><strong>{growthMin}</strong><span>Min</span></div>
+                  <div><strong>{activeZoneScore}</strong><span>Plant health</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="sd-studio-right">
+              <div className="sd-studio-map-card">
+                <div className="sd-heatmap-frame sd-heatmap-frame--studio" style={{ aspectRatio: frameRatio }}>
+                  <img
+                    className="sd-heatmap-image"
+                    src={parcelImageUrls?.imagery || satelliteFallback}
+                    alt={`Satellite view of ${parcelle?.name || "the parcel"}`}
+                    onError={(e) => {
+                      if (e.currentTarget.src !== new URL(satelliteFallback, window.location.href).href) {
+                        e.currentTarget.src = satelliteFallback;
+                      }
+                    }}
+                  />
+                  {parcelImageUrls?.reference && (
+                    <img
+                      className="sd-heatmap-image sd-heatmap-image--reference"
+                      src={parcelImageUrls.reference}
+                      alt=""
+                      aria-hidden="true"
+                    />
+                  )}
+                  <svg className="sd-heatmap-overlay" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+                    <defs>
+                      <filter id="sdGlow">
+                        <feGaussianBlur stdDeviation="10" result="blur" />
+                        <feMerge>
+                          <feMergeNode in="blur" />
+                          <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                      </filter>
+                      <pattern id="sdHeatNoise" width="120" height="120" patternUnits="userSpaceOnUse">
+                        <circle cx="20" cy="22" r="20" fill="rgba(255,255,255,0.16)" />
+                        <circle cx="86" cy="50" r="24" fill="rgba(255,255,255,0.14)" />
+                        <circle cx="56" cy="90" r="18" fill="rgba(255,255,255,0.12)" />
+                      </pattern>
+                    </defs>
+
+                    {zoneCards.map((item) => (
+                      <g
+                        key={item.index}
+                        className={`sd-heatmap-zone ${activeZone === item.index ? "sd-heatmap-zone--active" : ""}`}
+                        onClick={() => onSelectZone(item.index)}
+                      >
+                        {item.polygon && (
+                          <>
+                            <polygon points={item.polygon} fill={item.tone.fill} stroke={item.tone.stroke} strokeWidth="3" filter="url(#sdGlow)" />
+                            <polygon points={item.polygon} fill="url(#sdHeatNoise)" opacity="0.18" />
+                          </>
+                        )}
+                        {item.centroid && (
+                          <g transform={`translate(${item.centroid.x}, ${item.centroid.y})`}>
+                            <rect x="-56" y="-18" width="112" height="36" rx="18" fill="rgba(255,255,255,0.22)" />
+                            <text textAnchor="middle" y="3" className="sd-heatmap-zone-label">Zone {item.index + 1}</text>
+                          </g>
+                        )}
+                      </g>
+                    ))}
+                  </svg>
+
+                </div>
+              </div>
+
+              <div className="sd-studio-history-card">
+                <div className="sd-studio-history-head">
+                  <div>
+                    <strong>Analysis History</strong>
+                    <span>Compact comparison with previous snapshot</span>
+                  </div>
+                  <div className="sd-history-legend">
+                    <span><i className="sd-history-legend-swatch sd-history-legend-swatch--current" />Current</span>
+                    <span><i className="sd-history-legend-swatch sd-history-legend-swatch--last" />Previous</span>
+                  </div>
+                </div>
+
+                <div className="sd-studio-history-list">
+                  {currentAnalysisMetrics.map((item) => {
+                    const displayValue = item.value;
+                    const previousValue = item.previous;
+                    const hasValue = displayValue !== null && displayValue !== undefined && displayValue !== "";
+                    const hasPrevious = previousValue !== null && previousValue !== undefined && previousValue !== "";
+                    const currentWidth = getHistoryBarWidth(item.key, displayValue);
+                    const previousWidth = getHistoryBarWidth(item.key, previousValue);
+
+                    return (
+                      <div key={item.key} className="sd-studio-history-row">
+                        <div className="sd-studio-history-meta">
+                          <span>{item.label}</span>
+                          <strong>{hasValue ? (item.unit ? `${item.format(displayValue)} ${item.unit}` : item.format(displayValue)) : "—"}</strong>
+                        </div>
+                        <div className="sd-studio-history-bars">
+                          <div className="sd-history-bar sd-history-bar--current" style={{ width: currentWidth }} />
+                          <div className={`sd-history-bar ${hasPrevious ? "sd-history-bar--last" : "sd-history-bar--last sd-history-bar--empty"}`} style={{ width: hasPrevious ? previousWidth : "16%" }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2772,7 +2704,7 @@ export default function SoilDiagnostic({
         const data = await response.json();
         if (!cancelled) setRawCrops(Array.isArray(data) ? data : []);
       } catch (error) {
-        console.warn("⚠️ Crop requirements fetch failed:", error);
+        console.warn("âš ï¸ Crop requirements fetch failed:", error);
         if (!cancelled) setRawCrops([]);
       }
     };
@@ -2804,7 +2736,7 @@ export default function SoilDiagnostic({
         });
         setWindByMonth(byMonth);
       } catch (error) {
-        console.warn("⚠️ Wind expectations fetch failed:", error);
+        console.warn("âš ï¸ Wind expectations fetch failed:", error);
         if (!cancelled) setWindByMonth({});
       }
     };
@@ -2847,7 +2779,7 @@ export default function SoilDiagnostic({
     }
   }, [open, parcelleName, parcelle, cultureGroupId]);
 
-  /* ✅ FIXED: Fetch satellite data in BOTH eco AND standard mode */
+  /* âœ… FIXED: Fetch satellite data in BOTH eco AND standard mode */
   useEffect(() => {
     const fetchSatelliteData = async () => {
       if (!open || (diagMode !== "eco" && diagMode !== "standard") || !parcelle?.latlngs?.length) return;
@@ -2959,7 +2891,7 @@ export default function SoilDiagnostic({
         controller.abort();
       } catch (error) {
         if (error.name === 'AbortError') return;
-        console.warn("⚠️ Satellite fetch failed:", error);
+        console.warn("âš ï¸ Satellite fetch failed:", error);
       }
     };
 
@@ -3205,7 +3137,7 @@ export default function SoilDiagnostic({
       <div className="sd-overlay" onClick={e => e.target===e.currentTarget && onClose()}>
         <div className="sd-panel">
 
-          {/* ── TOPBAR ── */}
+          {/* â”€â”€ TOPBAR â”€â”€ */}
           <div className="sd-topbar">
             <div className="sd-tb-logo">
               <div className="sd-tb-icon">
@@ -3219,7 +3151,7 @@ export default function SoilDiagnostic({
             <div className="sd-tb-chip">
               <div className="sd-tb-dot" />
               <span className="sd-tb-cname">{parcelleName}</span>
-              <span className="sd-tb-csub">· {cultureLabel}</span>
+              <span className="sd-tb-csub">Â· {cultureLabel}</span>
             </div>
 
             {/* MODE TOGGLE */}
@@ -3250,7 +3182,7 @@ export default function SoilDiagnostic({
             <div className="sd-tb-right">
               {doneCount > 0 && (
                 <div className="sd-tb-progress">
-                  {doneCount}/{n} zone{n>1?"s":""} ✓
+                  {doneCount}/{n} zone{n>1?"s":""} âœ“
                 </div>
               )}
               <button className="sd-tb-close" onClick={onClose}>
@@ -3298,7 +3230,7 @@ export default function SoilDiagnostic({
               <div className="sd-dashboard-sheet-head">
                 <div>
                   <div className="sd-dashboard-eyebrow">Yield Heatmap Dashboard</div>
-                  <div className="sd-card-title">Vue détaillée de la parcelle</div>
+                  <div className="sd-card-title">Vue detaillee de la parcelle</div>
                 </div>
                 <button className="sd-dashboard-sheet-close" onClick={() => setShowDashboard(false)}>
                   Retour
@@ -3394,4 +3326,5 @@ function mapSoilTypeToTexture(soilType) {
   };
   return map[soilType] || "limon-argileux";
 }
+
 
