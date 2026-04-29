@@ -165,6 +165,28 @@ export default function Map() {
     clearSamplingMarkers, drawAllParcelles, clearAllParcelles, clearSelectedParcelle, getMapSnapshot,
   } = useMap({ onParcelleChange: handleParcelleChange, maxParcelAreaHa: MAX_PARCEL_AREA_HA });
 
+  // Listen for parcel click events dispatched by the map hook and select parcel in UI
+  useEffect(() => {
+    const el = mapRef.current;
+    if (!el) return;
+    const handler = (e) => {
+      const id = e?.detail?.id;
+      if (!id) return;
+      // Clear previous sampling overlays
+      try { clearZones(); clearSampleMarkers(); clearSamplingMarkers(); } catch (err) { console.warn(err); }
+      setSelectedParcelleId(id);
+      const p = parcelles.find(x => x.id === id);
+      if (p && p.latlngs && p.latlngs.length > 0) {
+        setSelectedGroupId(p.groupId || selectedGroupId);
+        const stats = drawParcelleFromLatLngs(p.latlngs, p.color || pendingColor);
+        if (stats) { setParcelleInfo({ ...stats, name: p.name, type: "polygon" }); }
+      }
+      setResultsOpen(false);
+    };
+    el.addEventListener('parcelle-click', handler);
+    return () => el.removeEventListener('parcelle-click', handler);
+  }, [mapRef, parcelles, clearZones, clearSampleMarkers, clearSamplingMarkers, drawParcelleFromLatLngs, pendingColor, selectedGroupId]);
+
   useEffect(() => {
     if (parcelles.length > 0) {
       drawAllParcelles(parcelles, selectedParcelleId);
@@ -367,6 +389,15 @@ export default function Map() {
       setResultsOpen(false);
       clearSelectedParcelle();
       return;
+    }
+
+    // Clear any sampling overlays from previously selected parcel
+    try {
+      clearZones();
+      clearSampleMarkers();
+      clearSamplingMarkers();
+    } catch (e) {
+      console.warn('Could not clear sampling overlays on parcel select', e);
     }
 
     setSelectedParcelleId(id);

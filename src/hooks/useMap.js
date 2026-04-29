@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
-export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
+export function useMap({ onParcelleChange, maxParcelAreaHa = 50, onParcelleClick = null }) {
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const drawnItemsRef = useRef(null);
@@ -28,6 +28,10 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
     return L.divIcon({
       className: " ",
       html: `<div style="
+        position: relative;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
         color: white;
         display: inline-flex;
         align-items: center;
@@ -220,9 +224,24 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
     if (!mapInstanceRef.current) return;
     sampleMarkersRef.current.forEach((m) => m.remove());
     sampleMarkersRef.current = [];
+    // mark sampling as not visible and restore parcel labels according to zoom
+    try {
+      samplingVisibleRef.current = false;
+      const map = mapInstanceRef.current;
+      if (map) {
+        const shouldShow = map.getZoom() >= MIN_ZOOM_FOR_MARKERS;
+        Object.values(parcelleLabelLayersRef.current).forEach((layer) => {
+          if (shouldShow && !map.hasLayer(layer)) map.addLayer(layer);
+          if (!shouldShow && map.hasLayer(layer)) map.removeLayer(layer);
+        });
+      }
+    } catch (e) {
+      console.warn("Could not restore parcel labels:", e);
+    }
   };
 
   const samplingMarkersRef = useRef([]);
+  const samplingVisibleRef = useRef(false);
 
   const drawAllParcelles = useCallback((parcelles, selectedParcelleId) => {
     const L = window.L;
@@ -263,11 +282,25 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
       const bounds = polygon.getBounds();
       const center = bounds.getCenter();
       const label = L.marker(center, {
-        interactive: false,
+        interactive: true,
         keyboard: false,
         zIndexOffset: 1000,
         icon: createParcelLabelIcon(parcel, map.getZoom()),
       }).addTo(map);
+
+      // Bind click handlers so clicking polygon or its label can notify the app
+      try {
+        polygon.on && polygon.on('click', () => {
+          if (typeof onParcelleClick === 'function') onParcelleClick(parcel.id);
+          try { if (mapRef && mapRef.current) mapRef.current.dispatchEvent(new CustomEvent('parcelle-click', { detail: { id: parcel.id } })); } catch(e){}
+        });
+        label.on && label.on('click', () => {
+          if (typeof onParcelleClick === 'function') onParcelleClick(parcel.id);
+          try { if (mapRef && mapRef.current) mapRef.current.dispatchEvent(new CustomEvent('parcelle-click', { detail: { id: parcel.id } })); } catch(e){}
+        });
+      } catch (e) {
+        console.warn('Could not bind parcel click handlers', e);
+      }
 
       parcelleLabelLayersRef.current[parcel.id] = label;
       if (map.getZoom() < MIN_ZOOM_FOR_MARKERS) {
@@ -487,6 +520,19 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
         }
       });
     });
+
+    // mark sampling visible and hide parcel labels while samples are shown
+    try {
+      samplingVisibleRef.current = true;
+      const map = mapInstanceRef.current;
+      if (map) {
+        Object.values(parcelleLabelLayersRef.current).forEach((layer) => {
+          if (map.hasLayer(layer)) map.removeLayer(layer);
+        });
+      }
+    } catch (e) {
+      console.warn("Could not hide parcel labels:", e);
+    }
 
   }, []);
 
