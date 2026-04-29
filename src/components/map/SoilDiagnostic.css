@@ -239,6 +239,51 @@
   margin-bottom: 18px; font-family: var(--sd-font2);
 }
 
+.sd-permanent-intro {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid;
+  border-radius: 18px;
+  box-shadow: var(--sdsh-xs);
+}
+.sd-permanent-intro-title {
+  font-size: .8rem;
+  font-weight: 900;
+  letter-spacing: -.01em;
+}
+.sd-permanent-intro-text {
+  margin-top: 4px;
+  font-size: .66rem;
+  color: var(--sd-ink3);
+  font-family: var(--sd-font2);
+}
+.sd-depth-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.sd-depth-card {
+  padding: 16px;
+  border: 1px solid;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255,255,255,.88), rgba(245,251,247,.8));
+  box-shadow: var(--sdsh-sm);
+}
+.sd-depth-head {
+  margin-bottom: 12px;
+}
+.sd-depth-title {
+  font-size: .86rem;
+  font-weight: 900;
+  letter-spacing: -.02em;
+}
+.sd-depth-note {
+  margin-top: 3px;
+  font-size: .64rem;
+  color: var(--sd-ink3);
+  font-family: var(--sd-font2);
+}
+
 /* Section */
 .sd-sec {
   margin-bottom: 18px;

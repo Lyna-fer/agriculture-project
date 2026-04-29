@@ -1414,21 +1414,41 @@ function buildZoneReportHtml({
 }
 
 /* ─── Default state factory ──────────────────────────────────────────────── */
-const freshSt = (mode = "eco") => ({
-  date: toDateInputValue(),
-  ph: 6.5,
-  ce:   mode==="eco" || mode==="standard" ? SAT_DEFAULTS.ce   : 1.2,
-  temp: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.temp : 18,
-  n: 45, p: 22, k: 180,
-  lime: 8,
-  wind: 12,
-  pb: 10,
-  cd: 5,
-  tex: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.tex : "limon-argileux",
-  mo: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.om : "moyen",
-  seas: seasonFromDate(toDateInputValue()),
-  crop: "",
-});
+const PERMANENT_DEPTHS = [
+  { key: "depth0_20", label: "0-20 cm", note: "Surface layer" },
+  { key: "depth20_40", label: "20-40 cm", note: "Root zone" },
+];
+
+function buildDepthState(mode = "eco") {
+  return {
+    ph: 6.5,
+    ce: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.ce : 1.2,
+    temp: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.temp : 18,
+    n: 45,
+    p: 22,
+    k: 180,
+    lime: 8,
+    pb: 10,
+    cd: 5,
+    tex: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.tex : "limon-argileux",
+    mo: mode==="eco" || mode==="standard" ? SAT_DEFAULTS.om : "moyen",
+  };
+}
+
+const freshSt = (mode = "eco") => {
+  const primaryDepth = buildDepthState(mode);
+  return {
+    date: toDateInputValue(),
+    ...primaryDepth,
+    wind: 12,
+    seas: seasonFromDate(toDateInputValue()),
+    crop: "",
+    permanentDepths: {
+      depth0_20: { ...primaryDepth },
+      depth20_40: buildDepthState(mode),
+    },
+  };
+};
 
 /* ATOM COMPONENTS */
 function ZoneBar({ id }) {
@@ -1485,72 +1505,30 @@ function Slider({ id, label, unit, min, max, step, value, onChange, zones, badge
   );
 }
 
-/* ZONE FORM */
-function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultureLabel, onAnalyze, analyzing, hasResult, onPrintLabRequest, onPrintLabRequestEco }) {
-  // ✅ LOCK fields ONLY in Eco mode. Standard mode stays fully editable.
-  const isSat = id => diagMode === "eco" && id in SAT_FIELDS;
-  const seasonLabel = getSeasonLabel(st.seas);
-  const seasonEmoji = SEASON_EMOJIS[st.seas] || "📅";
-
+function PermanentDepthSection({ depth, sectionColor, isSat, st, onChange }) {
   return (
-    <div className="sd-fc">
-      <div className="sd-zone-strip" style={{background: light, borderLeft: `4px solid ${color}`}}>
-        <div className="sd-zone-strip-dot" style={{background: color}} />
-        <span className="sd-zone-strip-name" style={{color}}>Zone {zoneIdx + 1}</span>
-        <span className="sd-zone-strip-hint">Enter the soil properties for this zone</span>
+    <div className="sd-depth-card" style={{ borderColor: `${sectionColor}26` }}>
+      <div className="sd-depth-head">
+        <div className="sd-depth-title" style={{ color: sectionColor }}>{depth.label}</div>
+        <div className="sd-depth-note">{depth.note}</div>
       </div>
 
-      {/* Satellite notice (Eco mode only) */}
-      {diagMode === "eco" && (
-        <div className="sd-sat-notice">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2" />
-            <circle cx="5" cy="5" r="1.5" fill="currentColor" />
-          </svg>
-          CE: Landsat 8 · Texture: OpenLandMap / SoilGrids (Global Soil Map)
-        </div>
-      )}
-
-      {/* Print Lab Request */}
-      {diagMode === "standard" && (
-        <button className="sd-lab-request-btn" onClick={onPrintLabRequest}>
-          <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
-            <path d="M3 2h7v9H3z" stroke="currentColor" strokeWidth="1.4"/>
-            <path d="M4.5 4.3h4M4.5 6.3h4M4.5 8.3h2.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-          </svg>
-          📄 Download Lab Request
-        </button>
-      )}
-
-      {diagMode === "eco" && onPrintLabRequestEco && (
-        <button className="sd-lab-request-btn" onClick={onPrintLabRequestEco}>
-          <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
-            <path d="M3 2h7v9H3z" stroke="currentColor" strokeWidth="1.4"/>
-            <path d="M4.5 4.3h4M4.5 6.3h4M4.5 8.3h2.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-          </svg>
-          📄 Download Lab Request (Eco)
-        </button>
-      )}
-
-      {/* 1 - Chemistry */}
       <div className="sd-sec">
-        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>1</span>Soil Chemistry</div>
-        <Slider id="ph"   label="Soil pH"          unit="pH"   min={4}  max={9}  step={0.1} value={st.ph}   onChange={onChange} zones badge l="4.0 Acidic"  m="6.5 Neutral"      r="9.0 Alkaline" />
-        <Slider id="ce"   label="Salinity (EC)"    unit="dS/m" min={0}  max={6}  step={0.1} value={st.ce}   onChange={onChange} zones badge l="0 None"      m="2.0 Limit"        r="6.0 Critical"   locked={isSat("ce")}   src={SAT_FIELDS.ce} />
+        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:sectionColor}}>1</span>Soil Chemistry</div>
+        <Slider id="ph" label="Soil pH" unit="pH" min={4} max={9} step={0.1} value={st.ph} onChange={(id, value) => onChange(id, value, depth.key)} zones l="4.0 Acidic" m="6.5 Neutral" r="9.0 Alkaline" />
+        <Slider id="ce" label="Salinity (EC)" unit="dS/m" min={0} max={6} step={0.1} value={st.ce} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 None" m="2.0 Limit" r="6.0 Critical" locked={isSat("ce")} src={SAT_FIELDS.ce} />
       </div>
 
-      {/* 2 - NPK */}
       <div className="sd-sec">
-        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>2</span>NPK Fertility</div>
-        <Slider id="n" label="Nitrogen (N)"   unit="kg/ha" min={0}  max={400} step={1} value={st.n} onChange={onChange} zones l="Low"    m="30–60 Optimal" r="400" />
-        <Slider id="p" label="Phosphorus (P)" unit="kg/ha" min={0}  max={400} step={1} value={st.p} onChange={onChange} zones l="0"      m="15–30 Optimal" r="400" />
-        <Slider id="k" label="Potassium (K)"  unit="kg/ha" min={0}  max={400} step={5} value={st.k} onChange={onChange} zones l="0"      m="130–250 Opt."  r="400" />
-        <Slider id="lime" label="Active Lime" unit="%" min={0} max={30} step={1} value={st.lime} onChange={onChange} zones l="0 Low" m="8–12 Preferred" r="30 High" />
+        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:sectionColor}}>2</span>NPK Fertility</div>
+        <Slider id="n" label="Nitrogen (N)" unit="kg/ha" min={0} max={400} step={1} value={st.n} onChange={(id, value) => onChange(id, value, depth.key)} zones l="Low" m="30-60 Optimal" r="400" />
+        <Slider id="p" label="Phosphorus (P)" unit="kg/ha" min={0} max={400} step={1} value={st.p} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0" m="15-30 Optimal" r="400" />
+        <Slider id="k" label="Potassium (K)" unit="kg/ha" min={0} max={400} step={5} value={st.k} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0" m="130-250 Opt." r="400" />
+        <Slider id="lime" label="Active Lime" unit="%" min={0} max={30} step={1} value={st.lime} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Low" m="8-12 Preferred" r="30 High" />
       </div>
 
-      {/* 3 - Physical */}
       <div className="sd-sec">
-        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>3</span>Physical Properties</div>
+        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:sectionColor}}>3</span>Physical Properties</div>
         <div className="sd-two">
           <div>
             <div className="sd-col-lbl">
@@ -1568,14 +1546,16 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
             <div className="sd-opts">
               {[
                 {val:"limon-argileux",label:"Clay loam", sub:"Ideal for vegetables"},
-                {val:"limoneux",      label:"Loam",      sub:"Very fertile"},
+                {val:"limoneux", label:"Loam", sub:"Very fertile"},
                 {val:"sablo-limoneux",label:"Sandy loam",sub:"Balanced drainage"},
-                {val:"sableux",       label:"Sandy",     sub:"Fast drainage"},
-                {val:"argileux",      label:"Clay",      sub:"High retention"},
+                {val:"sableux", label:"Sandy", sub:"Fast drainage"},
+                {val:"argileux", label:"Clay", sub:"High retention"},
               ].map(o => (
-                <div key={o.val}
+                <div
+                  key={o.val}
                   className={`sd-opt ${st.tex===o.val?"sd-opt--on":""} ${isSat("tex")?"sd-opt--locked":""}`}
-                  onClick={() => !isSat("tex") && onChange("tex", o.val)}>
+                  onClick={() => !isSat("tex") && onChange("tex", o.val, depth.key)}
+                >
                   <div className="sd-opt-r"><div className="sd-opt-dot" /></div>
                   <div>
                     <div className="sd-opt-lbl">{o.label}</div>
@@ -1609,14 +1589,16 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
             <div className="sd-opts">
               {[
                 {val:"tres-bas",label:"Very low <1%"},
-                {val:"bas",     label:"Low 1–2%"},
-                {val:"moyen",   label:"Medium 2–4%"},
-                {val:"bon",     label:"Good 4–6%"},
+                {val:"bas", label:"Low 1-2%"},
+                {val:"moyen", label:"Medium 2-4%"},
+                {val:"bon", label:"Good 4-6%"},
                 {val:"excellent",label:"Excellent >6%"},
               ].map(o => (
-                <div key={o.val}
+                <div
+                  key={o.val}
                   className={`sd-opt ${st.mo===o.val?"sd-opt--on":""} ${isSat("om")?"sd-opt--locked":""}`}
-                  onClick={() => !isSat("om") && onChange("mo", o.val)}>
+                  onClick={() => !isSat("om") && onChange("mo", o.val, depth.key)}
+                >
                   <div className="sd-opt-r"><div className="sd-opt-dot" /></div>
                   <div><div className="sd-opt-lbl">{o.label}</div></div>
                 </div>
@@ -1626,14 +1608,183 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
         </div>
       </div>
 
-      {/* 4 - Environment */}
       <div className="sd-sec">
-        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>4</span>Environmental Risks</div>
-        <Slider id="pb" label="Lead (Pb)" unit="mg/kg" min={0} max={100} step={1} value={st.pb} onChange={onChange} zones l="0 Clean" m="25 Alert" r="100 Critical" />
-        <Slider id="cd" label="Cadmium (Cd)" unit="mg/kg" min={0} max={100} step={1} value={st.cd} onChange={onChange} zones l="0 Clean" m="25 Alert" r="100 Critical" />
+        <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:sectionColor}}>4</span>Environmental Risks</div>
+        <Slider id="pb" label="Lead (Pb)" unit="mg/kg" min={0} max={100} step={1} value={st.pb} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Clean" m="25 Alert" r="100 Critical" />
+        <Slider id="cd" label="Cadmium (Cd)" unit="mg/kg" min={0} max={100} step={1} value={st.cd} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Clean" m="25 Alert" r="100 Critical" />
+      </div>
+    </div>
+  );
+}
+
+/* ZONE FORM */
+function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultureLabel, onAnalyze, analyzing, hasResult, onPrintLabRequest, onPrintLabRequestEco }) {
+  const isSat = id => diagMode === "eco" && id in SAT_FIELDS;
+  const seasonLabel = getSeasonLabel(st.seas);
+  const seasonEmoji = SEASON_EMOJIS[st.seas] || "??";
+  const isPermanentCulture = cultureLabel === "Permanent";
+
+  return (
+    <div className="sd-fc">
+      <div className="sd-zone-strip" style={{background: light, borderLeft: `4px solid ${color}`}}>
+        <div className="sd-zone-strip-dot" style={{background: color}} />
+        <span className="sd-zone-strip-name" style={{color}}>Zone {zoneIdx + 1}</span>
+        <span className="sd-zone-strip-hint">Enter the soil properties for this zone</span>
       </div>
 
-      {/* 5 - Season */}
+      {diagMode === "eco" && (
+        <div className="sd-sat-notice">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.2" />
+            <circle cx="5" cy="5" r="1.5" fill="currentColor" />
+          </svg>
+          CE: Landsat 8 � Texture: OpenLandMap / SoilGrids (Global Soil Map)
+        </div>
+      )}
+
+      {diagMode === "standard" && (
+        <button className="sd-lab-request-btn" onClick={onPrintLabRequest}>
+          <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+            <path d="M3 2h7v9H3z" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M4.5 4.3h4M4.5 6.3h4M4.5 8.3h2.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          </svg>
+          Download Lab Request
+        </button>
+      )}
+
+      {diagMode === "eco" && onPrintLabRequestEco && (
+        <button className="sd-lab-request-btn" onClick={onPrintLabRequestEco}>
+          <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+            <path d="M3 2h7v9H3z" stroke="currentColor" strokeWidth="1.4"/>
+            <path d="M4.5 4.3h4M4.5 6.3h4M4.5 8.3h2.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          </svg>
+          Download Lab Request (Eco)
+        </button>
+      )}
+
+      {isPermanentCulture ? (
+        <>
+          <div className="sd-permanent-intro" style={{ borderColor: `${color}24`, background: light }}>
+            <div className="sd-permanent-intro-title" style={{ color }}>Permanent crops: two depths in one form</div>
+            <div className="sd-permanent-intro-text">Fill both sections for this zone: 0-20 cm and 20-40 cm.</div>
+          </div>
+          <div className="sd-depth-stack">
+            {PERMANENT_DEPTHS.map((depth, index) => (
+              <PermanentDepthSection
+                key={depth.key}
+                depth={depth}
+                sectionColor={index === 0 ? color : "#8B6045"}
+                isSat={isSat}
+                st={{
+                  ...(st.permanentDepths?.[depth.key] || buildDepthState(diagMode)),
+                  ...(diagMode === "eco" ? { ce: st.ce, temp: st.temp, tex: st.tex, mo: st.mo } : {}),
+                }}
+                onChange={onChange}
+              />
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="sd-sec">
+            <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>1</span>Soil Chemistry</div>
+            <Slider id="ph" label="Soil pH" unit="pH" min={4} max={9} step={0.1} value={st.ph} onChange={onChange} zones l="4.0 Acidic" m="6.5 Neutral" r="9.0 Alkaline" />
+            <Slider id="ce" label="Salinity (EC)" unit="dS/m" min={0} max={6} step={0.1} value={st.ce} onChange={onChange} zones l="0 None" m="2.0 Limit" r="6.0 Critical" locked={isSat("ce")} src={SAT_FIELDS.ce} />
+          </div>
+
+          <div className="sd-sec">
+            <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>2</span>NPK Fertility</div>
+            <Slider id="n" label="Nitrogen (N)" unit="kg/ha" min={0} max={400} step={1} value={st.n} onChange={onChange} zones l="Low" m="30-60 Optimal" r="400" />
+            <Slider id="p" label="Phosphorus (P)" unit="kg/ha" min={0} max={400} step={1} value={st.p} onChange={onChange} zones l="0" m="15-30 Optimal" r="400" />
+            <Slider id="k" label="Potassium (K)" unit="kg/ha" min={0} max={400} step={5} value={st.k} onChange={onChange} zones l="0" m="130-250 Opt." r="400" />
+            <Slider id="lime" label="Active Lime" unit="%" min={0} max={30} step={1} value={st.lime} onChange={onChange} zones l="0 Low" m="8-12 Preferred" r="30 High" />
+          </div>
+
+          <div className="sd-sec">
+            <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>3</span>Physical Properties</div>
+            <div className="sd-two">
+              <div>
+                <div className="sd-col-lbl">
+                  Soil Texture
+                  {isSat("tex") && (
+                    <span className="sd-sat-tag" style={{marginLeft:5}}>
+                      <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
+                        <circle cx="3.5" cy="3.5" r="2.8" stroke="currentColor" strokeWidth="1.1" />
+                        <circle cx="3.5" cy="3.5" r="1" fill="currentColor" />
+                      </svg>
+                      {SAT_FIELDS.tex}
+                    </span>
+                  )}
+                </div>
+                <div className="sd-opts">
+                  {[
+                    {val:"limon-argileux",label:"Clay loam", sub:"Ideal for vegetables"},
+                    {val:"limoneux", label:"Loam", sub:"Very fertile"},
+                    {val:"sablo-limoneux",label:"Sandy loam",sub:"Balanced drainage"},
+                    {val:"sableux", label:"Sandy", sub:"Fast drainage"},
+                    {val:"argileux", label:"Clay", sub:"High retention"},
+                  ].map(o => (
+                    <div key={o.val}
+                      className={`sd-opt ${st.tex===o.val?"sd-opt--on":""} ${isSat("tex")?"sd-opt--locked":""}`}
+                      onClick={() => !isSat("tex") && onChange("tex", o.val)}>
+                      <div className="sd-opt-r"><div className="sd-opt-dot" /></div>
+                      <div>
+                        <div className="sd-opt-lbl">{o.label}</div>
+                        <div className="sd-opt-sub">{o.sub}</div>
+                      </div>
+                      {isSat("tex") && st.tex===o.val && (
+                        <div className="sd-opt-sat-mark">
+                          <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                            <circle cx="4.5" cy="4.5" r="3.5" stroke="#1D9E75" strokeWidth="1.1" />
+                            <circle cx="4.5" cy="4.5" r="1.2" fill="#1D9E75" />
+                          </svg>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="sd-col-lbl">
+                  Organic Matter
+                  {isSat("om") && (
+                    <span className="sd-sat-tag" style={{marginLeft:5}}>
+                      <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
+                        <circle cx="3.5" cy="3.5" r="2.8" stroke="currentColor" strokeWidth="1.1" />
+                        <circle cx="3.5" cy="3.5" r="1" fill="currentColor" />
+                      </svg>
+                      {SAT_FIELDS.om}
+                    </span>
+                  )}
+                </div>
+                <div className="sd-opts">
+                  {[
+                    {val:"tres-bas",label:"Very low <1%"},
+                    {val:"bas", label:"Low 1-2%"},
+                    {val:"moyen", label:"Medium 2-4%"},
+                    {val:"bon", label:"Good 4-6%"},
+                    {val:"excellent",label:"Excellent >6%"},
+                  ].map(o => (
+                    <div key={o.val}
+                      className={`sd-opt ${st.mo===o.val?"sd-opt--on":""} ${isSat("om")?"sd-opt--locked":""}`}
+                      onClick={() => !isSat("om") && onChange("mo", o.val)}>
+                      <div className="sd-opt-r"><div className="sd-opt-dot" /></div>
+                      <div><div className="sd-opt-lbl">{o.label}</div></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="sd-sec">
+            <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>4</span>Environmental Risks</div>
+            <Slider id="pb" label="Lead (Pb)" unit="mg/kg" min={0} max={100} step={1} value={st.pb} onChange={onChange} zones l="0 Clean" m="25 Alert" r="100 Critical" />
+            <Slider id="cd" label="Cadmium (Cd)" unit="mg/kg" min={0} max={100} step={1} value={st.cd} onChange={onChange} zones l="0 Clean" m="25 Alert" r="100 Critical" />
+          </div>
+        </>
+      )}
+
       <div className="sd-sec">
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>5</span>Field Date</div>
         <div className="sd-date-grid">
@@ -1659,7 +1810,6 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
         </div>
       </div>
 
-      {/* 6 - Crop */}
       <div className="sd-sec">
         <div className="sd-sec-lbl">
           <span className="sd-sec-num" style={{background:color}}>6</span>
@@ -1667,11 +1817,11 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
           <span className="sd-sec-opt"> - optional</span>
         </div>
         <div className="sd-crops-count">
-          <span>{crops.length} crops · {cultureLabel}</span>
+          <span>{crops.length} crops � {cultureLabel}</span>
         </div>
         <div className="sd-select-wrap">
           <select className="sd-sel" value={st.crop} onChange={e => onChange("crop", e.target.value)}>
-            <option value="">🔀 Recommend for me</option>
+            <option value="">Recommend for me</option>
             {crops.map(c => <option key={c.id} value={c.id}>{c.e} {c.n} / {c.ar}</option>)}
           </select>
           <svg className="sd-sel-arrow" width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -1680,7 +1830,6 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
         </div>
       </div>
 
-      {/* Submit */}
       <div className="sd-sub-wrap">
         {hasResult ? (
           <div className="sd-zone-done-hint" style={{ borderColor: `${color}44`, background: `${color}12`, color }}>
@@ -2831,17 +2980,34 @@ export default function SoilDiagnostic({
   }, [n, canToggleMode]);
 
   /* Field change for active zone */
-  const handleFieldChange = useCallback((id, v) => {
+  const handleFieldChange = useCallback((id, v, depthKey = null) => {
     setZoneStates(prev => {
       const next = [...prev];
-      const updated = { ...next[activeZone], [id]: v };
+      const currentZone = next[activeZone];
+      if (!currentZone) return prev;
+
+      if (depthKey) {
+        const depthState = currentZone.permanentDepths?.[depthKey] || buildDepthState(diagMode);
+        const updatedDepths = {
+          ...(currentZone.permanentDepths || {}),
+          [depthKey]: { ...depthState, [id]: v },
+        };
+        next[activeZone] = {
+          ...currentZone,
+          ...(depthKey === "depth0_20" ? { [id]: v } : {}),
+          permanentDepths: updatedDepths,
+        };
+        return next;
+      }
+
+      const updated = { ...currentZone, [id]: v };
       if (id === "date") {
         updated.seas = seasonFromDate(v);
       }
       next[activeZone] = updated;
       return next;
     });
-  }, [activeZone]);
+  }, [activeZone, diagMode]);
 
   useEffect(() => {
     if (!open) return;
@@ -3228,3 +3394,4 @@ function mapSoilTypeToTexture(soilType) {
   };
   return map[soilType] || "limon-argileux";
 }
+
