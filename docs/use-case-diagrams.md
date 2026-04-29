@@ -1,94 +1,112 @@
-# Diagrammes de Cas d'Utilisation (Système Agritech)
-
-## 1. Diagramme de Cas d'Utilisation Global
+## 1) Global Use Case Diagram
 
 ```mermaid
 flowchart LR
-    %% Acteurs
-    User["Acteur: Utilisateur"]
-    GEE["Système: Google Earth Engine"]
-    DB["Système: Base de Données (PostGIS)"]
+  Farmer(("🧑‍🌾\nAgriculteur"))
+  Technician(("🧑‍🔬\nTechnicien de laboratoire"))
 
-    %% Système
-    subgraph Systeme ["Système Agritech"]
-        UC1(["Délimiter une parcelle"])
-        UC2(["Générer le plan d'échantillonnage"])
-        UC3(["Récupérer les données satellitaires"])
-        UC4(["Évaluer la compatibilité du sol"])
-    end
+  subgraph "Système Expert d'Optimisation des Parcelles"
+    direction TB
+    Login(["Se connecter / accéder à l'application"])
+    Browse(["Consulter la carte et les parcelles"])
+    Draw(["Dessiner ou sélectionner une parcelle"])
+    Validate(["Valider la géométrie et la surface"])
+    Sample(["Générer les points d'échantillonnage"])
+    Kml(["Télécharger le fichier KML terrain"])
+    Diag(["Ouvrir le diagnostic de sol"])
+    Prefill(["Pré-remplir les données via satellite"])
+    Form(["Saisir les paramètres de sol"])
+    Score(["Calculer le score de compatibilité"])
+    LabReq(["Imprimer la demande de laboratoire"])
+    Report(["Télécharger le rapport de recommandations"])
+  end
 
-    %% Relations
-    User --> UC1
-    User --> UC2
-    User --> UC3
-    User --> UC4
+  Farmer --> Login
+  Farmer --> Browse
+  Farmer --> Draw
+  Farmer --> Diag
+  Technician --> LabReq
 
-    UC1 --> DB
-    UC2 --> DB
-    UC3 --> GEE
+  Draw -. "«include»" .-> Validate
+  Draw -. "«include»" .-> Sample
+  Sample -. "«include»" .-> Kml
+  Browse -. "«extend»" .-> Draw
 
-    ```mermaid
-    flowchart LR
-    User["Acteur: Utilisateur"]
-    DB["Base de Données"]
+  Diag -. "«include»" .-> Form
+  Prefill -. "«extend»" .-> Form
+  Form -. "«include»" .-> Score
+  Score -. "«extend»" .-> LabReq
+  Score -. "«extend»" .-> Report
+```
 
-    subgraph Mod1 ["Gestion Spatiale de la Parcelle"]
-        P1(["Tracer le polygone sur la carte"])
-        P2(["Calculer la surface géodésique"])
-        P3(["Détecter les doublons spatiaux"])
-        P4(["Sauvegarder la géométrie et métadonnées"])
-    end
+## 2) Phase 1 Use Case Diagram: Parcel Selection and Sampling
 
-    User --> P1
-    User --> P4
+```mermaid
+flowchart LR
+  Farmer(("🧑‍🌾\nAgriculteur"))
 
-    P1 -. "<< include >>" .-> P2
-    P4 -. "<< include >>" .-> P3
-    
-    P4 --> DB
+  subgraph "Phase 1 : Sélection de parcelle et export des points"
+    direction TB
+    OpenMap(["Ouvrir la carte de travail"])
+    SelectWilaya(["Rechercher et centrer la wilaya"])
+    DrawParcel(["Dessiner une parcelle (polygone)"])
+    CheckGeometry(["Vérifier le minimum de sommets et la validité"])
+    CalcArea(["Calculer la surface et le périmètre"])
+    ChooseMode(["Choisir le mode d'échantillonnage"])
+    GeneratePoints(["Générer les points d'échantillonnage"])
+    ShowRightPanel(["Afficher le panneau droit avec les infos de la parcelle"])
+    ExportKML(["Télécharger le KML des points"])
+  end
 
-    ```mermaid
-    flowchart TB
-    User["Acteur: Utilisateur"]
-    DB["Base de Données"]
+  Farmer --> OpenMap
+  Farmer --> SelectWilaya
+  Farmer --> DrawParcel
+  Farmer --> ChooseMode
+  Farmer --> ExportKML
 
-    subgraph Mod2 ["Moteur d'Échantillonnage"]
-        E1(["Sélectionner la culture et le mode"])
-        E2(["Exécuter l'algorithme de zonage Square-split"])
-        E3(["Générer les points (Serpentin)"])
-        E4(["Sauvegarder les zones et points"])
-        E5(["Exporter le plan au format KML"])
-    end
+  DrawParcel -. "«include»" .-> CheckGeometry
+  CheckGeometry -. "«include»" .-> CalcArea
+  DrawParcel -. "«include»" .-> ShowRightPanel
+  ChooseMode -. "«include»" .-> GeneratePoints
+  GeneratePoints -. "«include»" .-> ShowRightPanel
+  ExportKML -. "«extend»" .-> GeneratePoints
+  SelectWilaya -. "«extend»" .-> DrawParcel
+```
 
-    User --> E1
-    User --> E5
+## 3) Phase 2 Use Case Diagram: Diagnostic, Recommendations and Laboratory Outputs
 
-    E1 --> E2
-    E2 --> E3
-    E3 --> E4
-    
-    E4 --> DB
+```mermaid
+flowchart LR
+  Farmer(("🧑‍🌾\nAgriculteur"))
+  Technician(("🧑‍🔬\nTechnicien de laboratoire"))
 
-    ```mermaid
-    flowchart LR
-    User["Acteur: Utilisateur"]
-    GEE["API Google Earth Engine"]
+  subgraph "Phase 2 : Diagnostic de sol et recommandations"
+    direction TB
+    OpenDiag(["Ouvrir le diagnostic de sol"])
+    Preload(["Pré-remplir via données satellite"])
+    FillForm(["Remplir le formulaire (pH, CE, MO, texture, NPK)"])
+    LoadCrop(["Sélectionner la culture cible"])
+    ComputeScore(["Calculer le score de compatibilité"])
+    ShowVerdict(["Afficher le verdict et les alertes"])
+    PrintLab(["Imprimer la demande d'analyse de laboratoire"])
+    DownloadReport(["Télécharger le rapport de recommandations"])
+    SaveHistory(["Archiver les résultats et les recommandations"])
+  end
 
-    subgraph Mod3 ["Diagnostic et Recommandations"]
-        D1(["Demander le diagnostic satellitaire"])
-        D2(["Extraire pH, CE, Température, Texture"])
-        D3(["Ajuster manuellement les paramètres NPK"])
-        D4(["Calculer le score de compatibilité"])
-        D5(["Générer les recommandations agronomiques"])
-        D6(["Déclencher une alerte de toxicité"])
-    end
+  Farmer --> OpenDiag
+  Farmer --> FillForm
+  Farmer --> LoadCrop
+  Farmer --> PrintLab
+  Farmer --> DownloadReport
+  Technician --> PrintLab
 
-    User --> D1
-    User --> D3
-    User --> D4
-
-    D1 --> D2
-    D2 --> GEE
-    
-    D4 -. "<< include >>" .-> D5
-    D4 -. "<< extend >>" .-> D6
+  OpenDiag -. "«include»" .-> FillForm
+  OpenDiag -. "«include»" .-> LoadCrop
+  Preload -. "«extend»" .-> FillForm
+  FillForm -. "«include»" .-> ComputeScore
+  LoadCrop -. "«include»" .-> ComputeScore
+  ComputeScore -. "«include»" .-> ShowVerdict
+  ComputeScore -. "«extend»" .-> PrintLab
+  ComputeScore -. "«extend»" .-> DownloadReport
+  ComputeScore -. "«include»" .-> SaveHistory
+```

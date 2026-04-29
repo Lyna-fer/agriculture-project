@@ -198,6 +198,14 @@ class SamplingRequest(BaseModel):
     samplingMode: str
     parcelleName: Optional[str] = None
     groupId: Optional[int] = None  # ✅ NEW
+    parcelleId: Optional[int] = None
+
+
+class ParcelleCreateRequest(BaseModel):
+    name: str
+    polygonPoints: list[list[float]]
+    areaHa: Optional[float] = None
+    groupId: Optional[int] = None
 
 
 class SatelliteSoilRequest(BaseModel):
@@ -561,6 +569,17 @@ async def run_and_save(
         db: Session = Depends(get_db)
 ):
     try:
+        if not request.parcelleId:
+            raise HTTPException(400, "Parcelle must be saved before generating sampling guide")
+
+        parcelle_record = db.query(Parcelle).filter(
+            Parcelle.id == request.parcelleId,
+            Parcelle.user_id == current_user.id
+        ).first()
+
+        if not parcelle_record:
+            raise HTTPException(404, "Parcelle not found")
+
         # 1. Run sampling pipeline
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
@@ -574,65 +593,22 @@ async def run_and_save(
         result.setdefault('zones', [])
         result.setdefault('totalAreaHa', 0)
 
-        # 2. Generate deterministic parcelle name
-        parcelle_name = (
-            request.parcelleName.strip()
-            if request.parcelleName and request.parcelleName.strip()
-            else f"Parcelle_{result['totalAreaHa']:.1f}ha_{request.cropType}"
-        )
+        parcelle_name = parcelle_record.nom or f"Parcelle_{result['totalAreaHa']:.1f}ha_{request.cropType}"
 
-        # ✅ FIX: Compute geometry hash for duplicate detection
-        geo_hash = _compute_geometry_hash(request.polygonPoints)
+        # Keep the existing parcel geometry metadata in sync with the sampling request.
+        if request.groupId:
+            parcelle_record.group_id = request.groupId
 
-        # 3. 🔍 IDEMPOTENT CHECK: Look for existing parcel by user + name + geometry hash
-        # We store the hash in a comment on the location field or check via approximate match
-        existing = db.query(Parcelle).filter(
-            Parcelle.user_id == current_user.id,
-            Parcelle.nom == parcelle_name
-        ).first()
+        # Replace previous samples for this parcel so repeated generation does not duplicate them.
+        db.query(SoilSample).filter(SoilSample.parcelle_id == parcelle_record.id).delete()
 
-        if existing:
-            print(f"⚠️ Duplicate detected for user {current_user.id}, name '{parcelle_name}'. Returning existing ID: {existing.id}")
-            return {
-                "zones": result['zones'],
-                "totalAreaHa": result['totalAreaHa'],
-                "savedParcelleId": existing.id,
-                "savedSamplesCount": 0,
-                "savedParcelleName": existing.nom,
-                "user_id": current_user.id,
-                "message": "Parcelle already exists"
-            }
-
-        # 4. Convert polygon to PostGIS WKT
-        from shapely.geometry import Polygon
-        coords = [[p[1], p[0]] for p in request.polygonPoints]  # [lng, lat]
-        coords.append(coords[0])
-        location_wkt = f"SRID=4326;{Polygon(coords).wkt}"
-
-        # 5. Look up farmer
-        farmer_record = db.query(Farmer).filter(Farmer.email == current_user.email).first()
-        farmer_id_for_parcelle = farmer_record.id if farmer_record else None
-
-        # 6. Create new parcelle
-        new_parcelle = Parcelle(
-            user_id=current_user.id,
-            farmerid=farmer_id_for_parcelle,
-            nom=parcelle_name,
-            surface=result['totalAreaHa'],
-            location=location_wkt,
-            group_id=request.groupId or 1  # ✅ SAVE SELECTED CATEGORY
-
-        )
-        db.add(new_parcelle)
-        db.flush()
-
-        # 7. Create soil samples
+        # 2. Create soil samples for the saved parcel
         samples_created = 0
         for zone in result['zones']:
             for point in zone.get('points', []):
                 point_wkt = f"SRID=4326;POINT({point[1]} {point[0]})"
                 db.add(SoilSample(
-                    parcelle_id=new_parcelle.id,
+                    parcelle_id=parcelle_record.id,
                     zone_name=zone.get('id', 'Unknown'),
                     geometrie=point_wkt,
                     depth=20.0,
@@ -642,12 +618,11 @@ async def run_and_save(
                 samples_created += 1
 
         db.commit()
-        db.refresh(new_parcelle)
 
         return {
             "zones": result['zones'],
             "totalAreaHa": result['totalAreaHa'],
-            "savedParcelleId": new_parcelle.id,
+            "savedParcelleId": parcelle_record.id,
             "savedSamplesCount": samples_created,
             "savedParcelleName": parcelle_name,
             "user_id": current_user.id
@@ -679,6 +654,80 @@ async def run_and_save(
             }
         except:
             raise HTTPException(500, f"Server error: {str(e)}")
+
+
+@app.post("/api/parcels")
+def create_parcel(
+        request: ParcelleCreateRequest,
+        current_user: AuthUser = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    if not request.name or not request.name.strip():
+        raise HTTPException(400, detail="Parcel name is required")
+    if not request.polygonPoints or len(request.polygonPoints) < 3:
+        raise HTTPException(400, detail="Parcel geometry is required")
+
+    parcelle_name = request.name.strip()
+    existing = db.query(Parcelle).filter(
+        Parcelle.user_id == current_user.id,
+        Parcelle.nom == parcelle_name
+    ).first()
+    if existing:
+        from geoalchemy2.shape import to_shape
+
+        latlngs = []
+        if existing.location:
+          try:
+              geom = to_shape(existing.location)
+              if geom.geom_type == 'Polygon':
+                  latlngs = [[coord[1], coord[0]] for coord in list(geom.exterior.coords)[:-1]]
+          except:
+              pass
+
+        return {
+            "id": existing.id,
+            "name": existing.nom or f"Parcelle #{existing.id}",
+            "area": float(existing.surface) * 10000 if existing.surface else 0,
+            "color": "#2ecc71",
+            "groupId": existing.group_id or request.groupId or 1,
+            "latlngs": latlngs,
+            "bounds": None,
+            "user_id": existing.user_id,
+            "farmerid": existing.farmerid
+        }
+
+    from shapely.geometry import Polygon
+
+    coords = [[p[1], p[0]] for p in request.polygonPoints]
+    coords.append(coords[0])
+    location_wkt = f"SRID=4326;{Polygon(coords).wkt}"
+
+    farmer_record = db.query(Farmer).filter(Farmer.email == current_user.email).first()
+    farmer_id_for_parcelle = farmer_record.id if farmer_record else None
+
+    new_parcelle = Parcelle(
+        user_id=current_user.id,
+        farmerid=farmer_id_for_parcelle,
+        nom=parcelle_name,
+        surface=request.areaHa or 0,
+        location=location_wkt,
+        group_id=request.groupId or 1
+    )
+    db.add(new_parcelle)
+    db.commit()
+    db.refresh(new_parcelle)
+
+    return {
+        "id": new_parcelle.id,
+        "name": new_parcelle.nom,
+        "area": float(new_parcelle.surface) * 10000 if new_parcelle.surface else 0,
+        "color": "#2ecc71",
+        "groupId": new_parcelle.group_id or 1,
+        "latlngs": request.polygonPoints,
+        "bounds": None,
+        "user_id": new_parcelle.user_id,
+        "farmerid": new_parcelle.farmerid
+    }
 
 
 @app.post("/api/satellite/soil-metrics")

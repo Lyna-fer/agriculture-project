@@ -28,6 +28,43 @@ const MAX_PARCEL_AREA_HA = 50;
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
+const formatApiError = (fallbackMessage, response, errData) => {
+  const detail = errData?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail)) {
+    const joined = detail
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object") {
+          return item.msg || item.message || item.detail || JSON.stringify(item);
+        }
+        return String(item);
+      })
+      .filter(Boolean)
+      .join("; ");
+    if (joined) return joined;
+  }
+  if (detail && typeof detail === "object") {
+    return detail.message || detail.msg || JSON.stringify(detail);
+  }
+  return response?.statusText || fallbackMessage;
+};
+
+const normalizeLatLngPairs = (latlngs) => {
+  if (!Array.isArray(latlngs)) return [];
+  return latlngs
+    .map((point) => {
+      if (Array.isArray(point) && point.length >= 2) {
+        return [Number(point[0]), Number(point[1])];
+      }
+      if (point && typeof point === "object" && "lat" in point && "lng" in point) {
+        return [Number(point.lat), Number(point.lng)];
+      }
+      return null;
+    })
+    .filter((point) => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]));
+};
+
 export default function Map() {
   useEffect(() => { document.body.className = "page-map"; }, []);
 
@@ -142,29 +179,62 @@ export default function Map() {
     else { activateDrawTool(null); }
   }, [activateDrawTool]);
 
-  const handleSaveParcelle = useCallback(({ name, groupId }) => {
+  const handleSaveParcelle = useCallback(async ({ name, groupId }) => {
     if (!pendingParcelleInfo) return;
     if ((pendingParcelleInfo.area || 0) > MAX_PARCEL_AREA_HA) {
       showToast(`⚠️ Parcel too large: max ${MAX_PARCEL_AREA_HA} ha per parcel`);
       return;
     }
-    setPendingParcelleInfo({ ...pendingParcelleInfo, name });
-    const newP = {
-      id: Date.now(), name,
-      area: (pendingParcelleInfo.area || 0) * 10000,
-      color: pendingColor, groupId,
-      bounds: pendingParcelleInfo.bounds,
-      latlngs: pendingParcelleInfo.latlngs,
-    };
-    setParcelles(prev => [...prev, newP]);
-    setSelectedParcelleId(newP.id);
-    setSelectedGroupId(groupId);
-    setPendingParcelleInfo(null);
-    setAnalyzedParcelle(null);
-    setAnalysisMapSnapshot(null);
-    setResultsOpen(false);
-    showToast(`✅ ${name} saved`);
-  }, [pendingParcelleInfo, pendingColor, showToast]);
+    const token = localStorage.getItem("token");
+    if (!token) {
+      showToast("❌ Please sign in first");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/api/parcels`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name,
+          polygonPoints: normalizeLatLngPairs(pendingParcelleInfo.latlngs),
+          areaHa: pendingParcelleInfo.area || 0,
+          groupId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(formatApiError("Parcel save failed", response, errData));
+      }
+
+      const savedParcel = await response.json();
+      const newP = {
+        ...savedParcel,
+        color: pendingColor,
+      };
+
+      setParcelles((prev) => {
+        const withoutDuplicate = prev.filter((parcel) => parcel.id !== newP.id);
+        return [...withoutDuplicate, newP];
+      });
+      setSelectedParcelleId(newP.id);
+      setSelectedGroupId(groupId);
+      setPendingParcelleInfo(null);
+      setParcelleInfo(null);
+      setAnalyzedParcelle(null);
+      setAnalysisMapSnapshot(null);
+      setResultsOpen(false);
+      clearSelectedParcelle();
+      showToast(`✅ ${name} saved`);
+    } catch (error) {
+      console.error("Parcel save error:", error);
+      showToast(`❌ ${error.message}`);
+    }
+  }, [pendingParcelleInfo, pendingColor, showToast, clearSelectedParcelle]);
 
   const handleCancelDraw = useCallback(() => {
     setActiveTool(null);
@@ -352,6 +422,12 @@ export default function Map() {
       return;
     }
 
+    if (!isExistingParcelle || !targetParcelle?.id) {
+      showToast("❌ Save the parcel first before generating the sampling guide");
+      setIsAnalyzing(false);
+      return;
+    }
+
     const culture = CULTURES.find(c => c.id === cropGroupId);
     const cropType = CULTURES_TO_STRATEGIES[cropGroupId];
     if (!culture || !cropType) {
@@ -361,7 +437,7 @@ export default function Map() {
     const customName = pendingParcelleInfo?.name || targetParcelle?.name || null;
     const polygonPoints = normalizeLatLngs(geometry.latlngs);
 
-    const payload = { polygonPoints, cropType, samplingMode, parcelleName: customName,groupId: cropGroupId };
+    const payload = { polygonPoints, cropType, samplingMode, parcelleName: customName, groupId: cropGroupId, parcelleId: targetParcelle.id };
     showToast("⏳ Calculating + saving...");
 
     try {

@@ -8,10 +8,66 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
   const zoneLayersRef = useRef([]);
   const parcelleLayerRef = useRef(null);
   const parcelleLayersRef = useRef({});
+  const parcelleLabelLayersRef = useRef({});
   const currentZoomRef = useRef(10);
   const MIN_ZOOM_FOR_MARKERS = 13;
   const drawControlRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
+
+  const getParcelLabelFontSize = useCallback((zoom) => {
+    const clampedZoom = Math.max(MIN_ZOOM_FOR_MARKERS, Math.min(zoom, 18));
+    const ratio = (clampedZoom - MIN_ZOOM_FOR_MARKERS) / (18 - MIN_ZOOM_FOR_MARKERS || 1);
+    const size = 15 - ratio * 4;
+    return `${Math.max(11, size).toFixed(1)}px`;
+  }, []);
+
+  const createParcelLabelIcon = useCallback((parcel, zoom) => {
+    const L = window.L;
+    if (!L) return null;
+
+    return L.divIcon({
+      className: " ",
+      html: `<div style="
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: max-content;
+        padding: 0;
+        border-radius: 0;
+        font-size: ${getParcelLabelFontSize(zoom)};
+        font-weight: 700;
+        font-family: system-ui, sans-serif;
+        line-height: 1;
+        white-space: nowrap;
+        text-shadow: 0 2px 6px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.9);
+        box-sizing: border-box;
+      ">${parcel.name || `Parcel #${parcel.id}`}</div>`,
+      iconSize: [1, 1],
+      iconAnchor: [0, 0],
+    });
+  }, [getParcelLabelFontSize]);
+
+  const syncParcelLabelsWithZoom = useCallback(() => {
+    const map = mapInstanceRef.current;
+    const L = window.L;
+    if (!map || !L) return;
+
+    const shouldShow = map.getZoom() >= MIN_ZOOM_FOR_MARKERS;
+
+    Object.entries(parcelleLabelLayersRef.current).forEach(([parcelId, layer]) => {
+      const parcel = parcelleLayersRef.current[parcelId]?._parcelMeta;
+      if (!parcel) return;
+
+      if (!shouldShow) {
+        if (map.hasLayer(layer)) map.removeLayer(layer);
+        return;
+      }
+
+      layer.setIcon(createParcelLabelIcon(parcel, map.getZoom()));
+      if (!map.hasLayer(layer)) map.addLayer(layer);
+    });
+  }, [createParcelLabelIcon]);
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
@@ -128,6 +184,7 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
     map.on("zoomend", () => {
       currentZoomRef.current = map.getZoom();
       toggleMarkersByZoom();
+      syncParcelLabelsWithZoom();
     });
 
     mapInstanceRef.current = map;
@@ -177,6 +234,11 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
     });
     parcelleLayersRef.current = {};
 
+    Object.values(parcelleLabelLayersRef.current).forEach((layer) => {
+      map.removeLayer(layer);
+    });
+    parcelleLabelLayersRef.current = {};
+
     parcelles.forEach((parcel) => {
       if (!parcel.latlngs || parcel.latlngs.length < 3) return;
 
@@ -188,6 +250,7 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
         weight: isSelected ? 4 : 2,
         opacity: 0.8,
       });
+      polygon._parcelMeta = parcel;
 
       polygon.bindPopup(`
         <b>${parcel.name || `Parcel #${parcel.id}`}</b><br>
@@ -196,6 +259,20 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
 
       polygon.addTo(map);
       parcelleLayersRef.current[parcel.id] = polygon;
+
+      const bounds = polygon.getBounds();
+      const center = bounds.getCenter();
+      const label = L.marker(center, {
+        interactive: false,
+        keyboard: false,
+        zIndexOffset: 1000,
+        icon: createParcelLabelIcon(parcel, map.getZoom()),
+      }).addTo(map);
+
+      parcelleLabelLayersRef.current[parcel.id] = label;
+      if (map.getZoom() < MIN_ZOOM_FOR_MARKERS) {
+        map.removeLayer(label);
+      }
     });
   }, []);
 
@@ -207,6 +284,11 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
       map.removeLayer(layer);
     });
     parcelleLayersRef.current = {};
+
+    Object.values(parcelleLabelLayersRef.current).forEach((layer) => {
+      map.removeLayer(layer);
+    });
+    parcelleLabelLayersRef.current = {};
   }, []);
 
   const toggleMarkersByZoom = useCallback(() => {
@@ -221,6 +303,11 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50 }) {
     });
 
     zoneLayersRef.current.forEach((layer) => {
+      if (shouldShow && !map.hasLayer(layer)) map.addLayer(layer);
+      if (!shouldShow && map.hasLayer(layer)) map.removeLayer(layer);
+    });
+
+    Object.values(parcelleLabelLayersRef.current).forEach((layer) => {
       if (shouldShow && !map.hasLayer(layer)) map.addLayer(layer);
       if (!shouldShow && map.hasLayer(layer)) map.removeLayer(layer);
     });
