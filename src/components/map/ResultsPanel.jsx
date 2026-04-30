@@ -79,16 +79,22 @@ function getWeatherCodeMeta(code) {
 }
 
 function getForecastDayMeta(dateValue, index) {
+  const date = new Date(`${dateValue}T12:00:00`);
+  const monthLabel = Number.isNaN(date.getTime())
+    ? ""
+    : date.toLocaleDateString("fr-FR", { month: "short" }).replace(".", "");
+
   if (index === 0) {
     return {
-      dayNumber: new Date(`${dateValue}T12:00:00`).getDate(),
+      dayNumber: Number.isNaN(date.getTime()) ? "" : date.getDate(),
+      monthLabel,
       label: "Aujourd'hui",
     };
   }
 
-  const date = new Date(`${dateValue}T12:00:00`);
   return {
     dayNumber: date.getDate(),
+    monthLabel,
     label: date.toLocaleDateString("fr-FR", { weekday: "short" }).replace(".", "") + ".",
   };
 }
@@ -207,6 +213,7 @@ export default function ResultsPanel({
   zones      = [],
   nZones     = 1,   // received from map.jsx (data.zones.length from backend)
   onStartSampling,
+  weatherData = null,
 }) {
   const [tab,      setTab]      = useState("schema");
   const [diagOpen, setDiagOpen] = useState(false);
@@ -214,16 +221,32 @@ export default function ResultsPanel({
   const [weatherLoading, setWeatherLoading] = useState(false);
 
   const data = CULTURES.find(c => c.id === cultureId);
+  const resolvedParcelleHa = parcelleHa > 0
+    ? parcelleHa
+    : Number(parcelle?.area || 0) / 10000;
+  const weatherPolygonPoints = useMemo(
+    () => (parcelle?.latlngs || [])
+      .map((point) => {
+        const normalized = normalizeLatLngPoint(point);
+        return [normalized.lat, normalized.lng];
+      })
+      .filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1])),
+    [parcelle]
+  );
 
   const zoneHa = cultureId===1 ? 3 : cultureId===2 ? 5 : 4;
   const calcZones = useMemo(() => {
     if (samplingMode==="economic") {
-      if (parcelleHa<=10) return 1;
-      if (parcelleHa<=25) return 2;
+      if (resolvedParcelleHa<=10) return 1;
+      if (resolvedParcelleHa<=25) return 2;
       return 3;
     }
-    return Math.max(1, Math.ceil(parcelleHa/zoneHa));
-  }, [samplingMode, parcelleHa, zoneHa]);
+    // Match backend logic: only use multiple zones if area > zoneHa * 1.35
+    if (resolvedParcelleHa > zoneHa * 1.35) {
+      return Math.ceil(resolvedParcelleHa / zoneHa);
+    }
+    return 1;
+  }, [samplingMode, resolvedParcelleHa, zoneHa]);
 
   const effectiveZones = nZones > 1 ? nZones : calcZones;
   const fmtHa = ha => ha < 0.1 ? `${(ha*10000).toFixed(0)} m²` : `${ha.toFixed(2)} ha`;
@@ -232,7 +255,7 @@ export default function ResultsPanel({
   const A = data?.color || "#4a7c2f";
   const AB = data?.colorLight || "rgba(74,124,47,0.1)";
   const Icon = data?.icon;
-  const kpis = data ? buildKpis(data, parcelleHa) : [];
+  const kpis = data ? buildKpis(data, resolvedParcelleHa) : [];
   const seasonalTips = buildSeasonalSamplingTips(monthToSeason(new Date().getMonth() + 1), cultureName);
   const weatherAdvice = buildSamplingWeatherAdvice(weather);
   const todayWeather = weather?.forecastSummary?.[0] || null;
@@ -240,7 +263,13 @@ export default function ResultsPanel({
   const initialDiagMode = samplingMode==="economic" ? "eco" : "standard";
 
   useEffect(() => {
-    if (!open || !Number.isFinite(parcelCentroid?.lat) || !Number.isFinite(parcelCentroid?.lng)) {
+    if (weatherData) {
+      setWeather(weatherData);
+      setWeatherLoading(false);
+      return;
+    }
+
+    if (!open || weatherPolygonPoints.length < 3 || !Number.isFinite(parcelCentroid?.lat) || !Number.isFinite(parcelCentroid?.lng)) {
       setWeather(null);
       setWeatherLoading(false);
       return;
@@ -251,56 +280,15 @@ export default function ResultsPanel({
     const fetchWeather = async () => {
       setWeatherLoading(true);
       try {
-        const params = new URLSearchParams({
-          latitude: String(parcelCentroid.lat),
-          longitude: String(parcelCentroid.lng),
-          current: "temperature_2m,weather_code",
-          daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max",
-          past_days: "3",
-          forecast_days: "3",
-          timezone: "auto",
-        });
-
-        const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+        const response = await fetch(`${API_BASE}/api/weather/parcel`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ polygonPoints: weatherPolygonPoints }),
           signal: controller.signal,
         });
         if (!response.ok) throw new Error("Weather request failed");
 
-        const payload = await response.json();
-        const daily = payload?.daily || {};
-        const today = new Date().toISOString().slice(0, 10);
-        const dates = Array.isArray(daily.time) ? daily.time : [];
-        const rain = Array.isArray(daily.precipitation_sum) ? daily.precipitation_sum : [];
-        const probs = Array.isArray(daily.precipitation_probability_max) ? daily.precipitation_probability_max : [];
-        const maxTemps = Array.isArray(daily.temperature_2m_max) ? daily.temperature_2m_max : [];
-        const minTemps = Array.isArray(daily.temperature_2m_min) ? daily.temperature_2m_min : [];
-        const codes = Array.isArray(daily.weather_code) ? daily.weather_code : [];
-        const recentIndexes = dates.map((date, index) => ({ date, index })).filter((item) => item.date < today);
-        const forecastIndexes = dates.map((date, index) => ({ date, index })).filter((item) => item.date >= today);
-        const nextRainDay = forecastIndexes.find((item) => Number(rain[item.index] || 0) > 0.5 || Number(probs[item.index] || 0) >= 40);
-        const todayIndex = dates.findIndex((date) => date === today);
-        const currentMeta = getWeatherCodeMeta(payload?.current?.weather_code ?? codes[todayIndex]);
-
-        setWeather({
-          currentTemp: payload?.current?.temperature_2m,
-          currentLabel: currentMeta.label,
-          currentIcon: currentMeta.icon,
-          todayMaxTemp: todayIndex >= 0 ? Number(maxTemps[todayIndex] || 0) : null,
-          todayRainMm: todayIndex >= 0 ? Number(rain[todayIndex] || 0) : 0,
-          recentRainMm: recentIndexes.reduce((sum, item) => sum + Number(rain[item.index] || 0), 0),
-          maxRecentRainMm: recentIndexes.reduce((max, item) => Math.max(max, Number(rain[item.index] || 0)), 0),
-          nextRainDate: nextRainDay?.date || null,
-          nextRainMm: nextRainDay ? Number(rain[nextRainDay.index] || 0) : 0,
-          nextRainProbability: nextRainDay ? Number(probs[nextRainDay.index] || 0) : 0,
-          forecastSummary: forecastIndexes.slice(0, 3).map((item) => ({
-            date: item.date,
-            rain: Number(rain[item.index] || 0),
-            probability: Number(probs[item.index] || 0),
-            maxTemp: Number(maxTemps[item.index] || 0),
-            minTemp: Number(minTemps[item.index] || 0),
-            ...getWeatherCodeMeta(codes[item.index]),
-          })),
-        });
+        setWeather(await response.json());
       } catch (error) {
         if (error.name !== "AbortError") {
           console.warn("Weather fetch failed:", error);
@@ -315,7 +303,7 @@ export default function ResultsPanel({
 
     fetchWeather();
     return () => controller.abort();
-  }, [open, parcelCentroid]);
+  }, [open, parcelCentroid, weatherPolygonPoints, weatherData]);
 
   if (!data || !Icon) return null;
 
@@ -388,6 +376,12 @@ export default function ResultsPanel({
                       ? `${Number(weather.currentTemp).toFixed(1)} degC now`
                       : "No live parcel weather"}
                   </span>
+                  {!weatherLoading && weather && (
+                    <span>
+                      {weather.currentWindKmh != null ? `${Math.round(Number(weather.currentWindKmh))} km/h wind` : "Wind unavailable"}
+                      {weather.currentHumidity != null ? ` · ${Math.round(Number(weather.currentHumidity))}% humidity` : ""}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -398,7 +392,10 @@ export default function ResultsPanel({
                     return (
                       <article key={day.date} className={`cy-forecast-card ${index === 0 ? "cy-forecast-card--today" : ""}`}>
                         <div className="cy-forecast-top">
-                          <span className="cy-forecast-date">{meta.dayNumber}</span>
+                          <span className="cy-forecast-date">
+                            {meta.dayNumber}
+                            {meta.monthLabel ? <span className="cy-forecast-month"> {meta.monthLabel}</span> : null}
+                          </span>
                           <span className="cy-forecast-name">{meta.label}</span>
                         </div>
                         <div className="cy-forecast-mid">
@@ -521,7 +518,7 @@ export default function ResultsPanel({
                   <span className="cy-formula-n" style={{color:A}}>{effectiveZones}</span>
                   {samplingMode==="economic"
                     ? <><span className="cy-formula-op">→</span><span className="cy-formula-p">Fixed thresholds (Eco)</span></>
-                    : <><span className="cy-formula-op">≈</span><span className="cy-formula-p">{fmtHa(parcelleHa)}</span><span className="cy-formula-op">/</span><span className="cy-formula-p">{zoneHa} ha</span></>}
+                    : <><span className="cy-formula-op">≈</span><span className="cy-formula-p">{fmtHa(resolvedParcelleHa)}</span><span className="cy-formula-op">/</span><span className="cy-formula-p">{zoneHa} ha</span></>}
                 </div>
                 <div className="cy-formula-note">
                   {samplingMode==="economic"?"Subdivision optimized to reduce costs":"Subdivision based on strict agronomic standards"}
@@ -624,7 +621,7 @@ export default function ResultsPanel({
       <div className="cy-footer">
         <div className="cy-footer-summary">
           <div className="cy-footer-stats">
-            <span>{fmtHa(parcelleHa)}</span>
+            <span>{fmtHa(resolvedParcelleHa)}</span>
             <span className="cy-footer-dot"/>
             <span>{data.depths.length} horizons</span>
             <span className="cy-footer-dot"/>
@@ -653,13 +650,14 @@ export default function ResultsPanel({
           open={diagOpen}
           onClose={()=>setDiagOpen(false)}
           parcelleName={parcelle?.name || region || "Parcel A"}
-          parcelleHa={parcelleHa}
+          parcelleHa={resolvedParcelleHa}
           cultureGroupId={cultureId}
           parcelle={parcelle}
           mapSnapshot={mapSnapshot}
           zones={zones}
           nZones={effectiveZones}
           initialDiagMode={initialDiagMode}
+           weatherData={weatherData}
         />
       </div>
     </div>

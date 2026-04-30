@@ -1,5 +1,6 @@
 import ee
 import os
+import math
 import hashlib
 import base64
 import secrets
@@ -12,6 +13,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import Response
 from pydantic import BaseModel
 from jose import JWTError, jwt
+import httpx
 
 try:
     from Backend.services.sampling import run_sampling_pipeline
@@ -212,6 +214,10 @@ class SatelliteSoilRequest(BaseModel):
     polygonPoints: list[list[float]]
 
 
+class WeatherParcelRequest(BaseModel):
+    polygonPoints: list[list[float]]
+
+
 class KmlExportRequest(BaseModel):
     zones: list[dict]
     parcelleName: Optional[str] = None
@@ -389,6 +395,148 @@ def _compute_geometry_hash(coords: list[list[float]]) -> str:
     normalized = sorted([tuple(round(c, 6) for c in pt) for pt in coords])
     geo_str = f"{normalized}"
     return hashlib.sha256(geo_str.encode()).hexdigest()[:16]
+
+
+def _compute_polygon_centroid(latlngs: list[list[float]]) -> tuple[float, float]:
+    if not latlngs or len(latlngs) < 3:
+        raise HTTPException(400, "Need at least 3 polygon points.")
+
+    coords = [[float(point[1]), float(point[0])] for point in latlngs]
+    if coords[0] != coords[-1]:
+        coords.append(coords[0])
+
+    try:
+        from shapely.geometry import Polygon
+
+        centroid = Polygon(coords).centroid
+        if math.isfinite(centroid.y) and math.isfinite(centroid.x):
+            return float(centroid.y), float(centroid.x)
+    except Exception:
+        pass
+
+    lat = sum(float(point[0]) for point in latlngs) / len(latlngs)
+    lng = sum(float(point[1]) for point in latlngs) / len(latlngs)
+    return lat, lng
+
+
+def _weather_code_meta(code: int | float | None) -> dict:
+    weather_map = {
+        0: {"label": "Clear sky", "icon": "☀️"},
+        1: {"label": "Mostly clear", "icon": "🌤️"},
+        2: {"label": "Partly cloudy", "icon": "⛅"},
+        3: {"label": "Overcast", "icon": "☁️"},
+        45: {"label": "Fog", "icon": "🌫️"},
+        48: {"label": "Rime fog", "icon": "🌫️"},
+        51: {"label": "Light drizzle", "icon": "🌦️"},
+        53: {"label": "Drizzle", "icon": "🌦️"},
+        55: {"label": "Dense drizzle", "icon": "🌧️"},
+        61: {"label": "Light rain", "icon": "🌦️"},
+        63: {"label": "Rain", "icon": "🌧️"},
+        65: {"label": "Heavy rain", "icon": "⛈️"},
+        71: {"label": "Light snow", "icon": "🌨️"},
+        73: {"label": "Snow", "icon": "🌨️"},
+        75: {"label": "Heavy snow", "icon": "❄️"},
+        80: {"label": "Rain showers", "icon": "🌦️"},
+        81: {"label": "Rain showers", "icon": "🌧️"},
+        82: {"label": "Violent showers", "icon": "⛈️"},
+        95: {"label": "Thunderstorm", "icon": "⛈️"},
+        96: {"label": "Storm with hail", "icon": "⛈️"},
+        99: {"label": "Severe storm", "icon": "⛈️"},
+    }
+    return weather_map.get(int(code) if code is not None else -1, {"label": "Weather update", "icon": "🌤️"})
+
+
+async def _fetch_weather_payload(latitude: float, longitude: float) -> dict:
+    params = {
+        "latitude": str(latitude),
+        "longitude": str(longitude),
+        "current": "temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m,precipitation",
+        "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max",
+        "past_days": "3",
+        "forecast_days": "3",
+        "timezone": "auto",
+    }
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.get("https://api.open-meteo.com/v1/forecast", params=params)
+        response.raise_for_status()
+        return response.json()
+
+
+def _build_weather_response(payload: dict, latitude: float, longitude: float) -> dict:
+    daily = payload.get("daily") or {}
+    current = payload.get("current") or {}
+    today = datetime.now(timezone.utc).date().isoformat()
+    dates = list(daily.get("time") or [])
+    rain = list(daily.get("precipitation_sum") or [])
+    probs = list(daily.get("precipitation_probability_max") or [])
+    max_temps = list(daily.get("temperature_2m_max") or [])
+    min_temps = list(daily.get("temperature_2m_min") or [])
+    wind_max = list(daily.get("wind_speed_10m_max") or [])
+    codes = list(daily.get("weather_code") or [])
+
+    recent_indexes = [item for item in enumerate(dates) if item[1] < today]
+    forecast_indexes = [item for item in enumerate(dates) if item[1] >= today]
+    next_rain_day = next(
+        (
+            item for item in forecast_indexes
+            if float(rain[item[0]] or 0) > 0.5 or float(probs[item[0]] or 0) >= 40
+        ),
+        None,
+    )
+    today_index = next((index for index, value in enumerate(dates) if value == today), -1)
+    current_code = current.get("weather_code")
+    if current_code is None and today_index >= 0:
+      current_code = codes[today_index]
+    current_meta = _weather_code_meta(current_code)
+
+    return {
+        "source": "open-meteo",
+        "observedAt": current.get("time") or datetime.now(timezone.utc).isoformat(),
+        "location": {
+            "latitude": latitude,
+            "longitude": longitude,
+        },
+        "currentTemp": current.get("temperature_2m"),
+        "currentLabel": current_meta["label"],
+        "currentIcon": current_meta["icon"],
+        "currentWindKmh": current.get("wind_speed_10m"),
+        "currentHumidity": current.get("relative_humidity_2m"),
+        "currentRainMm": current.get("precipitation"),
+        "todayMaxTemp": float(max_temps[today_index]) if today_index >= 0 and max_temps[today_index] is not None else None,
+        "todayRainMm": float(rain[today_index]) if today_index >= 0 and rain[today_index] is not None else 0,
+        "recentRainMm": sum(float(rain[index] or 0) for index, _ in recent_indexes),
+        "maxRecentRainMm": max((float(rain[index] or 0) for index, _ in recent_indexes), default=0),
+        "nextRainDate": next_rain_day[1] if next_rain_day else None,
+        "nextRainMm": float(rain[next_rain_day[0]] or 0) if next_rain_day else 0,
+        "nextRainProbability": float(probs[next_rain_day[0]] or 0) if next_rain_day else 0,
+        "forecastSummary": [
+            {
+                "date": date_value,
+                "rain": float(rain[index] or 0),
+                "probability": float(probs[index] or 0),
+                "maxTemp": float(max_temps[index] or 0),
+                "minTemp": float(min_temps[index] or 0),
+                "windMaxKmh": float(wind_max[index] or 0),
+                **_weather_code_meta(codes[index]),
+            }
+            for index, date_value in forecast_indexes[:3]
+        ],
+    }
+
+
+@app.post("/api/weather/parcel")
+async def get_parcel_weather(request: WeatherParcelRequest):
+    try:
+        latitude, longitude = _compute_polygon_centroid(request.polygonPoints)
+        payload = await _fetch_weather_payload(latitude, longitude)
+        return _build_weather_response(payload, latitude, longitude)
+    except HTTPException:
+        raise
+    except httpx.HTTPError as error:
+        raise HTTPException(502, detail=f"Weather service unavailable: {str(error)}")
+    except Exception as error:
+        raise HTTPException(500, detail=f"Weather lookup failed: {str(error)}")
 
 
 def _compute_satellite_metrics(geometry: ee.Geometry) -> dict:

@@ -2265,6 +2265,16 @@ function getParcelBounds(latlngs = []) {
   };
 }
 
+function getParcelCentroid(latlngs = []) {
+  const pts = latlngs.map(normalizeLatLngPoint).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+  if (!pts.length) return null;
+  const sums = pts.reduce(
+    (acc, point) => ({ lat: acc.lat + point.lat, lng: acc.lng + point.lng }),
+    { lat: 0, lng: 0 }
+  );
+  return { lat: sums.lat / pts.length, lng: sums.lng / pts.length };
+}
+
 function projectPointToBounds(point, bounds, width, height, padding = 18) {
   const p = normalizeLatLngPoint(point);
   const rangeLng = Math.max(bounds.maxLng - bounds.minLng, 0.00001);
@@ -2411,6 +2421,9 @@ function DashboardView({
   activeZone,
   onSelectZone,
   currentAnalysis,
+  weather = null,
+  weatherLoading = false,
+  weatherData = null,
   analysisHistory = [],
 }) {
   const width = 720;
@@ -2424,6 +2437,15 @@ function DashboardView({
   const currentSnapshot = currentAnalysis || null;
   const previousSnapshot = analysisHistory.find((item) => item?.fingerprint && item.fingerprint !== currentSnapshot?.fingerprint) || null;
   const selectedCrop = activeZoneResult?.crop ? crops.find((crop) => String(crop.id) === String(activeZoneResult.crop)) : null;
+  const displayWeather = weatherData || weather;
+  const displayWeatherLoading = weatherData ? false : weatherLoading;
+  const weatherDate = displayWeather?.observedAt ? new Date(displayWeather.observedAt) : new Date();
+  const weatherDay = Number.isFinite(weatherDate.getTime()) ? weatherDate.getDate() : new Date().getDate();
+  const weatherMonth = Number.isFinite(weatherDate.getTime())
+    ? weatherDate.toLocaleDateString("en-GB", { month: "long", year: "numeric" })
+    : new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  const weatherLabel = displayWeatherLoading ? "Loading forecast..." : displayWeather?.currentLabel || "Weather unavailable";
+  const weatherIcon = displayWeather?.currentIcon || "⛅";
 
   const currentAnalysisMetrics = [
     { key: "ph", label: "Soil pH", value: activeZoneResult?.ph, previous: previousSnapshot?.avgPh, unit: "pH", format: (value) => Number(value).toFixed(1) },
@@ -2456,11 +2478,6 @@ function DashboardView({
   const growthLevel = Math.max(48, Math.min(96, Math.round(activeZoneScore + 8)));
   const growthMax = Math.min(100, growthLevel + 5);
   const growthMin = Math.max(0, growthLevel - 15);
-  const weatherDate = activeZoneResult?.date || currentSnapshot?.timestamp;
-  const weatherDay = weatherDate ? new Date(weatherDate).getDate() : new Date().getDate();
-  const weatherMonth = weatherDate
-    ? new Date(weatherDate).toLocaleDateString("en-GB", { month: "long", year: "numeric" })
-    : new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" });
   const nutrientMix = [
     { id: "n", value: Number(activeZoneResult?.n || 0), color: "#ff5b45" },
     { id: "p", value: Number(activeZoneResult?.p || 0), color: "#f89e3d" },
@@ -2482,8 +2499,8 @@ function DashboardView({
             <div className="sd-studio-left">
               <div className="sd-studio-weather-card">
                 <div className="sd-studio-weather-main">
-                  <span className="sd-studio-weather-label">Partly Cloudy</span>
-                  <div className="sd-studio-weather-emoji">⛅</div>
+                  <span className="sd-studio-weather-label">{weatherLabel}</span>
+                  <div className="sd-studio-weather-emoji">{weatherIcon}</div>
                   <div className="sd-studio-weather-date">
                     <strong>{weatherDay}</strong>
                     <span>{weatherMonth}</span>
@@ -2492,15 +2509,15 @@ function DashboardView({
                 <div className="sd-studio-weather-metrics">
                   <div className="sd-studio-weather-pill">
                     <span>Temperature</span>
-                    <strong>{Number(activeZoneResult?.temp || 0).toFixed(1)} °C</strong>
+                    <strong>{displayWeather?.currentTemp != null ? `${Number(displayWeather.currentTemp).toFixed(1)} °C` : "--"}</strong>
                   </div>
                   <div className="sd-studio-weather-pill">
                     <span>Wind</span>
-                    <strong>{Math.round(Number(activeZoneResult?.wind || 0))} km/h</strong>
+                    <strong>{displayWeather?.currentWindKmh != null ? `${Math.round(Number(displayWeather.currentWindKmh))} km/h` : "--"}</strong>
                   </div>
                   <div className="sd-studio-weather-pill">
-                    <span>Salinity</span>
-                    <strong>{Number(activeZoneResult?.ce || 0).toFixed(1)} dS/m</strong>
+                    <span>Rain</span>
+                    <strong>{displayWeather?.currentRainMm != null ? `${Number(displayWeather.currentRainMm).toFixed(1)} mm` : "--"}</strong>
                   </div>
                 </div>
               </div>
@@ -2677,6 +2694,7 @@ export default function SoilDiagnostic({
   zones          = [],
   nZones         = 1,
   initialDiagMode = "eco",
+  weatherData = null,
 }) {
   const [diagMode,    setDiagMode]    = useState(initialDiagMode);
   const [activeZone,  setActiveZone]  = useState(0);
@@ -2688,6 +2706,8 @@ export default function SoilDiagnostic({
   const [analysisHistory, setAnalysisHistory] = useState([]);
   const [currentAnalysis, setCurrentAnalysis] = useState(null);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [parcelWeather, setParcelWeather] = useState(null);
+  const [parcelWeatherLoading, setParcelWeatherLoading] = useState(false);
   // In-memory cache for satellite responses to avoid repeated network calls
   const satCacheRef = useRef(new Map());
   const lastStoredFingerprintRef = useRef("");
@@ -2695,6 +2715,16 @@ export default function SoilDiagnostic({
 
   const CROPS = useMemo(() => rawCrops.map(toCrop), [rawCrops]);
   const cultureLabel = cultureGroupId===1?"Vegetables":cultureGroupId===2?"Cereals":"Permanent";
+  const parcelWeatherCentroid = useMemo(() => getParcelCentroid(parcelle?.latlngs || []), [parcelle]);
+  const parcelWeatherPoints = useMemo(
+    () => (parcelle?.latlngs || [])
+      .map((point) => {
+        const normalized = normalizeLatLngPoint(point);
+        return [normalized.lat, normalized.lng];
+      })
+      .filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1])),
+    [parcelle]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -2748,6 +2778,47 @@ export default function SoilDiagnostic({
       cancelled = true;
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open || parcelWeatherPoints.length < 3 || !Number.isFinite(parcelWeatherCentroid?.lat) || !Number.isFinite(parcelWeatherCentroid?.lng)) {
+      setParcelWeather(null);
+      setParcelWeatherLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const fetchParcelWeather = async () => {
+      setParcelWeatherLoading(true);
+      try {
+        const response = await fetch(`${API_BASE}/api/weather/parcel`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ polygonPoints: parcelWeatherPoints }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) throw new Error("Weather request failed");
+
+        const data = await response.json();
+        if (!controller.signal.aborted) {
+          setParcelWeather(data);
+        }
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          console.warn("Weather fetch failed:", error);
+          setParcelWeather(null);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setParcelWeatherLoading(false);
+        }
+      }
+    };
+
+    fetchParcelWeather();
+    return () => controller.abort();
+  }, [open, parcelWeatherCentroid, parcelWeatherPoints]);
 
   /* Reset on open */
   useEffect(() => {
@@ -3250,6 +3321,9 @@ export default function SoilDiagnostic({
                   activeZone={activeZone}
                   onSelectZone={setActiveZone}
                   currentAnalysis={currentAnalysis}
+                  weather={parcelWeather}
+                  weatherLoading={parcelWeatherLoading}
+                  weatherData={weatherData}
                 />
               </div>
             </div>

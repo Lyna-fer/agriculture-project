@@ -87,6 +87,7 @@ export default function Map() {
   const [analyzedParcelle,   setAnalyzedParcelle]    = useState(null);
   const [analysisMapSnapshot,setAnalysisMapSnapshot] = useState(null);
   const [samplingColor,      setSamplingColor]       = useState("#2ecc71");
+  const [parcelWeather,      setParcelWeather]       = useState(null);
 
   const toastTimer = useRef(null);
 
@@ -380,6 +381,7 @@ export default function Map() {
     setAnalyzedParcelle(null);
     setAnalysisMapSnapshot(null);
     setSamplingColor("#2ecc71");
+    setParcelWeather(null);
   }, [parcelles, clearAll, clearZones, showToast, setNZonesFromBackend]);
 
   const handleSelectParcelle = useCallback((id) => {
@@ -492,13 +494,24 @@ export default function Map() {
       const data = await response.json();
 
       if (data.zones?.length > 0) {
+        const totalAreaSqm = Number(data.totalAreaHa || 0) * 10000;
+        if (data.savedParcelleId && Number.isFinite(totalAreaSqm) && totalAreaSqm > 0) {
+          setParcelles((prev) =>
+            prev.map((parcel) =>
+              parcel.id === data.savedParcelleId
+                ? { ...parcel, area: totalAreaSqm }
+                : parcel
+            )
+          );
+        }
+
         setNZonesFromBackend(data.zones.length);
         setAnalyzedZones(data.zones);
         setAnalyzedParcelle({
           ...(targetParcelle || {}),
           name: customName || targetParcelle?.name || parcelleInfo?.name || "Parcelle",
           latlngs: geometry.latlngs,
-          area: (geometry.area || 0) * 10000,
+          area: totalAreaSqm || (geometry.area || 0) * 10000,
           groupId: cropGroupId,
         });
         setAnalysisMapSnapshot(getMapSnapshot());
@@ -506,6 +519,19 @@ export default function Map() {
         clearSamplingMarkers();
         displayZones(data.zones, samplingMode);
         placeSamplePoints(data.zones, culture.color);
+
+        try {
+          const weatherResponse = await fetch(`${API_BASE}/api/weather/parcel`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ polygonPoints }),
+          });
+          setParcelWeather(weatherResponse.ok ? await weatherResponse.json() : null);
+        } catch (weatherError) {
+          console.warn("Parcel weather fetch failed:", weatherError);
+          setParcelWeather(null);
+        }
+
         setResultsOpen(true);
 
         // Prefetch satellite metrics for the parcel polygon to warm the cache used by SoilDiagnostic
@@ -551,6 +577,7 @@ export default function Map() {
         setAnalyzedZones([]);
         setAnalyzedParcelle(null);
         setAnalysisMapSnapshot(null);
+        setParcelWeather(null);
         clearSamplingMarkers();
         clearSampleMarkers();
         showToast("⚠️ No zone generated");
@@ -676,6 +703,7 @@ export default function Map() {
         zones={analyzedZones}
         nZones={nZonesFromBackend}
         onStartSampling={handleStartSampling}
+        weatherData={parcelWeather}
       />
       <Toast message={toast.msg} visible={toast.visible} />
     </>
