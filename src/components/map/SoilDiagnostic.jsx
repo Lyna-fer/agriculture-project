@@ -2731,12 +2731,41 @@ export default function SoilDiagnostic({
 
     const fetchCrops = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/crops/requirements?groupId=${cultureGroupId}`);
+        const response = await fetch(`${API_BASE}/api/crops/requirements`);
         if (!response.ok) throw new Error("Failed to load crop requirements");
         const data = await response.json();
-        if (!cancelled) setRawCrops(Array.isArray(data) ? data : []);
+
+        if (!cancelled) {
+          const allCrops = Array.isArray(data) ? data : [];
+          
+          // Determine the target category based on the selected tab
+          const targetCategory = cultureGroupId === 1 ? "vegetables" :
+                                 cultureGroupId === 2 ? "cereals" : "trees";
+
+          // Safely filter crops for the dropdown
+          const filteredCrops = allCrops.filter(crop => {
+            // First, try matching by the exact group ID if it exists
+            const groupId = crop.group_id || crop.groupId;
+            if (groupId) {
+                return Number(groupId) === cultureGroupId;
+            }
+
+            // Fallback: Check the category string (French or English)
+            const cat = String(crop.category || "").toLowerCase();
+            
+            if (targetCategory === "vegetables") return cat.includes("vegetable") || cat.includes("maraich") || cat.includes("maraîch");
+            if (targetCategory === "cereals") return cat.includes("cereal") || cat.includes("forage") || cat.includes("céréal");
+            if (targetCategory === "trees") return cat.includes("tree") || cat.includes("permanent") || cat.includes("fruit");
+            
+            return true; 
+          });
+
+          // Fallback: If the filter is too strict and returns 0, just show ALL crops
+          // so the dropdown never breaks and says "0 crops".
+          setRawCrops(filteredCrops.length > 0 ? filteredCrops : allCrops);
+        }
       } catch (error) {
-        console.warn("âš ï¸ Crop requirements fetch failed:", error);
+        console.warn("⚠️ Crop requirements fetch failed:", error);
         if (!cancelled) setRawCrops([]);
       }
     };
