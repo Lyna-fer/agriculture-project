@@ -2687,7 +2687,7 @@ function DashboardView({
 
               <div className="sd-studio-history-card">
                 <div className="sd-studio-history-head">
-                  <div>
+                  <div className="sd-studio-history-head-main">
                     <strong>Analysis History</strong>
                     <span>
                       {isPermanentCulture
@@ -2695,26 +2695,27 @@ function DashboardView({
                         : "Compact comparison with previous snapshot"}
                     </span>
                   </div>
-                  <div className="sd-history-legend">
-                    <span><i className="sd-history-legend-swatch sd-history-legend-swatch--current" />Current</span>
-                    <span><i className="sd-history-legend-swatch sd-history-legend-swatch--last" />Previous</span>
+                  <div className="sd-studio-history-head-actions">
+                    {isPermanentCulture && (
+                      <div className="sd-history-depth-tabs" role="tablist" aria-label="History depth selector">
+                        {DASHBOARD_DEPTH_TABS.map((depth) => (
+                          <button
+                            key={depth.key}
+                            type="button"
+                            className={`sd-history-depth-tab ${historyDepthKey === depth.key ? "sd-history-depth-tab--active" : ""}`}
+                            onClick={() => setHistoryDepthKey(depth.key)}
+                          >
+                            {depth.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="sd-history-legend">
+                      <span><i className="sd-history-legend-swatch sd-history-legend-swatch--current" />Current</span>
+                      <span><i className="sd-history-legend-swatch sd-history-legend-swatch--last" />Previous</span>
+                    </div>
                   </div>
                 </div>
-
-                {isPermanentCulture && (
-                  <div className="sd-history-depth-tabs" role="tablist" aria-label="History depth selector">
-                    {DASHBOARD_DEPTH_TABS.map((depth) => (
-                      <button
-                        key={depth.key}
-                        type="button"
-                        className={`sd-history-depth-tab ${historyDepthKey === depth.key ? "sd-history-depth-tab--active" : ""}`}
-                        onClick={() => setHistoryDepthKey(depth.key)}
-                      >
-                        {depth.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
 
                 <div className="sd-studio-history-list">
                   {currentAnalysisMetrics.map((item) => {

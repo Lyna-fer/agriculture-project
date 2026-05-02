@@ -1971,28 +1971,40 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 14px;
+}
+
+.sd-studio-history-head-main {
+  min-width: 0;
+}
+
+.sd-studio-history-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .sd-history-depth-tabs {
   display: inline-flex;
-  gap: 6px;
-  padding: 4px;
-  margin-bottom: 14px;
+  gap: 4px;
+  padding: 3px;
+  margin-bottom: 0;
   border-radius: 999px;
   background: rgba(16, 24, 18, 0.06);
 }
 
 .sd-history-depth-tab {
-  min-width: 78px;
-  min-height: 30px;
-  padding: 0 12px;
+  min-width: 68px;
+  min-height: 26px;
+  padding: 0 10px;
   border: none;
   border-radius: 999px;
   background: transparent;
   color: #58615a;
-  font-size: .72rem;
+  font-size: .68rem;
   font-weight: 700;
   cursor: pointer;
   transition: background .16s ease, color .16s ease, box-shadow .16s ease;
@@ -2057,6 +2069,14 @@
 
   .sd-studio-history-list {
     grid-template-columns: 1fr;
+  }
+
+  .sd-studio-history-head {
+    align-items: flex-start;
+  }
+
+  .sd-studio-history-head-actions {
+    justify-content: flex-start;
   }
 }
 
