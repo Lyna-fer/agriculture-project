@@ -25,6 +25,8 @@ except ModuleNotFoundError:
     from services.kml_export import build_sampling_kml
 import asyncio
 
+from sqlalchemy import create_engine, Column, Integer, String, Float, Numeric, Date, ForeignKey, DateTime, select, text, func, JSON
+
 # ─── DATABASE SETUP ───────────────────────────────────────────────────────────
 from sqlalchemy import create_engine, Column, Integer, String, Float, Numeric, Date, ForeignKey, DateTime, select, text, func
 from sqlalchemy.orm import sessionmaker, declarative_base, Session, relationship
@@ -106,6 +108,21 @@ class SoilSample(Base):
 
     parcelle = relationship("Parcelle", back_populates="soil_samples")
 
+class ZoneAnalysis(Base):
+    __tablename__ = "zone_analysis"
+    __table_args__ = {'extend_existing': True}
+
+    id = Column(Integer, primary_key=True)
+    parcelle_id = Column(Integer, ForeignKey("parcelles.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("auth_user.id"), nullable=False)
+    zone_index = Column(Integer, nullable=False) 
+    diag_mode = Column(String(50), nullable=False) 
+    target_crop_id = Column(String(255), nullable=True) 
+    soil_metrics = Column(JSON, nullable=False)
+    compatibility_score = Column(Float, nullable=True)
+    analyzed_at = Column(DateTime(timezone=True), default=sql_func.now())
+
+    parcelle = relationship("Parcelle", backref="analyses")
 
 # ─── DJANGO PASSWORD VERIFICATION ─────────────────────────────────────────────
 def verify_django_password(plain_password: str, hashed: str) -> bool:
@@ -1066,3 +1083,109 @@ def get_wind_expectations(db: Session = Depends(get_db)):
         }
         for row in rows
     ]
+    
+    from pydantic import BaseModel
+from typing import Any
+
+# Pydantic schema to receive the data from React
+class SaveZoneAnalysisRequest(BaseModel):
+    parcelleId: int
+    zoneIndex: int
+    diagMode: str
+    targetCropId: Optional[str] = None
+    soilMetrics: Any  # Accepts the entire 'st' JSON object
+    compatibilityScore: Optional[float] = None
+
+@app.post("/api/analysis/save-zone")
+def save_zone_analysis(
+    request: SaveZoneAnalysisRequest,
+    current_user: AuthUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        # 1. Verify the parcel exists and belongs to the user
+        parcelle = db.query(Parcelle).filter(
+            Parcelle.id == request.parcelleId,
+            Parcelle.user_id == current_user.id
+        ).first()
+
+        if not parcelle:
+            raise HTTPException(status_code=404, detail="Parcelle not found")
+
+        # 2. Insert the NEW analysis
+        new_analysis = ZoneAnalysis(
+            parcelle_id=parcelle.id,
+            user_id=current_user.id,
+            zone_index=request.zoneIndex,
+            diag_mode=request.diagMode,
+            target_crop_id=request.targetCropId,
+            soil_metrics=request.soilMetrics,
+            compatibility_score=request.compatibilityScore,
+        )
+        db.add(new_analysis)
+        db.commit()
+
+        # 3. THE ENFORCER: Keep only the 2 most recent analyses for this zone!
+        recent_analyses = db.query(ZoneAnalysis.id).filter(
+            ZoneAnalysis.parcelle_id == parcelle.id,
+            ZoneAnalysis.zone_index == request.zoneIndex
+        ).order_by(ZoneAnalysis.analyzed_at.desc()).limit(2).all()
+
+        keep_ids = [row.id for row in recent_analyses]
+
+        db.query(ZoneAnalysis).filter(
+            ZoneAnalysis.parcelle_id == parcelle.id,
+            ZoneAnalysis.zone_index == request.zoneIndex,
+            ~ZoneAnalysis.id.in_(keep_ids)
+        ).delete(synchronize_session=False)
+
+        db.commit()
+
+        return {"message": "Zone analysis saved successfully and history pruned to 2 rows."}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to save analysis: {str(e)}")
+
+
+@app.get("/api/analysis/parcel/{parcelle_id}")
+def get_parcel_analyses(
+    parcelle_id: int,
+    current_user: AuthUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Verify ownership
+    parcelle = db.query(Parcelle).filter(
+        Parcelle.id == parcelle_id,
+        Parcelle.user_id == current_user.id
+    ).first()
+
+    if not parcelle:
+        raise HTTPException(status_code=404, detail="Parcelle not found")
+
+    # Get ALL analyses for this parcel, ordered by newest first
+    analyses = db.query(ZoneAnalysis).filter(
+        ZoneAnalysis.parcelle_id == parcelle_id
+    ).order_by(ZoneAnalysis.zone_index.asc(), ZoneAnalysis.analyzed_at.desc()).all()
+
+    # Format the response to be easy for React to read
+    results = {}
+    
+    for row in analyses:
+        zone_str = f"zone_{row.zone_index}"
+        
+        # Initialize the zone array if it doesn't exist
+        if zone_str not in results:
+            results[zone_str] = []
+            
+        # Add this analysis to the zone's array (newest is first because of our order_by)
+        results[zone_str].append({
+            "id": row.id,
+            "diagMode": row.diag_mode,
+            "targetCropId": row.target_crop_id,
+            "soilMetrics": row.soil_metrics,
+            "compatibilityScore": row.compatibility_score,
+            "analyzedAt": row.analyzed_at.isoformat()
+        })
+
+    return results

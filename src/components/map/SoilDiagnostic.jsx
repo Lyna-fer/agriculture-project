@@ -2458,6 +2458,9 @@ function DashboardView({
   analysisHistory = [],
   cultureLabel = "",
 }) {
+  // ADD THIS LINE:
+  console.log("DASHBOARD HISTORY STATE:", analysisHistory);
+  
   const width = 720;
   const height = 500;
   const frameRatio = mapSnapshot?.size?.width && mapSnapshot?.size?.height
@@ -2467,8 +2470,9 @@ function DashboardView({
   const bounds = getParcelBounds(parcelLatLngs);
   const activeZoneResult = zoneResults[activeZone] || null;
   const currentSnapshot = currentAnalysis || null;
-  const previousSnapshot = analysisHistory.find((item) => item?.fingerprint && item.fingerprint !== currentSnapshot?.fingerprint) || null;
-  const isPermanentCulture = cultureLabel === "Permanent";
+  // Safely ensure analysisHistory is an array before trying to use .find()
+  const safeHistory = Array.isArray(analysisHistory) ? analysisHistory : [];
+  const previousSnapshot = safeHistory.find((item) => item?.fingerprint && item.fingerprint !== currentSnapshot?.fingerprint) || null;const isPermanentCulture = cultureLabel === "Permanent";
   const [historyDepthKey, setHistoryDepthKey] = useState("depth0_20");
   const selectedCrop = activeZoneResult?.crop ? crops.find((crop) => String(crop.id) === String(activeZoneResult.crop)) : null;
   const displayWeather = weatherData || weather;
@@ -2952,23 +2956,99 @@ export default function SoilDiagnostic({
     }
   }, [open, initialDiagMode, n, persistedDashboardData, startInDashboard]);
 
+  // NEW: Fetch history from the DB when the parcel loads to enable the Dashboard
   useEffect(() => {
-    if (!open) return;
-    if (persistedDashboardData?.zoneResults?.length) return;
-    try {
-      const currentStored = localStorage.getItem(getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId));
-      setCurrentAnalysis(currentStored ? JSON.parse(currentStored) : null);
-      const stored = localStorage.getItem(getHistoryKey(parcelleName, parcelle, cultureGroupId));
-      const parsed = stored ? JSON.parse(stored) : [];
-      setAnalysisHistory(Array.isArray(parsed) ? parsed : []);
-      lastStoredFingerprintRef.current = Array.isArray(parsed) && parsed[0]?.fingerprint ? parsed[0].fingerprint : "";
-    } catch (error) {
-      console.warn("History load failed:", error);
-      setAnalysisHistory([]);
-      setCurrentAnalysis(null);
-      lastStoredFingerprintRef.current = "";
-    }
-  }, [open, parcelleName, parcelle, cultureGroupId, persistedDashboardData]);
+    let cancelled = false;
+
+    const fetchHistory = async () => {
+      // Only run if the modal is open, we have a parcel ID, and a token
+      if (!open || !parcelle?.id) return;
+
+      try {
+        const token = localStorage.getItem("token");
+        // Use the endpoint we created earlier!
+        const response = await fetch(`${API_BASE}/api/analysis/parcel/${parcelle.id}`, {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) throw new Error("Failed to load history");
+
+        const data = await response.json();
+        
+        if (!cancelled) {
+          const hasData = Object.keys(data).length > 0;
+          
+          if (hasData) {
+            // 1. Get the most recent analysis for each zone to populate the UI
+            const latestZoneResults = Array(n).fill(null);
+            for (let i = 0; i < n; i++) {
+                const zoneData = data[`zone_${i}`];
+                if (zoneData && zoneData.length > 0) {
+                    latestZoneResults[i] = zoneData[0].soilMetrics;
+                }
+            }
+            
+            // 2. Build the history list for the Dashboard.
+            let historyList = [];
+            
+            if (data[`zone_${activeZone}`] && data[`zone_${activeZone}`].length > 0) {
+                 const zoneHistory = data[`zone_${activeZone}`];
+                 
+                 // Create a helper function to translate a DB row into a Dashboard Snapshot
+                 const translateDbToSnapshot = (dbRow) => {
+                     const metrics = dbRow.soilMetrics;
+                     return {
+                         fingerprint: dbRow.id.toString(), // Ensure unique ID
+                         timestamp: dbRow.analyzedAt,
+                         // The dashboard expects 'avgPh', 'avgCe' etc. for the whole parcel,
+                         // but since we are looking at a specific zone's history, we'll
+                         // just map the zone's metrics to those 'avg' fields.
+                         avgPh: metrics.ph,
+                         avgCe: metrics.ce,
+                         avgN: metrics.n,
+                         avgP: metrics.p,
+                         avgK: metrics.k,
+                         // If you are using permanent depths, you'd map those here too:
+                         depthAverages: metrics.permanentDepths ? {
+                             depth0_20: metrics.permanentDepths.depth0_20,
+                             depth20_40: metrics.permanentDepths.depth20_40,
+                         } : null
+                     };
+                 };
+
+                 // Push the current analysis (translated)
+                 historyList.push(translateDbToSnapshot(zoneHistory[0]));
+                 
+                 // If there is a second analysis in the DB, push it as the 'previous' (translated)
+                 if (zoneHistory.length > 1) {
+                     historyList.push(translateDbToSnapshot(zoneHistory[1]));
+                 }
+            }
+
+            console.log("Setting analysisHistory to:", historyList); 
+            
+            setAnalysisHistory(historyList); 
+            setZoneResults(latestZoneResults);
+            
+            dispatchDashboardUpdated({
+              parcelId: parcelle.id,
+              cultureGroupId,
+            });
+          }
+        }
+      } catch (error) {
+        console.warn("Could not fetch parcel history for dashboard:", error);
+      }
+    };
+
+    fetchHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, parcelle, cultureGroupId]);
 
   /* âœ… FIXED: Fetch satellite data in BOTH eco AND standard mode */
   useEffect(() => {
@@ -3156,19 +3236,62 @@ export default function SoilDiagnostic({
     });
   }, [open, activeZone, zoneStates, CROPS, windByMonth]);
 
-  /* Analyze */
-  const handleAnalyze = useCallback(() => {
+  
+  /* Analyze and Save to Database */
+  const handleAnalyze = useCallback(async () => {
     setAnalyzing(true);
-    setTimeout(() => {
-      const snap = {...zoneStates[activeZone]};
+    
+    // 1. Get the snapshot of the current zone
+    const snap = { ...zoneStates[activeZone] };
+    const score = calcScore(snap, CROPS); // Calculate score immediately
+    
+    try {
+      // 2. Send it to your new Python FastAPI endpoint
+      const token = localStorage.getItem("token"); // Assuming you use JWT auth
+      
+      const payload = {
+        parcelleId: parcelle?.id, 
+        zoneIndex: activeZone,
+        diagMode: diagMode,
+        targetCropId: snap.crop || null,
+        soilMetrics: snap, 
+        compatibilityScore: score
+      };
+
+      // Only attempt to save to DB if we actually have a saved parcel ID
+      if (parcelle?.id) {
+        const response = await fetch(`${API_BASE}/api/analysis/save-zone`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { "Authorization": `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          console.error("Database save failed:", errData);
+          // You could show a toast notification to the user here
+        } else {
+          console.log("Zone analysis securely saved to database!");
+        }
+      } else {
+         console.warn("No parcel ID found. Saving locally only.");
+      }
+
+    } catch (error) {
+      console.error("Network error while saving zone analysis:", error);
+    } finally {
+      // 3. Update the local React state so the UI continues to the results view
       setZoneResults(prev => {
         const next = [...prev];
         next[activeZone] = snap;
         return next;
       });
       setAnalyzing(false);
-    }, 800);
-  }, [activeZone, zoneStates]);
+    }
+  }, [activeZone, zoneStates, parcelle, diagMode, CROPS]);
 
   const resetZone = useCallback(idx => {
     setZoneResults(prev => { const next=[...prev]; next[idx]=null; return next; });
@@ -3280,7 +3403,10 @@ export default function SoilDiagnostic({
 
   useEffect(() => {
     if (!open) return;
+    
+    // Only run this if ALL zones have been analyzed
     if (zoneResults.some((item) => !item)) return;
+    
     const snapshot = buildAnalysisSnapshot({
       zoneResults,
       crops: CROPS,
@@ -3288,19 +3414,23 @@ export default function SoilDiagnostic({
       parcelleHa,
       cultureLabel,
     });
+    
     if (!snapshot.fingerprint || lastStoredFingerprintRef.current === snapshot.fingerprint) return;
 
     setCurrentAnalysis(snapshot);
+    
     try {
       localStorage.setItem(getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId), JSON.stringify(snapshot));
     } catch (error) {
       console.warn("Current analysis save failed:", error);
     }
 
-    const nextHistory = [snapshot, ...analysisHistory.filter((item) => item.fingerprint !== snapshot.fingerprint)].slice(0, 8);
-
+    // Safely update analysisHistory, ensuring it stays an array
     setAnalysisHistory((prev) => {
-      const next = [snapshot, ...prev.filter((item) => item.fingerprint !== snapshot.fingerprint)].slice(0, 8);
+      // Make sure prev is actually an array before filtering
+      const safePrev = Array.isArray(prev) ? prev : [];
+      const next = [snapshot, ...safePrev.filter((item) => item.fingerprint !== snapshot.fingerprint)].slice(0, 8);
+      
       try {
         localStorage.setItem(getHistoryKey(parcelleName, parcelle, cultureGroupId), JSON.stringify(next));
       } catch (error) {
@@ -3325,20 +3455,18 @@ export default function SoilDiagnostic({
           nZones: n,
           zoneResults,
           currentAnalysis: snapshot,
-          analysisHistory: nextHistory,
+          // Use the safe array we just generated, or fallback to an empty array
+          analysisHistory: Array.isArray(analysisHistory) ? [snapshot, ...analysisHistory.filter(i => i.fingerprint !== snapshot.fingerprint)].slice(0,8) : [snapshot],
           weatherData: weatherData || parcelWeather || null,
         })
       );
-      dispatchDashboardUpdated({
-        parcelId: parcelle?.id || null,
-        cultureGroupId,
-      });
     } catch (error) {
       console.warn("Dashboard state save failed:", error);
     }
+    
     lastStoredFingerprintRef.current = snapshot.fingerprint;
   }, [open, zoneResults, CROPS, parcelleName, parcelle, cultureGroupId, parcelleHa, cultureLabel, analysisHistory, activeZone, diagMode, mapSnapshot, zones, n, weatherData, parcelWeather]);
-
+  
   const parcelImageUrls = buildParcelImageUrls(parcelle?.latlngs || [], mapSnapshot);
 
   if (!open) return null;
@@ -3473,6 +3601,7 @@ export default function SoilDiagnostic({
                   weather={parcelWeather}
                   weatherLoading={parcelWeatherLoading}
                   weatherData={weatherData}
+                  analysisHistory={analysisHistory}
                 />
               </div>
             </div>

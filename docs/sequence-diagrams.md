@@ -238,3 +238,35 @@ sequenceDiagram
     MapPage->>Panel: Set selected wilaya
     Panel-->>Farmer: Show zone badge + recommendation
 ```
+
+## 9) Download KML and Soil Diagnostic Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Farmer
+    participant MapPage as Map.jsx
+    participant Diagnostic as SoilDiagnostic.jsx
+    participant API as FastAPI
+    participant KML as kml_export.py
+    participant GEE as Google Earth Engine
+    participant DB as PostgreSQL
+
+    Farmer->>MapPage: Analyze parcel (zones generated)
+    MapPage->>MapPage: Set analyzedZones
+
+    Farmer->>Diagnostic: Open soil diagnostic panel
+    Diagnostic->>API: POST /api/satellite/soil-metrics (polygonPoints)
+    API->>GEE: Query satellite soil data (salinity, pH, texture, temperature)
+    GEE-->>API: Soil metrics
+    API-->>Diagnostic: Soil diagnostic data
+    Diagnostic-->>Farmer: Display soil metrics
+
+    Farmer->>MapPage: Click download KML
+    MapPage->>API: POST /api/sampling/export-kml (zones, parcelleName)
+    API->>KML: build_sampling_kml(zones, parcelleName)
+    KML-->>API: KML content
+    API-->>MapPage: KML file blob
+    MapPage->>MapPage: Trigger download
+    MapPage-->>Farmer: KML file downloaded
+```
