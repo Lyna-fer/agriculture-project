@@ -2,6 +2,13 @@
 import "./SoilDiagnostic.css";
 import PortalOverlay from "./PortalOverlay";
 import satelliteFallback from "../../assets/satellite.png";
+import {
+  normalizeLatLngPoint,
+  getHistoryKey,
+  getCurrentAnalysisKey,
+  getDashboardStateKey,
+  dispatchDashboardUpdated,
+} from "../../lib/soilDashboardStorage";
 
 /* ─── Satellite defaults ─────────────────────────────────────────────────── */
 const SAT_DEFAULTS = { ce: 1.2, temp: 22, tex: "limon-argileux", om: "moyen" };
@@ -2247,11 +2254,6 @@ function ResultsView({
   );
 }
 
-function normalizeLatLngPoint(point) {
-  if (Array.isArray(point)) return { lat: Number(point[0]), lng: Number(point[1]) };
-  return { lat: Number(point?.lat), lng: Number(point?.lng) };
-}
-
 function getParcelBounds(latlngs = []) {
   const pts = latlngs.map(normalizeLatLngPoint).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
   if (!pts.length) {
@@ -2325,16 +2327,6 @@ function averageMetric(zoneResults, key, parser = Number) {
     .filter((value) => Number.isFinite(value));
   if (!values.length) return null;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function getHistoryKey(parcelleName, parcelle, cultureGroupId) {
-  const coords = JSON.stringify((parcelle?.latlngs || []).map((pt) => normalizeLatLngPoint(pt)));
-  return `soil-dashboard-history:${cultureGroupId}:${parcelleName || "parcel"}:${coords}`;
-}
-
-function getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId) {
-  const coords = JSON.stringify((parcelle?.latlngs || []).map((pt) => normalizeLatLngPoint(pt)));
-  return `soil-dashboard-current-analysis:${cultureGroupId}:${parcelleName || "parcel"}:${coords}`;
 }
 
 function buildAnalysisSnapshot({ zoneResults, crops, parcelleName, parcelleHa, cultureLabel }) {
@@ -2695,6 +2687,8 @@ export default function SoilDiagnostic({
   nZones         = 1,
   initialDiagMode = "eco",
   weatherData = null,
+  persistedDashboardData = null,
+  startInDashboard = false,
 }) {
   const [diagMode,    setDiagMode]    = useState(initialDiagMode);
   const [activeZone,  setActiveZone]  = useState(0);
@@ -2853,19 +2847,40 @@ export default function SoilDiagnostic({
   useEffect(() => {
     if (open) {
       setDiagMode(initialDiagMode);
-      setActiveZone(0);
+      const storedZoneIndex = Number(persistedDashboardData?.activeZone);
+      setActiveZone(
+        Number.isInteger(storedZoneIndex) && storedZoneIndex >= 0
+          ? Math.min(n - 1, storedZoneIndex)
+          : 0
+      );
       setAnalyzing(false);
-      setZoneStates(Array.from({length:n}, () => freshSt(initialDiagMode)));
-      setZoneResults(Array(n).fill(null));
-      setAnalysisHistory([]);
-      setCurrentAnalysis(null);
-      setShowDashboard(false);
-      lastStoredFingerprintRef.current = "";
+      const storedResults = Array.isArray(persistedDashboardData?.zoneResults)
+        ? persistedDashboardData.zoneResults.slice(0, n)
+        : null;
+      const hydratedZoneResults = storedResults?.length
+        ? Array.from({ length: n }, (_, index) => storedResults[index] || null)
+        : Array(n).fill(null);
+      setZoneStates(
+        storedResults?.length
+          ? hydratedZoneResults.map((zone) => zone || freshSt(initialDiagMode))
+          : Array.from({ length: n }, () => freshSt(initialDiagMode))
+      );
+      setZoneResults(hydratedZoneResults);
+      setAnalysisHistory(
+        Array.isArray(persistedDashboardData?.analysisHistory)
+          ? persistedDashboardData.analysisHistory
+          : []
+      );
+      setCurrentAnalysis(persistedDashboardData?.currentAnalysis || null);
+      setShowDashboard(Boolean(startInDashboard && storedResults?.length));
+      lastStoredFingerprintRef.current =
+        persistedDashboardData?.currentAnalysis?.fingerprint || "";
     }
-  }, [open]);
+  }, [open, initialDiagMode, n, persistedDashboardData, startInDashboard]);
 
   useEffect(() => {
     if (!open) return;
+    if (persistedDashboardData?.zoneResults?.length) return;
     try {
       const currentStored = localStorage.getItem(getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId));
       setCurrentAnalysis(currentStored ? JSON.parse(currentStored) : null);
@@ -2879,7 +2894,7 @@ export default function SoilDiagnostic({
       setCurrentAnalysis(null);
       lastStoredFingerprintRef.current = "";
     }
-  }, [open, parcelleName, parcelle, cultureGroupId]);
+  }, [open, parcelleName, parcelle, cultureGroupId, persistedDashboardData]);
 
   /* âœ… FIXED: Fetch satellite data in BOTH eco AND standard mode */
   useEffect(() => {
@@ -3208,6 +3223,8 @@ export default function SoilDiagnostic({
       console.warn("Current analysis save failed:", error);
     }
 
+    const nextHistory = [snapshot, ...analysisHistory.filter((item) => item.fingerprint !== snapshot.fingerprint)].slice(0, 8);
+
     setAnalysisHistory((prev) => {
       const next = [snapshot, ...prev.filter((item) => item.fingerprint !== snapshot.fingerprint)].slice(0, 8);
       try {
@@ -3217,8 +3234,36 @@ export default function SoilDiagnostic({
       }
       return next;
     });
+
+    try {
+      localStorage.setItem(
+        getDashboardStateKey(parcelleName, parcelle, cultureGroupId),
+        JSON.stringify({
+          savedAt: new Date().toISOString(),
+          activeZone,
+          diagMode,
+          parcelleName: (parcelle && parcelle.name) || parcelleName,
+          parcelleHa,
+          cultureGroupId,
+          parcelle,
+          mapSnapshot,
+          zones,
+          nZones: n,
+          zoneResults,
+          currentAnalysis: snapshot,
+          analysisHistory: nextHistory,
+          weatherData: weatherData || parcelWeather || null,
+        })
+      );
+      dispatchDashboardUpdated({
+        parcelId: parcelle?.id || null,
+        cultureGroupId,
+      });
+    } catch (error) {
+      console.warn("Dashboard state save failed:", error);
+    }
     lastStoredFingerprintRef.current = snapshot.fingerprint;
-  }, [open, zoneResults, CROPS, parcelleName, parcelle, cultureGroupId, parcelleHa, cultureLabel]);
+  }, [open, zoneResults, CROPS, parcelleName, parcelle, cultureGroupId, parcelleHa, cultureLabel, analysisHistory, activeZone, diagMode, mapSnapshot, zones, n, weatherData, parcelWeather]);
 
   const parcelImageUrls = buildParcelImageUrls(parcelle?.latlngs || [], mapSnapshot);
 

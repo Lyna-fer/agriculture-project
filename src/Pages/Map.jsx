@@ -3,6 +3,7 @@ import "../styles/map.css";
 import LeftPanel from "../components/map/LeftPanel";
 import MapView from "../components/map/MapView";
 import ResultsPanel from "../components/map/ResultsPanel";
+import SoilDiagnostic from "../components/map/SoilDiagnostic";
 import Toast from "../components/map/Toast";
 import { useMap } from "../hooks/useMap";
 import { CULTURES } from "../data/cultures";
@@ -13,6 +14,11 @@ import {
   authenticateGEE,
 } from "../lib/samplingEngine";
 import { ZONE_COLORS } from "../data/wilayas";
+import {
+  hasStoredDashboardAnalysis,
+  readStoredDashboardState,
+  SOIL_DASHBOARD_UPDATED_EVENT,
+} from "../lib/soilDashboardStorage";
 const CULTURES_TO_STRATEGIES = {
   1: "vegetables",
   2: "cereals",
@@ -88,6 +94,9 @@ export default function Map() {
   const [analysisMapSnapshot,setAnalysisMapSnapshot] = useState(null);
   const [samplingColor,      setSamplingColor]       = useState("#2ecc71");
   const [parcelWeather,      setParcelWeather]       = useState(null);
+  const [storedDashboardSession, setStoredDashboardSession] = useState(null);
+  const [storedDashboardOpen, setStoredDashboardOpen] = useState(false);
+  const [dashboardRefreshTick, setDashboardRefreshTick] = useState(0);
 
   const toastTimer = useRef(null);
 
@@ -122,6 +131,17 @@ export default function Map() {
       try { await authenticateGEE(); setGeeReady(true); }
       catch (err) { console.log("GEE auth stub:", err?.message || "OK"); }
     })();
+  }, []);
+
+  useEffect(() => {
+    const handleDashboardUpdated = () => {
+      setDashboardRefreshTick((prev) => prev + 1);
+    };
+
+    window.addEventListener(SOIL_DASHBOARD_UPDATED_EVENT, handleDashboardUpdated);
+    return () => {
+      window.removeEventListener(SOIL_DASHBOARD_UPDATED_EVENT, handleDashboardUpdated);
+    };
   }, []);
 
   const showToast = useCallback((msg) => {
@@ -660,6 +680,35 @@ export default function Map() {
 
   const selectedCulture = CULTURES.find(c => c.id === selectedGroupId);
   const selectedParcelle = parcelles.find(p => p.id === selectedParcelleId) ?? null;
+  const selectedParcelDashboardReady = dashboardRefreshTick >= 0 && selectedParcelle
+    ? hasStoredDashboardAnalysis(
+        selectedParcelle.name,
+        selectedParcelle,
+        Number(selectedParcelle.groupId || selectedGroupId)
+      )
+    : false;
+
+  const handleOpenStoredDashboard = useCallback(() => {
+    if (!selectedParcelle) {
+      showToast("❌ Select a parcel first");
+      return;
+    }
+
+    const cultureGroupId = Number(selectedParcelle.groupId || selectedGroupId);
+    const storedSession = readStoredDashboardState(
+      selectedParcelle.name,
+      selectedParcelle,
+      cultureGroupId
+    );
+
+    if (!storedSession?.zoneResults?.length) {
+      showToast("❌ This parcel does not have a saved dashboard yet");
+      return;
+    }
+
+    setStoredDashboardSession(storedSession);
+    setStoredDashboardOpen(true);
+  }, [selectedParcelle, selectedGroupId, showToast]);
 
   return (
     <>
@@ -681,6 +730,9 @@ export default function Map() {
           onCancelDraw={handleCancelDraw}
           isAnalyzing={isAnalyzing}
           maxParcelAreaHa={MAX_PARCEL_AREA_HA}
+          selectedParcelleData={selectedParcelle}
+          dashboardEnabled={selectedParcelDashboardReady}
+          onOpenDashboard={handleOpenStoredDashboard}
         />
         <MapView
           mapRef={mapRef}
@@ -704,6 +756,21 @@ export default function Map() {
         nZones={nZonesFromBackend}
         onStartSampling={handleStartSampling}
         weatherData={parcelWeather}
+      />
+      <SoilDiagnostic
+        open={storedDashboardOpen}
+        onClose={() => setStoredDashboardOpen(false)}
+        parcelleName={storedDashboardSession?.parcelleName || selectedParcelle?.name || "Parcel"}
+        parcelleHa={storedDashboardSession?.parcelleHa || (selectedParcelle?.area || 0) / 10000}
+        cultureGroupId={storedDashboardSession?.cultureGroupId || Number(selectedParcelle?.groupId || selectedGroupId || 1)}
+        parcelle={storedDashboardSession?.parcelle || selectedParcelle}
+        mapSnapshot={storedDashboardSession?.mapSnapshot || null}
+        zones={storedDashboardSession?.zones || []}
+        nZones={storedDashboardSession?.nZones || storedDashboardSession?.zoneResults?.length || 1}
+        initialDiagMode={storedDashboardSession?.diagMode || "standard"}
+        weatherData={storedDashboardSession?.weatherData || null}
+        persistedDashboardData={storedDashboardSession}
+        startInDashboard
       />
       <Toast message={toast.msg} visible={toast.visible} />
     </>
