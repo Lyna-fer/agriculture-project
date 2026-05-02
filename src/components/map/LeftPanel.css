@@ -1,4 +1,5 @@
 .lp {
+  position: relative;
   width: 354px;
   min-width: 354px;
   height: 100%;

@@ -195,6 +195,27 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50, onParcelleClick
     setMapReady(true);
   }, []);
 
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !mapReady) return;
+
+    const refreshSize = () => {
+      try {
+        map.invalidateSize({ pan: false, animate: false });
+      } catch (e) {
+        console.warn("Map resize refresh failed:", e);
+      }
+    };
+
+    const rafId = window.requestAnimationFrame(refreshSize);
+    window.addEventListener("resize", refreshSize);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", refreshSize);
+    };
+  }, [mapReady]);
+
   const computeStats = (layer) => {
     const turf = window.turf;
     const latlngs = layer.getLatLngs().flat(2);
