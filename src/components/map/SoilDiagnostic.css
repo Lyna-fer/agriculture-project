@@ -1975,6 +1975,35 @@
   margin-bottom: 14px;
 }
 
+.sd-history-depth-tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: rgba(16, 24, 18, 0.06);
+}
+
+.sd-history-depth-tab {
+  min-width: 78px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #58615a;
+  font-size: .72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .16s ease, color .16s ease, box-shadow .16s ease;
+}
+
+.sd-history-depth-tab--active {
+  background: #ffffff;
+  color: #151a16;
+  box-shadow: 0 8px 18px rgba(16, 24, 18, 0.08);
+}
+
 .sd-studio-history-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

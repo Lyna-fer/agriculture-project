@@ -2346,6 +2346,7 @@ function buildAnalysisSnapshot({ zoneResults, crops, parcelleName, parcelleHa, c
     ? Math.round(scores.reduce((sum, item) => sum + item.score, 0) / scores.length)
     : 0;
   const fingerprint = scores.map((item) => `${item.zone}:${item.score}:${item.ph}:${item.n}:${item.p}:${item.k}`).join("|");
+  const hasPermanentDepths = completed.some((zone) => zone?.permanentDepths);
   return {
     id: `${Date.now()}-${fingerprint}`,
     timestamp: new Date().toISOString(),
@@ -2360,6 +2361,30 @@ function buildAnalysisSnapshot({ zoneResults, crops, parcelleName, parcelleHa, c
     avgN: averageMetric(completed, "n"),
     avgP: averageMetric(completed, "p"),
     avgK: averageMetric(completed, "k"),
+    depthAverages: hasPermanentDepths
+      ? {
+          depth0_20: {
+            ph: averageMetricForDepth(completed, "depth0_20", "ph"),
+            ce: averageMetricForDepth(completed, "depth0_20", "ce"),
+            n: averageMetricForDepth(completed, "depth0_20", "n"),
+            p: averageMetricForDepth(completed, "depth0_20", "p"),
+            k: averageMetricForDepth(completed, "depth0_20", "k"),
+            lime: averageMetricForDepth(completed, "depth0_20", "lime"),
+            pb: averageMetricForDepth(completed, "depth0_20", "pb"),
+            cd: averageMetricForDepth(completed, "depth0_20", "cd"),
+          },
+          depth20_40: {
+            ph: averageMetricForDepth(completed, "depth20_40", "ph"),
+            ce: averageMetricForDepth(completed, "depth20_40", "ce"),
+            n: averageMetricForDepth(completed, "depth20_40", "n"),
+            p: averageMetricForDepth(completed, "depth20_40", "p"),
+            k: averageMetricForDepth(completed, "depth20_40", "k"),
+            lime: averageMetricForDepth(completed, "depth20_40", "lime"),
+            pb: averageMetricForDepth(completed, "depth20_40", "pb"),
+            cd: averageMetricForDepth(completed, "depth20_40", "cd"),
+          },
+        }
+      : null,
     fingerprint,
   };
 }
@@ -2382,6 +2407,20 @@ const HISTORY_METRIC_RANGES = {
   pb: { min: 0, max: 100 },
   cd: { min: 0, max: 100 },
 };
+
+const DASHBOARD_DEPTH_TABS = [
+  { key: "depth0_20", label: "0-20 cm" },
+  { key: "depth20_40", label: "20-40 cm" },
+];
+
+function averageMetricForDepth(zoneResults, depthKey, metricKey, parser = Number) {
+  const values = zoneResults
+    .filter(Boolean)
+    .map((zone) => parser(zone?.permanentDepths?.[depthKey]?.[metricKey]))
+    .filter((value) => Number.isFinite(value));
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
 
 function getHistoryBarWidth(metricKey, value) {
   const numericValue = Number(value);
@@ -2417,6 +2456,7 @@ function DashboardView({
   weatherLoading = false,
   weatherData = null,
   analysisHistory = [],
+  cultureLabel = "",
 }) {
   const width = 720;
   const height = 500;
@@ -2428,6 +2468,8 @@ function DashboardView({
   const activeZoneResult = zoneResults[activeZone] || null;
   const currentSnapshot = currentAnalysis || null;
   const previousSnapshot = analysisHistory.find((item) => item?.fingerprint && item.fingerprint !== currentSnapshot?.fingerprint) || null;
+  const isPermanentCulture = cultureLabel === "Permanent";
+  const [historyDepthKey, setHistoryDepthKey] = useState("depth0_20");
   const selectedCrop = activeZoneResult?.crop ? crops.find((crop) => String(crop.id) === String(activeZoneResult.crop)) : null;
   const displayWeather = weatherData || weather;
   const displayWeatherLoading = weatherData ? false : weatherLoading;
@@ -2438,16 +2480,28 @@ function DashboardView({
     : new Date().toLocaleDateString("en-GB", { month: "long", year: "numeric" });
   const weatherLabel = displayWeatherLoading ? "Loading forecast..." : displayWeather?.currentLabel || "Weather unavailable";
   const weatherIcon = displayWeather?.currentIcon || "⛅";
+  const activeDepthResult = isPermanentCulture
+    ? activeZoneResult?.permanentDepths?.[historyDepthKey] || null
+    : null;
+  const previousDepthMetrics = isPermanentCulture
+    ? previousSnapshot?.depthAverages?.[historyDepthKey] || null
+    : null;
+
+  useEffect(() => {
+    if (!isPermanentCulture) {
+      setHistoryDepthKey("depth0_20");
+    }
+  }, [isPermanentCulture]);
 
   const currentAnalysisMetrics = [
-    { key: "ph", label: "Soil pH", value: activeZoneResult?.ph, previous: previousSnapshot?.avgPh, unit: "pH", format: (value) => Number(value).toFixed(1) },
-    { key: "ce", label: "Salinity", value: activeZoneResult?.ce, previous: previousSnapshot?.avgCe, unit: "dS/m", format: (value) => Number(value).toFixed(1) },
-    { key: "n", label: "Nitrogen", value: activeZoneResult?.n, previous: previousSnapshot?.avgN, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
-    { key: "p", label: "Phosphorus", value: activeZoneResult?.p, previous: previousSnapshot?.avgP, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
-    { key: "k", label: "Potassium", value: activeZoneResult?.k, previous: previousSnapshot?.avgK, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
-    { key: "lime", label: "Active lime", value: activeZoneResult?.lime, previous: null, unit: "%", format: (value) => Math.round(Number(value)) },
-    { key: "pb", label: "Lead (Pb)", value: activeZoneResult?.pb, previous: null, unit: "mg/kg", format: (value) => Math.round(Number(value)) },
-    { key: "cd", label: "Cadmium (Cd)", value: activeZoneResult?.cd, previous: null, unit: "mg/kg", format: (value) => Math.round(Number(value)) },
+    { key: "ph", label: "Soil pH", value: isPermanentCulture ? activeDepthResult?.ph : activeZoneResult?.ph, previous: isPermanentCulture ? previousDepthMetrics?.ph : previousSnapshot?.avgPh, unit: "pH", format: (value) => Number(value).toFixed(1) },
+    { key: "ce", label: "Salinity", value: isPermanentCulture ? activeDepthResult?.ce : activeZoneResult?.ce, previous: isPermanentCulture ? previousDepthMetrics?.ce : previousSnapshot?.avgCe, unit: "dS/m", format: (value) => Number(value).toFixed(1) },
+    { key: "n", label: "Nitrogen", value: isPermanentCulture ? activeDepthResult?.n : activeZoneResult?.n, previous: isPermanentCulture ? previousDepthMetrics?.n : previousSnapshot?.avgN, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
+    { key: "p", label: "Phosphorus", value: isPermanentCulture ? activeDepthResult?.p : activeZoneResult?.p, previous: isPermanentCulture ? previousDepthMetrics?.p : previousSnapshot?.avgP, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
+    { key: "k", label: "Potassium", value: isPermanentCulture ? activeDepthResult?.k : activeZoneResult?.k, previous: isPermanentCulture ? previousDepthMetrics?.k : previousSnapshot?.avgK, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
+    { key: "lime", label: "Active lime", value: isPermanentCulture ? activeDepthResult?.lime : activeZoneResult?.lime, previous: isPermanentCulture ? previousDepthMetrics?.lime : null, unit: "%", format: (value) => Math.round(Number(value)) },
+    { key: "pb", label: "Lead (Pb)", value: isPermanentCulture ? activeDepthResult?.pb : activeZoneResult?.pb, previous: isPermanentCulture ? previousDepthMetrics?.pb : null, unit: "mg/kg", format: (value) => Math.round(Number(value)) },
+    { key: "cd", label: "Cadmium (Cd)", value: isPermanentCulture ? activeDepthResult?.cd : activeZoneResult?.cd, previous: isPermanentCulture ? previousDepthMetrics?.cd : null, unit: "mg/kg", format: (value) => Math.round(Number(value)) },
   ];
 
   const zoneCards = zoneResults.map((zone, index) => {
@@ -2635,13 +2689,32 @@ function DashboardView({
                 <div className="sd-studio-history-head">
                   <div>
                     <strong>Analysis History</strong>
-                    <span>Compact comparison with previous snapshot</span>
+                    <span>
+                      {isPermanentCulture
+                        ? "Compact comparison by soil depth"
+                        : "Compact comparison with previous snapshot"}
+                    </span>
                   </div>
                   <div className="sd-history-legend">
                     <span><i className="sd-history-legend-swatch sd-history-legend-swatch--current" />Current</span>
                     <span><i className="sd-history-legend-swatch sd-history-legend-swatch--last" />Previous</span>
                   </div>
                 </div>
+
+                {isPermanentCulture && (
+                  <div className="sd-history-depth-tabs" role="tablist" aria-label="History depth selector">
+                    {DASHBOARD_DEPTH_TABS.map((depth) => (
+                      <button
+                        key={depth.key}
+                        type="button"
+                        className={`sd-history-depth-tab ${historyDepthKey === depth.key ? "sd-history-depth-tab--active" : ""}`}
+                        onClick={() => setHistoryDepthKey(depth.key)}
+                      >
+                        {depth.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <div className="sd-studio-history-list">
                   {currentAnalysisMetrics.map((item) => {
@@ -3392,6 +3465,7 @@ export default function SoilDiagnostic({
                   zoneResults={zoneResults}
                   zones={zones}
                   crops={CROPS}
+                  cultureLabel={cultureLabel}
                   activeZone={activeZone}
                   onSelectZone={setActiveZone}
                   currentAnalysis={currentAnalysis}
