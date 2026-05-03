@@ -103,6 +103,7 @@ export default function LeftPanel({
   selectedParcelleData = null,
   dashboardEnabled = false,
   onOpenDashboard,
+  onLogout,
 }) {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -180,7 +181,16 @@ export default function LeftPanel({
                   <Settings size={18} />
                   Paramètres du compte
                 </button>
-                <button type="button" className="lp-profile-item">
+                <button
+                  type="button"
+                  className="lp-profile-item"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    if (typeof onLogout === "function") {
+                      onLogout();
+                    }
+                  }}
+                >
                   <LogOut size={18} />
                   Déconnexion
                 </button>

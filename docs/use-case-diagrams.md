@@ -2,41 +2,68 @@
 
 ```mermaid
 flowchart LR
-  Farmer(("🧑‍🌾\nAgriculteur"))
-  Technician(("🧑‍🔬\nTechnicien de laboratoire"))
+    %% Acteurs
+    User(("👤\nUtilisateur\n(Agriculteur/Ingénieur)"))
+    SatAPI(("🛰️\nAPI Satellite\n(Landsat/Sentinel)"))
+    Backend(("💾\nServeur &\nBase de données"))
 
-  subgraph "Système Expert d'Optimisation des Parcelles"
-    direction TB
-    Login(["Se connecter / accéder à l'application"])
-    Browse(["Consulter la carte et les parcelles"])
-    Draw(["Dessiner ou sélectionner une parcelle"])
-    Validate(["Valider la géométrie et la surface"])
-    Sample(["Générer les points d'échantillonnage"])
-    Kml(["Télécharger le fichier KML terrain"])
-    Diag(["Ouvrir le diagnostic de sol"])
-    Prefill(["Pré-remplir les données via satellite"])
-    Form(["Saisir les paramètres de sol"])
-    Score(["Calculer le score de compatibilité"])
-    LabReq(["Imprimer la demande de laboratoire"])
-    Report(["Télécharger le rapport de recommandations"])
-  end
+    %% Frontière du Système
+    subgraph SolGuide ["Plateforme SolGuide (Vue Globale Détaillée)"]
+        direction TB
+        
+        Auth(["S'authentifier (Login/Register)"])
+        
+        subgraph Carto ["Phase 1 : Cartographie"]
+            Wilaya(["Rechercher une Wilaya"])
+            Draw(["Dessiner une parcelle (Polygone/Rectangle)"])
+            CheckArea(["Contrôler la superficie (< 50 ha)"])
+            Manage(["Sauvegarder / Supprimer la parcelle"])
+        end
 
-  Farmer --> Login
-  Farmer --> Browse
-  Farmer --> Draw
-  Farmer --> Diag
-  Technician --> LabReq
+        subgraph Echant ["Phase 2 : Échantillonnage"]
+            Crop(["Choisir la culture (Céréales, Maraîchères...)"])
+            GenPoints(["Générer les zones et points d'échantillonnage"])
+            KML(["Exporter le plan au format KML"])
+        end
 
-  Draw -. "«include»" .-> Validate
-  Draw -. "«include»" .-> Sample
-  Sample -. "«include»" .-> Kml
-  Browse -. "«extend»" .-> Draw
+        subgraph Diag ["Phase 3 : Diagnostic Agronomique"]
+            SatData(["Pré-remplir les données via Satellite"])
+            FillForm(["Saisir paramètres (pH, NPK, MO, Pb, Cd...)"])
+            Score(["Calculer le score de compatibilité"])
+            Alerts(["Générer les alertes (Toxicité, Saison)"])
+            Reports(["Télécharger le rapport & Demande Labo"])
+        end
+    end
 
-  Diag -. "«include»" .-> Form
-  Prefill -. "«extend»" .-> Form
-  Form -. "«include»" .-> Score
-  Score -. "«extend»" .-> LabReq
-  Score -. "«extend»" .-> Report
+    %% Connexions Acteur Principal -> Système
+    User --> Auth
+    User --> Wilaya
+    User --> Draw
+    User --> Manage
+    User --> Crop
+    User --> GenPoints
+    User --> FillForm
+    User --> Reports
+
+    %% Relations Cartographie
+    Draw -. "<<include>>" .-> CheckArea
+    Manage -. "<<extend>>" .-> Draw
+    
+    %% Relations Échantillonnage
+    GenPoints -. "<<include>>" .-> Crop
+    KML -. "<<extend>>" .-> GenPoints
+
+    %% Relations Diagnostic
+    SatData -. "<<extend>>" .-> FillForm
+    Score -. "<<include>>" .-> FillForm
+    Alerts -. "<<extend>>" .-> Score
+    Reports -. "<<extend>>" .-> Score
+
+    %% Connexions Acteurs Secondaires (Systèmes)
+    SatAPI --> SatData
+    Manage --> Backend
+    Auth --> Backend
+    GenPoints --> Backend
 ```
 
 ## 2) Phase 1 Use Case Diagram: Parcel Selection and Sampling

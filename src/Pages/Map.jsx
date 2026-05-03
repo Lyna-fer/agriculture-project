@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import "../styles/map.css";
 import LeftPanel from "../components/map/LeftPanel";
 import MapView from "../components/map/MapView";
@@ -143,6 +144,7 @@ const buildDashboardSessionFromDb = ({
 
 export default function Map() {
   useEffect(() => { document.body.className = "page-map"; }, []);
+  const navigate = useNavigate();
 
   const [parcelles,          setParcelles]          = useState([]);
   const [selectedParcelleId, setSelectedParcelleId] = useState(null);
@@ -792,6 +794,12 @@ export default function Map() {
     }
   }, [analysisMapSnapshot, analyzedZones, parcelWeather, selectedGroupId, selectedParcelle, showToast]);
 
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/login", { replace: true });
+  }, [navigate]);
+
   return (
     <>
       <div style={{ display: "flex", height: "100vh" }}>
@@ -815,6 +823,7 @@ export default function Map() {
           selectedParcelleData={selectedParcelle}
           dashboardEnabled={selectedParcelDashboardReady}
           onOpenDashboard={handleOpenStoredDashboard}
+          onLogout={handleLogout}
         />
         <MapView
           mapRef={mapRef}
