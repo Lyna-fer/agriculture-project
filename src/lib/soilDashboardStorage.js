@@ -18,7 +18,9 @@ function buildParcelCoordsKey(parcelle) {
 }
 
 function buildParcelStorageBase(parcelleName, parcelle, cultureGroupId) {
-  return `${cultureGroupId}:${parcelleName || "parcel"}:${buildParcelCoordsKey(parcelle)}`;
+  // Include parcel id when available to ensure uniqueness across parcels
+  const idPart = parcelle && parcelle.id ? String(parcelle.id) : "noid";
+  return `${cultureGroupId}:${parcelleName || "parcel"}:${idPart}:${buildParcelCoordsKey(parcelle)}`;
 }
 
 export function getHistoryKey(parcelleName, parcelle, cultureGroupId) {
@@ -52,6 +54,28 @@ export function readStoredDashboardState(parcelleName, parcelle, cultureGroupId)
 export function hasStoredDashboardAnalysis(parcelleName, parcelle, cultureGroupId) {
   const stored = readStoredDashboardState(parcelleName, parcelle, cultureGroupId);
   return !!stored?.zoneResults?.length;
+}
+
+/**
+ * Check if a parcelle has completed analysis for all zones
+ * Returns true if all zones have zone results (no null values in zoneResults)
+ */
+export function isParcelleAnalysisComplete(parcelleName, parcelle, cultureGroupId, nZones = 1) {
+  const stored = readStoredDashboardState(parcelleName, parcelle, cultureGroupId);
+  
+  if (!stored || !Array.isArray(stored.zoneResults)) {
+    return false;
+  }
+  
+  const zoneResults = stored.zoneResults;
+  const expectedZones = stored.nZones || nZones || 1;
+  
+  // All zones must have results (not null/undefined)
+  if (zoneResults.length < expectedZones) {
+    return false;
+  }
+  
+  return zoneResults.slice(0, expectedZones).every(result => result !== null && result !== undefined);
 }
 
 export function dispatchDashboardUpdated(detail = {}) {

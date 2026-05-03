@@ -2356,11 +2356,15 @@ function buildAnalysisSnapshot({ zoneResults, crops, parcelleName, parcelleHa, c
     avgScore,
     zoneCount: completed.length,
     scores,
+    zoneResults, // Store full zone data for zone-specific dashboard queries
     avgPh: averageMetric(completed, "ph"),
     avgCe: averageMetric(completed, "ce"),
     avgN: averageMetric(completed, "n"),
     avgP: averageMetric(completed, "p"),
     avgK: averageMetric(completed, "k"),
+    avgLime: averageMetric(completed, "lime"),
+    avgPb: averageMetric(completed, "pb"),
+    avgCd: averageMetric(completed, "cd"),
     depthAverages: hasPermanentDepths
       ? {
           depth0_20: {
@@ -2477,7 +2481,12 @@ function DashboardView({
     orderedHistory[0] ||
     currentAnalysis ||
     null;
-  const previousSnapshot = orderedHistory.find((item) => item?.fingerprint !== currentSnapshot?.fingerprint) || null;
+  let previousSnapshot = orderedHistory.find((item) => item?.fingerprint !== currentSnapshot?.fingerprint) || null;
+
+  // If there's no meaningful history (first-time analysis), do not show a previous snapshot
+  if (!orderedHistory || orderedHistory.length <= 1) {
+    previousSnapshot = null;
+  }
   const isPermanentCulture = cultureLabel === "Permanent";
   const [historyDepthKey, setHistoryDepthKey] = useState("depth0_20");
   const selectedCrop = activeZoneResult?.crop ? crops.find((crop) => String(crop.id) === String(activeZoneResult.crop)) : null;
@@ -2496,8 +2505,30 @@ function DashboardView({
   const previousDepthMetrics = isPermanentCulture
     ? previousSnapshot?.depthAverages?.[historyDepthKey] || null
     : null;
-  const comparisonCurrent = isPermanentCulture ? activeDepthResult : currentSnapshot;
-  const comparisonPrevious = isPermanentCulture ? previousDepthMetrics : previousSnapshot;
+  
+  // Helper: Extract zone metrics, normalizing property names
+  const extractZoneMetrics = (zoneData) => {
+    if (!zoneData) return null;
+    return {
+      ph: Number(zoneData.ph || 0),
+      ce: Number(zoneData.ce || 0),
+      n: Number(zoneData.n || 0),
+      p: Number(zoneData.p || 0),
+      k: Number(zoneData.k || 0),
+      lime: Number(zoneData.lime || 0),
+      pb: Number(zoneData.pb || 0),
+      cd: Number(zoneData.cd || 0),
+    };
+  };
+
+  // For zone-specific dashboard: get current zone from activeZoneResult, previous from history
+  const currentZoneMetrics = extractZoneMetrics(activeZoneResult);
+  const previousZoneFromHistory = previousSnapshot?.zoneResults?.[activeZone];
+  const previousZoneMetrics = extractZoneMetrics(previousZoneFromHistory);
+  
+  // Comparison uses zone-level metrics for non-permanent, depth metrics for permanent
+  const comparisonCurrent = isPermanentCulture ? activeDepthResult : currentZoneMetrics;
+  const comparisonPrevious = isPermanentCulture ? previousDepthMetrics : previousZoneMetrics;
 
   useEffect(() => {
     if (!isPermanentCulture) {
@@ -2506,14 +2537,14 @@ function DashboardView({
   }, [isPermanentCulture]);
 
   const currentAnalysisMetrics = [
-    { key: "ph", label: "Soil pH", value: isPermanentCulture ? comparisonCurrent?.ph : comparisonCurrent?.avgPh, previous: isPermanentCulture ? comparisonPrevious?.ph : comparisonPrevious?.avgPh, unit: "pH", format: (value) => Number(value).toFixed(1) },
-    { key: "ce", label: "Salinity", value: isPermanentCulture ? comparisonCurrent?.ce : comparisonCurrent?.avgCe, previous: isPermanentCulture ? comparisonPrevious?.ce : comparisonPrevious?.avgCe, unit: "dS/m", format: (value) => Number(value).toFixed(1) },
-    { key: "n", label: "Nitrogen", value: isPermanentCulture ? comparisonCurrent?.n : comparisonCurrent?.avgN, previous: isPermanentCulture ? comparisonPrevious?.n : comparisonPrevious?.avgN, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
-    { key: "p", label: "Phosphorus", value: isPermanentCulture ? comparisonCurrent?.p : comparisonCurrent?.avgP, previous: isPermanentCulture ? comparisonPrevious?.p : comparisonPrevious?.avgP, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
-    { key: "k", label: "Potassium", value: isPermanentCulture ? comparisonCurrent?.k : comparisonCurrent?.avgK, previous: isPermanentCulture ? comparisonPrevious?.k : comparisonPrevious?.avgK, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
-    { key: "lime", label: "Active lime", value: isPermanentCulture ? comparisonCurrent?.lime : (comparisonCurrent?.avgLime ?? comparisonCurrent?.lime), previous: isPermanentCulture ? comparisonPrevious?.lime : (comparisonPrevious?.avgLime ?? comparisonPrevious?.lime), unit: "%", format: (value) => (Number.isFinite(Number(value)) ? Math.round(Number(value)) : "—") },
-    { key: "pb", label: "Lead (Pb)", value: isPermanentCulture ? comparisonCurrent?.pb : (comparisonCurrent?.avgPb ?? comparisonCurrent?.pb), previous: isPermanentCulture ? comparisonPrevious?.pb : (comparisonPrevious?.avgPb ?? comparisonPrevious?.pb), unit: "mg/kg", format: (value) => (Number.isFinite(Number(value)) ? Math.round(Number(value)) : "—") },
-    { key: "cd", label: "Cadmium (Cd)", value: isPermanentCulture ? comparisonCurrent?.cd : (comparisonCurrent?.avgCd ?? comparisonCurrent?.cd), previous: isPermanentCulture ? comparisonPrevious?.cd : (comparisonPrevious?.avgCd ?? comparisonPrevious?.cd), unit: "mg/kg", format: (value) => (Number.isFinite(Number(value)) ? Math.round(Number(value)) : "—") },
+    { key: "ph", label: "Soil pH", value: isPermanentCulture ? comparisonCurrent?.ph : comparisonCurrent?.ph, previous: isPermanentCulture ? comparisonPrevious?.ph : comparisonPrevious?.ph, unit: "pH", format: (value) => Number(value).toFixed(1) },
+    { key: "ce", label: "Salinity", value: isPermanentCulture ? comparisonCurrent?.ce : comparisonCurrent?.ce, previous: isPermanentCulture ? comparisonPrevious?.ce : comparisonPrevious?.ce, unit: "dS/m", format: (value) => Number(value).toFixed(1) },
+    { key: "n", label: "Nitrogen", value: isPermanentCulture ? comparisonCurrent?.n : comparisonCurrent?.n, previous: isPermanentCulture ? comparisonPrevious?.n : comparisonPrevious?.n, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
+    { key: "p", label: "Phosphorus", value: isPermanentCulture ? comparisonCurrent?.p : comparisonCurrent?.p, previous: isPermanentCulture ? comparisonPrevious?.p : comparisonPrevious?.p, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
+    { key: "k", label: "Potassium", value: isPermanentCulture ? comparisonCurrent?.k : comparisonCurrent?.k, previous: isPermanentCulture ? comparisonPrevious?.k : comparisonPrevious?.k, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
+    { key: "lime", label: "Active lime", value: comparisonCurrent?.lime, previous: comparisonPrevious?.lime, unit: "%", format: (value) => (Number.isFinite(Number(value)) ? Math.round(Number(value)) : "—") },
+    { key: "pb", label: "Lead (Pb)", value: comparisonCurrent?.pb, previous: comparisonPrevious?.pb, unit: "mg/kg", format: (value) => (Number.isFinite(Number(value)) ? Math.round(Number(value)) : "—") },
+    { key: "cd", label: "Cadmium (Cd)", value: comparisonCurrent?.cd, previous: comparisonPrevious?.cd, unit: "mg/kg", format: (value) => (Number.isFinite(Number(value)) ? Math.round(Number(value)) : "—") },
   ];
 
   const zoneCards = zoneResults.map((zone, index) => {
@@ -2677,6 +2708,7 @@ function DashboardView({
                         key={item.index}
                         className={`sd-heatmap-zone ${activeZone === item.index ? "sd-heatmap-zone--active" : ""}`}
                         onClick={() => onSelectZone(item.index)}
+                        style={{ cursor: 'pointer' }}
                       >
                         {item.polygon && (
                           <>
@@ -2949,40 +2981,52 @@ export default function SoilDiagnostic({
   useEffect(() => {
     if (open) {
       setDiagMode(initialDiagMode);
-      const storedZoneIndex = Number(persistedDashboardData?.activeZone);
-      setActiveZone(
-        Number.isInteger(storedZoneIndex) && storedZoneIndex >= 0
-          ? Math.min(n - 1, storedZoneIndex)
-          : 0
-      );
+      // Default dashboard to show first zone (zone 0)
+      setActiveZone(0);
       setAnalyzing(false);
-      const storedResults = Array.isArray(persistedDashboardData?.zoneResults)
-        ? persistedDashboardData.zoneResults.slice(0, n)
-        : null;
-      const hydratedZoneResults = storedResults?.length
-        ? Array.from({ length: n }, (_, index) => storedResults[index] || null)
-        : Array(n).fill(null);
       setZoneStates(
         Array.from({ length: n }, () => freshSt(initialDiagMode))
       );
-      // Keep all previous results for dashboard, but only clear the current zone
-      if (Array.isArray(persistedDashboardData?.zoneResults)) {
-        const results = persistedDashboardData.zoneResults.slice(0, n);
-        results[0] = null; // Clear only the initial active zone (0)
-        setZoneResults(results);
+      
+      // When loading stored dashboard data (startInDashboard), preserve all zone results
+      if (startInDashboard && persistedDashboardData) {
+        // Loading dashboard view - keep all stored zone results
+        if (Array.isArray(persistedDashboardData?.zoneResults)) {
+          const results = persistedDashboardData.zoneResults.slice(0, n);
+          setZoneResults(results);
+        } else {
+          setZoneResults(Array(n).fill(null));
+        }
+        
+        // Load analysis history from persistedDashboardData or localStorage
+        let history = persistedDashboardData?.analysisHistory || [];
+        if (!Array.isArray(history) || history.length === 0) {
+          // Try loading from localStorage as fallback
+          try {
+            const historyKey = getHistoryKey(
+              persistedDashboardData?.parcelleName || "",
+              persistedDashboardData?.parcelle,
+              persistedDashboardData?.cultureGroupId
+            );
+            const storedHistory = localStorage.getItem(historyKey);
+            if (storedHistory) {
+              history = JSON.parse(storedHistory);
+            }
+          } catch (e) {
+            console.warn("Failed to load history from localStorage:", e);
+          }
+        }
+        setAnalysisHistory(Array.isArray(history) ? history : []);
+        setCurrentAnalysis(persistedDashboardData?.currentAnalysis || null);
+        setShowDashboard(true);
       } else {
+        // Entering analysis mode - clear all zones for fresh analysis
         setZoneResults(Array(n).fill(null));
+        setAnalysisHistory([]);
+        setCurrentAnalysis(null);
+        setShowDashboard(false);
       }
-      setAnalysisHistory(
-        Array.isArray(persistedDashboardData?.analysisHistory)
-          ? persistedDashboardData.analysisHistory
-          : []
-      );
-      setCurrentAnalysis(persistedDashboardData?.currentAnalysis || null);
-      // Go directly to dashboard if data exists and startInDashboard is true
-      const hasAnyResults = Array.isArray(persistedDashboardData?.zoneResults) && 
-                           persistedDashboardData.zoneResults.some(r => r != null);
-      setShowDashboard(Boolean(startInDashboard && hasAnyResults));
+      
       lastStoredFingerprintRef.current =
         persistedDashboardData?.currentAnalysis?.fingerprint || "";
     }
@@ -2998,16 +3042,16 @@ export default function SoilDiagnostic({
     }
   }, [open, parcelle?.id, cultureGroupId, persistedDashboardData]);
 
-  /* Clear current zone result so right panel is empty (unless starting in dashboard) */
+  /* Clear current zone result so right panel is empty (unless starting in dashboard or viewing dashboard) */
   useEffect(() => {
-    if (open && !startInDashboard) {
+    if (open && !startInDashboard && !showDashboard) {
       setZoneResults(prev => {
         const next = [...prev];
         next[activeZone] = null;
         return next;
       });
     }
-  }, [open, startInDashboard, activeZone]);
+  }, [open, startInDashboard, activeZone, showDashboard]);
 
   /* âœ… FIXED: Fetch satellite data in BOTH eco AND standard mode */
   useEffect(() => {
@@ -3383,7 +3427,15 @@ export default function SoilDiagnostic({
     if (!snapshot.fingerprint || lastStoredFingerprintRef.current === snapshot.fingerprint) return;
 
     setCurrentAnalysis(snapshot);
-    
+
+    const canPersistLocally = parcelle && (parcelle.id || (Array.isArray(parcelle.latlngs) && parcelle.latlngs.length > 0));
+
+    if (!canPersistLocally) {
+      console.log("⚠️ Skipping local persistence: parcelle has no id or coordinates");
+      lastStoredFingerprintRef.current = snapshot.fingerprint;
+      return;
+    }
+
     try {
       localStorage.setItem(getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId), JSON.stringify(snapshot));
     } catch (error) {
@@ -3403,7 +3455,6 @@ export default function SoilDiagnostic({
       }
       return next;
     });
-
     try {
       localStorage.setItem(
         getDashboardStateKey(parcelleName, parcelle, cultureGroupId),
@@ -3425,10 +3476,15 @@ export default function SoilDiagnostic({
           weatherData: weatherData || parcelWeather || null,
         })
       );
+
+      // Notify other components that the dashboard for this parcel was updated
+      try {
+        dispatchDashboardUpdated({ parcelId: parcelle.id, cultureGroupId });
+      } catch (err) { /* ignore */ }
     } catch (error) {
       console.warn("Dashboard state save failed:", error);
     }
-    
+
     lastStoredFingerprintRef.current = snapshot.fingerprint;
   }, [open, zoneResults, CROPS, parcelleName, parcelle, cultureGroupId, parcelleHa, cultureLabel, analysisHistory, activeZone, diagMode, mapSnapshot, zones, n, weatherData, parcelWeather]);
   
