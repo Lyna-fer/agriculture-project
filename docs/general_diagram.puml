@@ -1,0 +1,130 @@
+@startuml General_Workflow
+!define TITLE <b>Landing Map - General System Workflow</b>
+title TITLE
+
+left to right direction
+
+actor Agriculteur
+actor "Technicien\nLaboratoire"
+
+package "Phase 1: Plot Management & Sampling" {
+    usecase "UC1: Manage Plots\n(Create, View, Delete)" as UC1
+    usecase "UC2: Generate Sampling\nPoints" as UC2
+    usecase "UC3: Export Plot Data\n(KML)" as UC3
+}flowchart LR
+    %% Acteurs
+    User(("👤\nUtilisateur\n(Agriculteur/Ingénieur)"))
+    SatAPI(("🛰️\nAPI Satellite\n(Landsat/Sentinel)"))
+    Backend(("💾\nServeur &\nBase de données"))
+
+    %% Frontière du Système
+    subgraph SolGuide ["Plateforme SolGuide (Vue Globale Détaillée)"]
+        direction TB
+        
+        Auth(["S'authentifier (Login/Register)"])
+        
+        subgraph Carto ["Phase 1 : Cartographie"]
+            Wilaya(["Rechercher une Wilaya"])
+            Draw(["Dessiner une parcelle (Polygone/Rectangle)"])
+            CheckArea(["Contrôler la superficie (< 50 ha)"])
+            Manage(["Sauvegarder / Supprimer la parcelle"])
+        end
+
+        subgraph Echant ["Phase 2 : Échantillonnage"]
+            Crop(["Choisir la culture (Céréales, Maraîchères...)"])
+            GenPoints(["Générer les zones et points d'échantillonnage"])
+            KML(["Exporter le plan au format KML"])
+        end
+
+        subgraph Diag ["Phase 3 : Diagnostic Agronomique"]
+            SatData(["Pré-remplir les données via Satellite"])
+            FillForm(["Saisir paramètres (pH, NPK, MO, Pb, Cd...)"])
+            Score(["Calculer le score de compatibilité"])
+            Alerts(["Générer les alertes (Toxicité, Saison)"])
+            Reports(["Télécharger le rapport & Demande Labo"])
+        end
+    end
+
+    %% Connexions Acteur Principal -> Système
+    User --> Auth
+    User --> Wilaya
+    User --> Draw
+    User --> Manage
+    User --> Crop
+    User --> GenPoints
+    User --> FillForm
+    User --> Reports
+
+    %% Relations Cartographie
+    Draw -. "<<include>>" .-> CheckArea
+    Manage -. "<<extend>>" .-> Draw
+    
+    %% Relations Échantillonnage
+    GenPoints -. "<<include>>" .-> Crop
+    KML -. "<<extend>>" .-> GenPoints
+
+    %% Relations Diagnostic
+    SatData -. "<<extend>>" .-> FillForm
+    Score -. "<<include>>" .-> FillForm
+    Alerts -. "<<extend>>" .-> Score
+    Reports -. "<<extend>>" .-> Score
+
+    %% Connexions Acteurs Secondaires (Systèmes)
+    SatAPI --> SatData
+    Manage --> Backend
+    Auth --> Backend
+    GenPoints --> Backend
+
+package "Phase 2: Analysis & Recommendations" {
+    usecase "UC4: Fill Analysis Form\n(Soil Parameters)" as UC4
+    usecase "UC5: View Compatibility\nScore & Alerts" as UC5
+    usecase "UC6: Generate Report\n& Recommendations" as UC6
+}
+
+package "Lab Integration" {
+    usecase "UC7: Submit Lab\nRequest" as UC7
+}
+
+Agriculteur --> UC1
+Agriculteur --> UC2
+Agriculteur --> UC3
+UC2 -.-> UC4 : uses sampling data
+
+Agriculteur --> UC4
+UC4 --> UC5
+UC5 --> UC6
+UC6 --> UC7
+
+UC7 --> Technicien
+
+note right of UC1
+  - Locate wilaya region
+  - Draw/edit parcelles
+  - Manage plot metadata
+end note
+
+note right of UC2
+  - Auto-generate sampling points
+  - Display coordinates
+  - Prepare for data collection
+end note
+
+note right of UC4
+  - Input soil parameters
+  - Edit form data
+  - Preview dashboard
+end note
+
+note right of UC5
+  - Display analysis results
+  - Show compatibility with cultures
+  - Display alerts & verdicts
+end note
+
+note right of UC6
+  - Generate comprehensive report
+  - Include recommendations
+  - Export for farmer
+end note
+
+@enduml

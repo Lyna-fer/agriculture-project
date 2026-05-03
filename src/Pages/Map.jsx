@@ -15,9 +15,6 @@ import {
 } from "../lib/samplingEngine";
 import { ZONE_COLORS } from "../data/wilayas";
 import {
-  hasStoredDashboardAnalysis,
-  readStoredDashboardState,
-  SOIL_DASHBOARD_UPDATED_EVENT,
 } from "../lib/soilDashboardStorage";
 const CULTURES_TO_STRATEGIES = {
   1: "vegetables",
@@ -71,6 +68,79 @@ const normalizeLatLngPairs = (latlngs) => {
     .filter((point) => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]));
 };
 
+const buildDashboardSnapshotFromRow = (row) => {
+  const metrics = row?.soilMetrics || {};
+  return {
+    fingerprint: String(row?.id ?? ""),
+    timestamp: row?.analyzedAt || null,
+    diagMode: row?.diagMode || "standard",
+    targetCropId: row?.targetCropId ?? null,
+    avgScore: Number(row?.compatibilityScore || 0),
+    avgPh: metrics.ph,
+    avgLime: metrics.lime,
+    avgCe: metrics.ce,
+    avgN: metrics.n,
+    avgP: metrics.p,
+    avgK: metrics.k,
+    avgPb: metrics.pb,
+    avgCd: metrics.cd,
+    depthAverages: metrics.permanentDepths || null,
+  };
+};
+
+const buildDashboardSessionFromDb = ({
+  parcelle,
+  parcelleName,
+  parcelleHa,
+  cultureGroupId,
+  responseData,
+  mapSnapshot,
+  zones,
+  weatherData,
+}) => {
+  const zoneEntries = Object.entries(responseData || {})
+    .map(([zoneKey, rows]) => {
+      const zoneIndex = Number(zoneKey.replace("zone_", ""));
+      const zoneRows = Array.isArray(rows) ? rows : [];
+      const latestRow = zoneRows[0] || null;
+      return {
+        zoneIndex,
+        latestRow,
+        snapshots: zoneRows.slice(0, 2).map(buildDashboardSnapshotFromRow).filter(Boolean),
+      };
+    })
+    .filter((entry) => Number.isInteger(entry.zoneIndex) && entry.latestRow);
+
+  const zoneResults = [];
+  zoneEntries.forEach((entry) => {
+    zoneResults[entry.zoneIndex] = entry.latestRow.soilMetrics || null;
+  });
+
+  const activeZoneEntry = zoneEntries
+    .slice()
+    .sort((a, b) => new Date(b.latestRow.analyzedAt).getTime() - new Date(a.latestRow.analyzedAt).getTime())[0] || null;
+
+  const activeZone = activeZoneEntry?.zoneIndex ?? 0;
+  const activeZoneHistory = activeZoneEntry?.snapshots || [];
+
+  return {
+    savedAt: new Date().toISOString(),
+    activeZone,
+    diagMode: activeZoneHistory[0]?.diagMode || "standard",
+    parcelleName,
+    parcelleHa,
+    cultureGroupId,
+    parcelle,
+    mapSnapshot,
+    zones,
+    nZones: Math.max(1, zoneResults.length || zones?.length || 1),
+    zoneResults: zoneResults.length ? zoneResults : Array(Math.max(1, zones?.length || 1)).fill(null),
+    currentAnalysis: activeZoneHistory[0] || null,
+    analysisHistory: activeZoneHistory,
+    weatherData: weatherData || null,
+  };
+};
+
 export default function Map() {
   useEffect(() => { document.body.className = "page-map"; }, []);
 
@@ -96,7 +166,6 @@ export default function Map() {
   const [parcelWeather,      setParcelWeather]       = useState(null);
   const [storedDashboardSession, setStoredDashboardSession] = useState(null);
   const [storedDashboardOpen, setStoredDashboardOpen] = useState(false);
-  const [dashboardRefreshTick, setDashboardRefreshTick] = useState(0);
 
   const toastTimer = useRef(null);
 
@@ -131,17 +200,6 @@ export default function Map() {
       try { await authenticateGEE(); setGeeReady(true); }
       catch (err) { console.log("GEE auth stub:", err?.message || "OK"); }
     })();
-  }, []);
-
-  useEffect(() => {
-    const handleDashboardUpdated = () => {
-      setDashboardRefreshTick((prev) => prev + 1);
-    };
-
-    window.addEventListener(SOIL_DASHBOARD_UPDATED_EVENT, handleDashboardUpdated);
-    return () => {
-      window.removeEventListener(SOIL_DASHBOARD_UPDATED_EVENT, handleDashboardUpdated);
-    };
   }, []);
 
   const showToast = useCallback((msg) => {
@@ -680,35 +738,59 @@ export default function Map() {
 
   const selectedCulture = CULTURES.find(c => c.id === selectedGroupId);
   const selectedParcelle = parcelles.find(p => p.id === selectedParcelleId) ?? null;
-  const selectedParcelDashboardReady = dashboardRefreshTick >= 0 && selectedParcelle
-    ? hasStoredDashboardAnalysis(
-        selectedParcelle.name,
-        selectedParcelle,
-        Number(selectedParcelle.groupId || selectedGroupId)
-      )
-    : false;
+  const selectedParcelDashboardReady = Boolean(selectedParcelle);
 
-  const handleOpenStoredDashboard = useCallback(() => {
+  const handleOpenStoredDashboard = useCallback(async () => {
     if (!selectedParcelle) {
       showToast("❌ Select a parcel first");
       return;
     }
 
-    const cultureGroupId = Number(selectedParcelle.groupId || selectedGroupId);
-    const storedSession = readStoredDashboardState(
-      selectedParcelle.name,
-      selectedParcelle,
-      cultureGroupId
-    );
-
-    if (!storedSession?.zoneResults?.length) {
-      showToast("❌ This parcel does not have a saved dashboard yet");
+    const token = localStorage.getItem("token");
+    if (!token) {
+      showToast("❌ Please sign in again to load the dashboard");
       return;
     }
 
-    setStoredDashboardSession(storedSession);
-    setStoredDashboardOpen(true);
-  }, [selectedParcelle, selectedGroupId, showToast]);
+    const cultureGroupId = Number(selectedParcelle.groupId || selectedGroupId);
+    try {
+      const response = await fetch(`${API_BASE}/api/analysis/parcel/${selectedParcelle.id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        showToast("❌ This parcel does not have a saved dashboard yet");
+        return;
+      }
+
+      const data = await response.json();
+      const hasData = data && Object.values(data).some((rows) => Array.isArray(rows) && rows.length > 0);
+
+      if (!hasData) {
+        showToast("❌ This parcel does not have a saved dashboard yet");
+        return;
+      }
+
+      const storedSession = buildDashboardSessionFromDb({
+        parcelle: selectedParcelle,
+        parcelleName: selectedParcelle.name,
+        parcelleHa: (selectedParcelle.area || 0) / 10000,
+        cultureGroupId,
+        responseData: data,
+        mapSnapshot: analysisMapSnapshot,
+        zones: analyzedZones,
+        weatherData: parcelWeather,
+      });
+
+      setStoredDashboardSession(storedSession);
+      setStoredDashboardOpen(true);
+    } catch (error) {
+      console.warn("Failed to load dashboard from DB:", error);
+      showToast("❌ Could not load dashboard data");
+    }
+  }, [analysisMapSnapshot, analyzedZones, parcelWeather, selectedGroupId, selectedParcelle, showToast]);
 
   return (
     <>

@@ -2458,9 +2458,6 @@ function DashboardView({
   analysisHistory = [],
   cultureLabel = "",
 }) {
-  // ADD THIS LINE:
-  console.log("DASHBOARD HISTORY STATE:", analysisHistory);
-  
   const width = 720;
   const height = 500;
   const frameRatio = mapSnapshot?.size?.width && mapSnapshot?.size?.height
@@ -2469,10 +2466,19 @@ function DashboardView({
   const parcelLatLngs = (parcelle?.latlngs || []).map(normalizeLatLngPoint);
   const bounds = getParcelBounds(parcelLatLngs);
   const activeZoneResult = zoneResults[activeZone] || null;
-  const currentSnapshot = currentAnalysis || null;
-  // Safely ensure analysisHistory is an array before trying to use .find()
-  const safeHistory = Array.isArray(analysisHistory) ? analysisHistory : [];
-  const previousSnapshot = safeHistory.find((item) => item?.fingerprint && item.fingerprint !== currentSnapshot?.fingerprint) || null;const isPermanentCulture = cultureLabel === "Permanent";
+  const safeHistory = Array.isArray(analysisHistory) ? analysisHistory.filter(Boolean) : [];
+  const orderedHistory = [...safeHistory].sort((a, b) => {
+    const aTime = new Date(a?.timestamp || 0).getTime();
+    const bTime = new Date(b?.timestamp || 0).getTime();
+    return bTime - aTime;
+  });
+  const currentSnapshot =
+    (currentAnalysis?.fingerprint && orderedHistory.find((item) => item?.fingerprint === currentAnalysis.fingerprint)) ||
+    orderedHistory[0] ||
+    currentAnalysis ||
+    null;
+  const previousSnapshot = orderedHistory.find((item) => item?.fingerprint !== currentSnapshot?.fingerprint) || null;
+  const isPermanentCulture = cultureLabel === "Permanent";
   const [historyDepthKey, setHistoryDepthKey] = useState("depth0_20");
   const selectedCrop = activeZoneResult?.crop ? crops.find((crop) => String(crop.id) === String(activeZoneResult.crop)) : null;
   const displayWeather = weatherData || weather;
@@ -2490,6 +2496,8 @@ function DashboardView({
   const previousDepthMetrics = isPermanentCulture
     ? previousSnapshot?.depthAverages?.[historyDepthKey] || null
     : null;
+  const comparisonCurrent = isPermanentCulture ? activeDepthResult : currentSnapshot;
+  const comparisonPrevious = isPermanentCulture ? previousDepthMetrics : previousSnapshot;
 
   useEffect(() => {
     if (!isPermanentCulture) {
@@ -2498,14 +2506,14 @@ function DashboardView({
   }, [isPermanentCulture]);
 
   const currentAnalysisMetrics = [
-    { key: "ph", label: "Soil pH", value: isPermanentCulture ? activeDepthResult?.ph : activeZoneResult?.ph, previous: isPermanentCulture ? previousDepthMetrics?.ph : previousSnapshot?.avgPh, unit: "pH", format: (value) => Number(value).toFixed(1) },
-    { key: "ce", label: "Salinity", value: isPermanentCulture ? activeDepthResult?.ce : activeZoneResult?.ce, previous: isPermanentCulture ? previousDepthMetrics?.ce : previousSnapshot?.avgCe, unit: "dS/m", format: (value) => Number(value).toFixed(1) },
-    { key: "n", label: "Nitrogen", value: isPermanentCulture ? activeDepthResult?.n : activeZoneResult?.n, previous: isPermanentCulture ? previousDepthMetrics?.n : previousSnapshot?.avgN, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
-    { key: "p", label: "Phosphorus", value: isPermanentCulture ? activeDepthResult?.p : activeZoneResult?.p, previous: isPermanentCulture ? previousDepthMetrics?.p : previousSnapshot?.avgP, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
-    { key: "k", label: "Potassium", value: isPermanentCulture ? activeDepthResult?.k : activeZoneResult?.k, previous: isPermanentCulture ? previousDepthMetrics?.k : previousSnapshot?.avgK, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
-    { key: "lime", label: "Active lime", value: isPermanentCulture ? activeDepthResult?.lime : activeZoneResult?.lime, previous: isPermanentCulture ? previousDepthMetrics?.lime : null, unit: "%", format: (value) => Math.round(Number(value)) },
-    { key: "pb", label: "Lead (Pb)", value: isPermanentCulture ? activeDepthResult?.pb : activeZoneResult?.pb, previous: isPermanentCulture ? previousDepthMetrics?.pb : null, unit: "mg/kg", format: (value) => Math.round(Number(value)) },
-    { key: "cd", label: "Cadmium (Cd)", value: isPermanentCulture ? activeDepthResult?.cd : activeZoneResult?.cd, previous: isPermanentCulture ? previousDepthMetrics?.cd : null, unit: "mg/kg", format: (value) => Math.round(Number(value)) },
+    { key: "ph", label: "Soil pH", value: isPermanentCulture ? comparisonCurrent?.ph : comparisonCurrent?.avgPh, previous: isPermanentCulture ? comparisonPrevious?.ph : comparisonPrevious?.avgPh, unit: "pH", format: (value) => Number(value).toFixed(1) },
+    { key: "ce", label: "Salinity", value: isPermanentCulture ? comparisonCurrent?.ce : comparisonCurrent?.avgCe, previous: isPermanentCulture ? comparisonPrevious?.ce : comparisonPrevious?.avgCe, unit: "dS/m", format: (value) => Number(value).toFixed(1) },
+    { key: "n", label: "Nitrogen", value: isPermanentCulture ? comparisonCurrent?.n : comparisonCurrent?.avgN, previous: isPermanentCulture ? comparisonPrevious?.n : comparisonPrevious?.avgN, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
+    { key: "p", label: "Phosphorus", value: isPermanentCulture ? comparisonCurrent?.p : comparisonCurrent?.avgP, previous: isPermanentCulture ? comparisonPrevious?.p : comparisonPrevious?.avgP, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
+    { key: "k", label: "Potassium", value: isPermanentCulture ? comparisonCurrent?.k : comparisonCurrent?.avgK, previous: isPermanentCulture ? comparisonPrevious?.k : comparisonPrevious?.avgK, unit: "kg/ha", format: (value) => Math.round(Number(value)) },
+    { key: "lime", label: "Active lime", value: isPermanentCulture ? comparisonCurrent?.lime : (comparisonCurrent?.avgLime ?? comparisonCurrent?.lime), previous: isPermanentCulture ? comparisonPrevious?.lime : (comparisonPrevious?.avgLime ?? comparisonPrevious?.lime), unit: "%", format: (value) => (Number.isFinite(Number(value)) ? Math.round(Number(value)) : "—") },
+    { key: "pb", label: "Lead (Pb)", value: isPermanentCulture ? comparisonCurrent?.pb : (comparisonCurrent?.avgPb ?? comparisonCurrent?.pb), previous: isPermanentCulture ? comparisonPrevious?.pb : (comparisonPrevious?.avgPb ?? comparisonPrevious?.pb), unit: "mg/kg", format: (value) => (Number.isFinite(Number(value)) ? Math.round(Number(value)) : "—") },
+    { key: "cd", label: "Cadmium (Cd)", value: isPermanentCulture ? comparisonCurrent?.cd : (comparisonCurrent?.avgCd ?? comparisonCurrent?.cd), previous: isPermanentCulture ? comparisonPrevious?.cd : (comparisonPrevious?.avgCd ?? comparisonPrevious?.cd), unit: "mg/kg", format: (value) => (Number.isFinite(Number(value)) ? Math.round(Number(value)) : "—") },
   ];
 
   const zoneCards = zoneResults.map((zone, index) => {
@@ -2694,9 +2702,11 @@ function DashboardView({
                   <div className="sd-studio-history-head-main">
                     <strong>Analysis History</strong>
                     <span>
-                      {isPermanentCulture
-                        ? "Compact comparison by soil depth"
-                        : "Compact comparison with previous snapshot"}
+                        {previousSnapshot
+                          ? isPermanentCulture
+                            ? "Latest analysis compared with the previous one by soil depth"
+                            : "Latest analysis compared with the previous one"
+                          : "No previous analysis available yet"}
                     </span>
                   </div>
                   <div className="sd-studio-history-head-actions">
@@ -2734,7 +2744,21 @@ function DashboardView({
                       <div key={item.key} className="sd-studio-history-row">
                         <div className="sd-studio-history-meta">
                           <span>{item.label}</span>
-                          <strong>{hasValue ? (item.unit ? `${item.format(displayValue)} ${item.unit}` : item.format(displayValue)) : "—"}</strong>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+                            {/* Previous Value (Smaller, Gray) */}
+                            {hasPrevious && (
+                              <span style={{ fontSize: "11px", color: "#9ca3af", textDecoration: "line-through" }}>
+                                {item.format(previousValue)}
+                              </span>
+                            )}
+                            
+                            {/* Current Value (Bold, Black/Green) */}
+                            <strong>
+                              {hasValue 
+                                ? (item.unit ? `${item.format(displayValue)} ${item.unit}` : item.format(displayValue)) 
+                                : "—"}
+                            </strong>
+                          </div>
                         </div>
                         <div className="sd-studio-history-bars">
                           <div className="sd-history-bar sd-history-bar--current" style={{ width: currentWidth }} />
@@ -2939,116 +2963,51 @@ export default function SoilDiagnostic({
         ? Array.from({ length: n }, (_, index) => storedResults[index] || null)
         : Array(n).fill(null);
       setZoneStates(
-        storedResults?.length
-          ? hydratedZoneResults.map((zone) => zone || freshSt(initialDiagMode))
-          : Array.from({ length: n }, () => freshSt(initialDiagMode))
+        Array.from({ length: n }, () => freshSt(initialDiagMode))
       );
-      setZoneResults(hydratedZoneResults);
+      // Keep all previous results for dashboard, but only clear the current zone
+      if (Array.isArray(persistedDashboardData?.zoneResults)) {
+        const results = persistedDashboardData.zoneResults.slice(0, n);
+        results[0] = null; // Clear only the initial active zone (0)
+        setZoneResults(results);
+      } else {
+        setZoneResults(Array(n).fill(null));
+      }
       setAnalysisHistory(
         Array.isArray(persistedDashboardData?.analysisHistory)
           ? persistedDashboardData.analysisHistory
           : []
       );
       setCurrentAnalysis(persistedDashboardData?.currentAnalysis || null);
-      setShowDashboard(Boolean(startInDashboard && storedResults?.length));
+      // Go directly to dashboard if data exists and startInDashboard is true
+      const hasAnyResults = Array.isArray(persistedDashboardData?.zoneResults) && 
+                           persistedDashboardData.zoneResults.some(r => r != null);
+      setShowDashboard(Boolean(startInDashboard && hasAnyResults));
       lastStoredFingerprintRef.current =
         persistedDashboardData?.currentAnalysis?.fingerprint || "";
     }
   }, [open, initialDiagMode, n, persistedDashboardData, startInDashboard]);
 
-  // NEW: Fetch history from the DB when the parcel loads to enable the Dashboard
   useEffect(() => {
-    let cancelled = false;
+    // Dashboard state is restored from localStorage; do not overwrite it from the DB.
+    if (open && persistedDashboardData) {
+      dispatchDashboardUpdated({
+        parcelId: parcelle?.id,
+        cultureGroupId,
+      });
+    }
+  }, [open, parcelle?.id, cultureGroupId, persistedDashboardData]);
 
-    const fetchHistory = async () => {
-      // Only run if the modal is open, we have a parcel ID, and a token
-      if (!open || !parcelle?.id) return;
-
-      try {
-        const token = localStorage.getItem("token");
-        // Use the endpoint we created earlier!
-        const response = await fetch(`${API_BASE}/api/analysis/parcel/${parcelle.id}`, {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) throw new Error("Failed to load history");
-
-        const data = await response.json();
-        
-        if (!cancelled) {
-          const hasData = Object.keys(data).length > 0;
-          
-          if (hasData) {
-            // 1. Get the most recent analysis for each zone to populate the UI
-            const latestZoneResults = Array(n).fill(null);
-            for (let i = 0; i < n; i++) {
-                const zoneData = data[`zone_${i}`];
-                if (zoneData && zoneData.length > 0) {
-                    latestZoneResults[i] = zoneData[0].soilMetrics;
-                }
-            }
-            
-            // 2. Build the history list for the Dashboard.
-            let historyList = [];
-            
-            if (data[`zone_${activeZone}`] && data[`zone_${activeZone}`].length > 0) {
-                 const zoneHistory = data[`zone_${activeZone}`];
-                 
-                 // Create a helper function to translate a DB row into a Dashboard Snapshot
-                 const translateDbToSnapshot = (dbRow) => {
-                     const metrics = dbRow.soilMetrics;
-                     return {
-                         fingerprint: dbRow.id.toString(), // Ensure unique ID
-                         timestamp: dbRow.analyzedAt,
-                         // The dashboard expects 'avgPh', 'avgCe' etc. for the whole parcel,
-                         // but since we are looking at a specific zone's history, we'll
-                         // just map the zone's metrics to those 'avg' fields.
-                         avgPh: metrics.ph,
-                         avgCe: metrics.ce,
-                         avgN: metrics.n,
-                         avgP: metrics.p,
-                         avgK: metrics.k,
-                         // If you are using permanent depths, you'd map those here too:
-                         depthAverages: metrics.permanentDepths ? {
-                             depth0_20: metrics.permanentDepths.depth0_20,
-                             depth20_40: metrics.permanentDepths.depth20_40,
-                         } : null
-                     };
-                 };
-
-                 // Push the current analysis (translated)
-                 historyList.push(translateDbToSnapshot(zoneHistory[0]));
-                 
-                 // If there is a second analysis in the DB, push it as the 'previous' (translated)
-                 if (zoneHistory.length > 1) {
-                     historyList.push(translateDbToSnapshot(zoneHistory[1]));
-                 }
-            }
-
-            console.log("Setting analysisHistory to:", historyList); 
-            
-            setAnalysisHistory(historyList); 
-            setZoneResults(latestZoneResults);
-            
-            dispatchDashboardUpdated({
-              parcelId: parcelle.id,
-              cultureGroupId,
-            });
-          }
-        }
-      } catch (error) {
-        console.warn("Could not fetch parcel history for dashboard:", error);
-      }
-    };
-
-    fetchHistory();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, parcelle, cultureGroupId]);
+  /* Clear current zone result so right panel is empty (unless starting in dashboard) */
+  useEffect(() => {
+    if (open && !startInDashboard) {
+      setZoneResults(prev => {
+        const next = [...prev];
+        next[activeZone] = null;
+        return next;
+      });
+    }
+  }, [open, startInDashboard, activeZone]);
 
   /* âœ… FIXED: Fetch satellite data in BOTH eco AND standard mode */
   useEffect(() => {
@@ -3295,8 +3254,14 @@ export default function SoilDiagnostic({
 
   const resetZone = useCallback(idx => {
     setZoneResults(prev => { const next=[...prev]; next[idx]=null; return next; });
+    // Also reset the zone state to clear the selected crop and start fresh
+    setZoneStates(prev => { 
+      const next=[...prev]; 
+      next[idx] = freshSt(diagMode);
+      return next; 
+    });
     setShowDashboard(false);
-  }, []);
+  }, [diagMode]);
 
   const handlePrintLabRequest = useCallback(() => {
     const now = new Date();
@@ -3574,7 +3539,7 @@ export default function SoilDiagnostic({
           )}
 
           {/* TWO-COLUMN LAYOUT */}
-          {showDashboard && allZonesDone ? (
+          {showDashboard && (analysisHistory?.length > 0 || currentAnalysis) ? (
             <div className="sd-dashboard-sheet">
               <div className="sd-dashboard-sheet-head">
                 <div>
@@ -3653,7 +3618,7 @@ export default function SoilDiagnostic({
                     onNext={() => setActiveZone(prev => Math.min(n - 1, prev + 1))}
                     onDownloadReport={handleDownloadZoneReport}
                     onOpenDashboard={() => setShowDashboard(true)}
-                    showDashboardAction={allZonesDone && activeZone === n - 1}
+                    showDashboardAction={Boolean(analysisHistory?.length > 0 || currentAnalysis)}
                   />
                 )}
               </div>
