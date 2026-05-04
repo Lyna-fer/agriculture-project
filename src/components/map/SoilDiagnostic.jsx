@@ -1902,9 +1902,18 @@ function ResultsView({
   };
 
   const scored = crops
-    .map(c => ({...c, sc: cropScore(c,st), adj: cropAdj(c,st)}))
-    .filter(c => isTextureAllowed(st.tex, c.prefTex))
-    .sort((a,b) => b.sc - a.sc);
+  .map(c => ({...c, sc: cropScore(c,st), adj: cropAdj(c,st)}))
+  .filter(c => {
+    // ✅ 1. If user explicitly selected a crop, ALWAYS show it (bypass filter)
+    if (st.crop && String(c.id) === String(st.crop)) return true;
+
+    // ✅ 2. If "Recommend for me" (no crop selected), only show compatible crops
+    if (!st.crop) return isTextureAllowed(st.tex, c.prefTex);
+
+    // ✅ 3. If a crop IS selected, show other alternatives only if compatible
+    return isTextureAllowed(st.tex, c.prefTex);
+  })
+  .sort((a,b) => b.sc - a.sc);
 
   const tgt  = st.crop ? scored.find(c => c.id===st.crop) : null;
   const bestCrop = scored[0] || null;
