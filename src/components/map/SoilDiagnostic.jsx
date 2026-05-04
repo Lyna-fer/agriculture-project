@@ -273,18 +273,74 @@ function scoreCropByFormula(crop, st) {
     add(8, st.lime <= crop.limeMx ? "optimal" : st.lime <= crop.limeMx + 7 ? "stress" : "destroyable");
     add(7, seasonFit);
     add(3, st.wind <= crop.maxWindKmh ? "optimal" : st.wind <= crop.maxWindKmh + 30 ? "stress" : "destroyable");
-  } else {
-    add(20, texFit);
-    add(15, within(st.ph, phMin, phMax) ? "optimal" : within(st.ph, phCenter - 1, phCenter + 1) ? "stress" : "destroyable");
-    add(12, st.ce <= crop.ce ? "optimal" : st.ce <= crop.ce + 3 ? "stress" : "destroyable");
-    add(13, st.lime <= crop.limeMx ? "optimal" : st.lime <= crop.limeMx + 5 ? "stress" : "destroyable");
-    add(8, nutrientLevel(st.k, crop.kReq, 60, 100));
-    add(7, st.wind <= crop.maxWindKmh ? "optimal" : st.wind <= crop.maxWindKmh + 20 ? "stress" : "destroyable");
-    maxPoints += 7; base += organicMatterPoints(st.mo, groupKey);
-    add(6, seasonFit);
-    add(4, nutrientLevel(st.n, crop.nReq, 20, 50));
-    add(4, nutrientLevel(st.p, crop.pReq, 20, 50));
+ } else if (groupKey === "trees") {
+  // ✅ UPDATED: Two-depth scoring for Permanent crops (0-20cm & 20-40cm)
+  const top = st.permanentDepths?.depth0_20 || st;
+  const sub = st.permanentDepths?.depth20_40 || st;
+
+  // Depth-specific weights (normalized to 1.0 per parameter)
+  const W = {
+    tex:  { top: 0.375, sub: 0.625 },
+    ph:   { top: 0.571, sub: 0.429 },
+    ec:   { top: 0.429, sub: 0.571 },
+    lime: { top: 0.429, sub: 0.571 },
+    om:   { top: 0.833, sub: 0.167 },
+    n:    { top: 0.667, sub: 0.333 },
+    p:    { top: 0.571, sub: 0.429 },
+    k:    { top: 0.333, sub: 0.667 },
+  };
+
+  const getPoints = (param, s) => {
+    if (param === 'tex') return pointsByLevel(20, textureLevel(crop.prefTex, s.tex));
+    if (param === 'ph') {
+      const lvl = within(s.ph, phMin, phMax) ? 'optimal' : within(s.ph, phCenter - 1, phCenter + 1) ? 'stress' : 'destroyable';
+      return pointsByLevel(15, lvl);
+    }
+    if (param === 'ec') {
+      const lvl = s.ce <= crop.ce ? 'optimal' : s.ce <= crop.ce + 3 ? 'stress' : 'destroyable';
+      return pointsByLevel(12, lvl);
+    }
+    if (param === 'lime') {
+      const lvl = s.lime <= crop.limeMx ? 'optimal' : s.lime <= crop.limeMx + 5 ? 'stress' : 'destroyable';
+      return pointsByLevel(13, lvl);
+    }
+    if (param === 'om') return organicMatterPoints(s.mo, 'trees'); // Max 7
+    if (param === 'n') return pointsByLevel(4, nutrientLevel(s.n, crop.nReq, 20, 50));
+    if (param === 'p') return pointsByLevel(4, nutrientLevel(s.p, crop.pReq, 20, 50));
+    if (param === 'k') return pointsByLevel(8, nutrientLevel(s.k, crop.kReq, 60, 100));
+    return 0;
+  };
+
+  let baseSoilScore = 0;
+  for (const param of Object.keys(W)) {
+    const topPts = getPoints(param, top);
+    const subPts = getPoints(param, sub);
+    let combined = (topPts * W[param].top) + (subPts * W[param].sub);
+
+    // Step 3: Critical Texture Override (Subsoil destroyable caps texture at 6.0)
+    if (param === 'tex') {
+      if (textureLevel(crop.prefTex, sub.tex) === 'destroyable') {
+        combined = Math.min(combined, 6.0); // 30% of max 20
+      }
+    }
+    baseSoilScore += combined;
   }
+
+  // Step 4: Add canopy-level parameters (Wind & Season)
+  const windLvl = st.wind <= crop.maxWindKmh ? 'optimal' : st.wind <= crop.maxWindKmh + 20 ? 'stress' : 'destroyable';
+  const windPts = pointsByLevel(7, windLvl);
+  const seasonPts = pointsByLevel(6, seasonLevel(st.seas, crop.ss));
+
+  const baseTotal = baseSoilScore + windPts + seasonPts;
+
+  // Step 5: Pollution Multiplier (Limiting Factor Principle across both depths)
+  const F_top = pollutionMultiplier(top, crop);
+  const F_sub = pollutionMultiplier(sub, crop);
+  const F_final = Math.min(F_top, F_sub);
+
+  // Return immediately to bypass generic scoring at the end
+  return clampScore(baseTotal * F_final);
+}
 
   const normalizedBase = maxPoints > 0 ? (base / maxPoints) * 100 : 0;
   return clampScore(normalizedBase * pollutionMultiplier(st, crop));
@@ -1681,24 +1737,31 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
             <div className="sd-permanent-intro-title" style={{ color }}>Permanent crops: two depths in one form</div>
             <div className="sd-permanent-intro-text">Fill both sections for this zone: 0-20 cm and 20-40 cm.</div>
           </div>
-          <div className="sd-depth-stack">
-            {PERMANENT_DEPTHS.map((depth, index) => (
-              <PermanentDepthSection
-                key={depth.key}
-                depth={depth}
-                sectionColor={index === 0 ? color : "#8B6045"}
-                isSat={isSat}
-                st={{
-                     ...(st.permanentDepths?.[depth.key] || buildDepthState(diagMode)),
-                      ce: st.ce,
-                      temp: st.temp,
-                      tex: st.tex,
-                      mo: st.mo,
-                      }}
-                onChange={onChange}
-              />
-            ))}
-          </div>
+                 <div className="sd-depth-stack">
+        {PERMANENT_DEPTHS.map((depth, index) => (
+           <PermanentDepthSection
+            key={depth.key}
+            depth={depth}
+            sectionColor={index === 0 ? color : "#8B6045"}
+            // ✅ EXPLICIT LOCK: Only locks in Eco mode. Standard mode ALWAYS allows edits.
+            isSat={id => diagMode === "eco" && id in SAT_FIELDS}
+            st={{
+              // ✅ 1. Start with depth-specific state (preserves manual lab edits)
+              ...(st.permanentDepths?.[depth.key] || buildDepthState(diagMode)),
+              // ✅ 2. In Eco mode, sync top-level satellite values to depths
+              ...(diagMode === "eco" ? { ce: st.ce, temp: st.temp, tex: st.tex, mo: st.mo } : {}),
+              // ✅ 3. In Standard mode, explicitly pass values but DO NOT override depth edits
+              ...(diagMode !== "eco" ? {
+                ce: st.permanentDepths?.[depth.key]?.ce ?? st.ce,
+                temp: st.permanentDepths?.[depth.key]?.temp ?? st.temp,
+                tex: st.permanentDepths?.[depth.key]?.tex ?? st.tex,
+                mo: st.permanentDepths?.[depth.key]?.mo ?? st.mo,
+              } : {}),
+            }}
+            onChange={onChange}
+          />
+        ))}
+       </div>
         </>
       ) : (
         <>
