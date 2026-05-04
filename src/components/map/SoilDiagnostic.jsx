@@ -208,14 +208,28 @@ function pollutionMultiplier(st, crop) {
 }
 
 // âœ… NEW: Severe contamination check (Pb > 800 OR Cd > 15 blocks ALL crops)
-function isSoilToxic(st) {
+// ✅ UPDATED: Severe contamination check based on parcel category tolerance
+function isSoilToxic(st, cultureGroupId = 1) {
   const pb = Number(st?.pb || 0);
   const cd = Number(st?.cd || 0);
+
+  // Category-based lethal thresholds (Pb in mg/kg, Cd in mg/kg)
+  // 1: Vegetables/Maraîchère (most sensitive)
+  // 2: Cereals (moderate)
+  // 3: Permanent/Trees (most tolerant)
+  const CATEGORY_THRESHOLDS = {
+    1: { pb: 150, cd: 2 },
+    2: { pb: 400, cd: 5 },
+    3: { pb: 800, cd: 15 },
+  };
+
+  const thresholds = CATEGORY_THRESHOLDS[cultureGroupId] || CATEGORY_THRESHOLDS[1];
+
   return {
-    isToxic: pb > 800 || cd > 15,
+    isToxic: pb > thresholds.pb || cd > thresholds.cd,
     pb, cd,
-    pbExcess: pb > 800 ? pb - 800 : 0,
-    cdExcess: cd > 15 ? cd - 15 : 0,
+    pbExcess: pb > thresholds.pb ? pb - thresholds.pb : 0,
+    cdExcess: cd > thresholds.cd ? cd - thresholds.cd : 0,
   };
 }
 
@@ -856,15 +870,7 @@ function buildLabRequestHtml({
 }
 
 function buildZoneReportHtml({
-  parcelleName,
-  parcelleHa,
-  cultureLabel,
-  zoneNumber,
-  totalZones,
-  generatedAt,
-  diagMode,
-  st,
-  crops = [],
+  parcelleName, parcelleHa, cultureLabel, zoneNumber, totalZones, generatedAt, diagMode, st, crops = [], cultureGroupId = 1,
 }) {
   const state = st || {};
   const surface =
@@ -885,7 +891,7 @@ function buildZoneReportHtml({
   const selectedCrop = state.crop ? scored.find(c => String(c.id) === String(state.crop)) : null;
   const bestCrop = scored[0] || null;
   const focusCrop = selectedCrop || bestCrop || null;
-  const contamination = isSoilToxic(state);
+  const contamination = isSoilToxic(state, cultureGroupId);
   const score = calcScore(state, crops);
   const scoreAccent = mc(score);
   const scoreBg = mcBg(score);
@@ -1880,10 +1886,10 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
 /* RESULTS VIEW - âœ… FIXED WITH CONTAMINATION WARNING */
 function ResultsView({
   st, onReset, crops, diagMode, color, zoneIdx, nZones, onNext, onDownloadReport,
-  onOpenDashboard, showDashboardAction = false,
+  onOpenDashboard, showDashboardAction = false, cultureGroupId = 1,
 }) {
-  // âœ… NEW: Check for severe contamination (Pb>800 OR Cd>15)
-  const contamination = isSoilToxic(st);
+  // ✅ UPDATED: Check for severe contamination based on parcel category
+  const contamination = isSoilToxic(st, cultureGroupId);
 
   const sc = calcScore(st, crops), scC = mc(sc), scBg = mcBg(sc);
   const scLbl = sc>=80 ? "Excellent 🎉" : sc>=60 ? "Needs improvement" : "Difficult";
@@ -3402,6 +3408,8 @@ export default function SoilDiagnostic({
       diagMode,
       st: zoneState,
       crops: CROPS,
+      cultureGroupId, // ✅ ADD THIS
+
     });
 
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
@@ -3674,6 +3682,7 @@ export default function SoilDiagnostic({
                 ) : (
                   <ResultsView
                     st={result}
+                    cultureGroupId={cultureGroupId} // ✅ PASS CATEGORY ID
                     onReset={() => resetZone(activeZone)}
                     crops={CROPS}
                     diagMode={diagMode}
