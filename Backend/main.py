@@ -976,6 +976,7 @@ def delete_parcel(parcel_id: int, current_user: AuthUser = Depends(get_current_u
         raise HTTPException(404, detail="Parcel not found or access denied")
 
     db.query(SoilSample).filter(SoilSample.parcelle_id == parcel_id).delete()
+    db.query(ZoneAnalysis).filter(ZoneAnalysis.parcelle_id == parcel_id).delete()
     db.delete(parcel)
     db.commit()
 
