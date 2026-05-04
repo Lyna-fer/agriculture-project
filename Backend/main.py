@@ -1097,23 +1097,23 @@ class SaveZoneAnalysisRequest(BaseModel):
     soilMetrics: Any  # Accepts the entire 'st' JSON object
     compatibilityScore: Optional[float] = None
 
+
+# Replace your existing POST /api/analysis/save-zone with this:
+# Replace your existing POST /api/analysis/save-zone with this:
 @app.post("/api/analysis/save-zone")
 def save_zone_analysis(
-    request: SaveZoneAnalysisRequest,
-    current_user: AuthUser = Depends(get_current_user),
-    db: Session = Depends(get_db)
+        request: SaveZoneAnalysisRequest,
+        current_user: AuthUser = Depends(get_current_user),
+        db: Session = Depends(get_db)
 ):
     try:
-        # 1. Verify the parcel exists and belongs to the user
         parcelle = db.query(Parcelle).filter(
             Parcelle.id == request.parcelleId,
             Parcelle.user_id == current_user.id
         ).first()
-
         if not parcelle:
             raise HTTPException(status_code=404, detail="Parcelle not found")
 
-        # 2. Insert the NEW analysis
         new_analysis = ZoneAnalysis(
             parcelle_id=parcelle.id,
             user_id=current_user.id,
@@ -1125,68 +1125,85 @@ def save_zone_analysis(
         )
         db.add(new_analysis)
         db.commit()
+        db.refresh(new_analysis)
 
-        # 3. THE ENFORCER: Keep only the 2 most recent analyses for this zone!
-        recent_analyses = db.query(ZoneAnalysis.id).filter(
+        # ENFORCER: Keep only the 2 most recent analyses for this zone
+        recent_ids = db.query(ZoneAnalysis.id).filter(
             ZoneAnalysis.parcelle_id == parcelle.id,
             ZoneAnalysis.zone_index == request.zoneIndex
         ).order_by(ZoneAnalysis.analyzed_at.desc()).limit(2).all()
 
-        keep_ids = [row.id for row in recent_analyses]
-
+        keep_ids = [row.id for row in recent_ids]
         db.query(ZoneAnalysis).filter(
             ZoneAnalysis.parcelle_id == parcelle.id,
             ZoneAnalysis.zone_index == request.zoneIndex,
             ~ZoneAnalysis.id.in_(keep_ids)
         ).delete(synchronize_session=False)
-
         db.commit()
 
-        return {"message": "Zone analysis saved successfully and history pruned to 2 rows."}
-
+        # Return the saved analysis for immediate frontend sync
+        return {
+            "message": "Zone analysis saved successfully",
+            "analysis": {
+                "id": new_analysis.id,
+                "diagMode": new_analysis.diag_mode,
+                "targetCropId": new_analysis.target_crop_id,
+                "soilMetrics": new_analysis.soil_metrics,
+                "compatibilityScore": new_analysis.compatibility_score,
+                "analyzedAt": new_analysis.analyzed_at.isoformat()
+            }
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to save analysis: {str(e)}")
 
 
+# Replace your existing GET /api/analysis/parcel/{parcelle_id} with this:
 @app.get("/api/analysis/parcel/{parcelle_id}")
 def get_parcel_analyses(
-    parcelle_id: int,
-    current_user: AuthUser = Depends(get_current_user),
-    db: Session = Depends(get_db)
+        parcelle_id: int,
+        current_user: AuthUser = Depends(get_current_user),
+        db: Session = Depends(get_db)
 ):
-    # Verify ownership
     parcelle = db.query(Parcelle).filter(
         Parcelle.id == parcelle_id,
         Parcelle.user_id == current_user.id
     ).first()
-
     if not parcelle:
         raise HTTPException(status_code=404, detail="Parcelle not found")
 
-    # Get ALL analyses for this parcel, ordered by newest first
+    # Fetch all, ordered newest first
     analyses = db.query(ZoneAnalysis).filter(
         ZoneAnalysis.parcelle_id == parcelle_id
-    ).order_by(ZoneAnalysis.zone_index.asc(), ZoneAnalysis.analyzed_at.desc()).all()
+    ).order_by(
+        ZoneAnalysis.zone_index.asc(),
+        ZoneAnalysis.analyzed_at.desc()
+    ).all()
 
-    # Format the response to be easy for React to read
     results = {}
-    
     for row in analyses:
         zone_str = f"zone_{row.zone_index}"
-        
-        # Initialize the zone array if it doesn't exist
         if zone_str not in results:
             results[zone_str] = []
-            
-        # Add this analysis to the zone's array (newest is first because of our order_by)
-        results[zone_str].append({
-            "id": row.id,
-            "diagMode": row.diag_mode,
-            "targetCropId": row.target_crop_id,
-            "soilMetrics": row.soil_metrics,
-            "compatibilityScore": row.compatibility_score,
-            "analyzedAt": row.analyzed_at.isoformat()
-        })
+        # Enforce max 2 per zone in the response
+        if len(results[zone_str]) < 2:
+            results[zone_str].append({
+                "id": row.id,
+                "diagMode": row.diag_mode,
+                "targetCropId": row.target_crop_id,
+                "soilMetrics": row.soil_metrics,
+                "compatibilityScore": row.compatibility_score,
+                "analyzedAt": row.analyzed_at.isoformat()
+            })
 
-    return results
+    # Format explicitly for frontend: { "zone_X": { "current": {...}, "previous": {... or null} } }
+    formatted_results = {}
+    for zone_key, zone_arr in results.items():
+        formatted_results[zone_key] = {
+            "current": zone_arr[0] if len(zone_arr) > 0 else None,
+            "previous": zone_arr[1] if len(zone_arr) > 1 else None
+        }
+
+    return formatted_results

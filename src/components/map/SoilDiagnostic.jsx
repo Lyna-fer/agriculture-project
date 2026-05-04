@@ -8,6 +8,8 @@ import {
   getCurrentAnalysisKey,
   getDashboardStateKey,
   dispatchDashboardUpdated,
+  getDashboardHistory, // ✅ ADD
+  saveDashboardState,  // ✅ ADD
 } from "../../lib/soilDashboardStorage";
 
 /* ─── Satellite defaults ─────────────────────────────────────────────────── */
@@ -3080,25 +3082,17 @@ export default function SoilDiagnostic({
         }
         
         // Load analysis history from persistedDashboardData or localStorage
-        let history = persistedDashboardData?.analysisHistory || [];
-        if (!Array.isArray(history) || history.length === 0) {
-          // Try loading from localStorage as fallback
-          try {
-            const historyKey = getHistoryKey(
-              persistedDashboardData?.parcelleName || "",
-              persistedDashboardData?.parcelle,
-              persistedDashboardData?.cultureGroupId
-            );
-            const storedHistory = localStorage.getItem(historyKey);
-            if (storedHistory) {
-              history = JSON.parse(storedHistory);
-            }
-          } catch (e) {
-            console.warn("Failed to load history from localStorage:", e);
-          }
-        }
-        setAnalysisHistory(Array.isArray(history) ? history : []);
-        setCurrentAnalysis(persistedDashboardData?.currentAnalysis || null);
+        // ✅ PASTE THIS INSTEAD:
+const parcelNameForLoad = (parcelle?.name) || parcelleName;
+const { current, previous } = getDashboardHistory(
+  parcelNameForLoad,
+  parcelle || persistedDashboardData?.parcelle || null,
+  cultureGroupId
+);
+
+const historyArray = [current, previous].filter(Boolean);
+setAnalysisHistory(historyArray);
+setCurrentAnalysis(current || persistedDashboardData?.currentAnalysis || null);
         setShowDashboard(true);
       } else {
         // Entering analysis mode - clear all zones for fresh analysis
@@ -3546,18 +3540,16 @@ setZoneStates(prev => {
     }
 
     // Safely update analysisHistory, ensuring it stays an array
-    setAnalysisHistory((prev) => {
-      // Make sure prev is actually an array before filtering
-      const safePrev = Array.isArray(prev) ? prev : [];
-      const next = [snapshot, ...safePrev.filter((item) => item.fingerprint !== snapshot.fingerprint)].slice(0, 8);
-      
-      try {
-        localStorage.setItem(getHistoryKey(parcelleName, parcelle, cultureGroupId), JSON.stringify(next));
-      } catch (error) {
-        console.warn("History save failed:", error);
-      }
-      return next;
-    });
+    // ✅ PASTE THIS INSTEAD:
+const parcelNameForSave = (parcelle?.name) || parcelleName;
+
+// Automatically shifts old 'current' → 'previous' & keeps max 2 in localStorage
+saveDashboardState(parcelNameForSave, parcelle, cultureGroupId, snapshot);
+
+// Sync React state for UI rendering
+const { current, previous } = getDashboardHistory(parcelNameForSave, parcelle, cultureGroupId);
+setCurrentAnalysis(current);
+setAnalysisHistory([current, previous].filter(Boolean));
     try {
       localStorage.setItem(
         getDashboardStateKey(parcelleName, parcelle, cultureGroupId),
