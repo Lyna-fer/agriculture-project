@@ -1689,9 +1689,12 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
                 sectionColor={index === 0 ? color : "#8B6045"}
                 isSat={isSat}
                 st={{
-                  ...(st.permanentDepths?.[depth.key] || buildDepthState(diagMode)),
-                  ...(diagMode === "eco" ? { ce: st.ce, temp: st.temp, tex: st.tex, mo: st.mo } : {}),
-                }}
+                     ...(st.permanentDepths?.[depth.key] || buildDepthState(diagMode)),
+                      ce: st.ce,
+                      temp: st.temp,
+                      tex: st.tex,
+                      mo: st.mo,
+                      }}
                 onChange={onChange}
               />
             ))}
@@ -3163,18 +3166,38 @@ export default function SoilDiagnostic({
         try { satCacheRef.current.set(cacheKey, { ts: Date.now(), data: fresh }); } catch (e) { /* ignore */ }
 
         // apply fresh data
-        setZoneStates(prev => {
-          const next = [...prev];
-          const satelliteOmLevel = fresh.organicMatter?.level ?? next[activeZone].mo;
-          next[activeZone] = {
-            ...next[activeZone],
-            ce: fresh.salinity?.ec_dS_m ?? next[activeZone].ce,
-            temp: fresh.temperature?.celsius ?? next[activeZone].temp,
-            tex: mapSoilTypeToTexture(fresh.texture?.label) ?? next[activeZone].tex,
-            mo: satelliteOmLevel,
-          };
-          return next;
-        });
+        // ✅ NEW CODE (Updates top-level AND permanently syncs both soil depths)
+setZoneStates(prev => {
+  const next = [...prev];
+  const zone = { ...next[activeZone] };
+
+  const satCE = fresh.salinity?.ec_dS_m ?? zone.ce;
+  const satTemp = fresh.temperature?.celsius ?? zone.temp;
+  const satTex = mapSoilTypeToTexture(fresh.texture?.label) ?? zone.tex;
+  const satOM = fresh.organicMatter?.level ?? zone.mo;
+
+  // 1. Update top-level state
+  zone.ce = satCE;
+  zone.temp = satTemp;
+  zone.tex = satTex;
+  zone.mo = satOM;
+
+  // 2. ✅ CRITICAL: Sync satellite values into permanentDepths (0-20 & 20-40 cm)
+  if (zone.permanentDepths) {
+    for (const key of Object.keys(zone.permanentDepths)) {
+      zone.permanentDepths[key] = {
+        ...zone.permanentDepths[key],
+        ce: satCE,
+        temp: satTemp,
+        tex: satTex,
+        mo: satOM,
+      };
+    }
+  }
+
+  next[activeZone] = zone;
+  return next;
+});
 
         // cleanup controller on success
         controller.abort();
