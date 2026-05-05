@@ -610,6 +610,45 @@ function calcScore(st, crops = []) {
   return clampScore(bestScore);
 }
 
+function isTextureAllowedForCrop(actual, preferred) {
+  if (!actual || !preferred) return true;
+  if (actual === preferred) return true;
+  const compatible = new Set([
+    "limoneux|sablo-limoneux", "sablo-limoneux|limoneux",
+    "limoneux|limon-argileux", "limon-argileux|limoneux",
+    "sablo-limoneux|sableux", "sableux|sablo-limoneux",
+    "limon-argileux|argileux", "argileux|limon-argileux"
+  ]);
+  return compatible.has(`${actual}|${preferred}`);
+}
+
+function getRankedCropsForState(st, crops = []) {
+  if (!st || !Array.isArray(crops) || crops.length === 0) return [];
+
+  return crops
+    .map(c => ({ ...c, sc: cropScore(c, st), adj: cropAdj(c, st) }))
+    .filter(c => {
+      if (st.crop && String(c.id) === String(st.crop)) return true;
+      return isTextureAllowedForCrop(st.tex, c.prefTex);
+    })
+    .sort((a, b) => b.sc - a.sc);
+}
+
+function resolveAnalysisCrop(st, crops = []) {
+  const ranked = getRankedCropsForState(st, crops);
+  const selectedCrop = st?.crop ? ranked.find(c => String(c.id) === String(st.crop)) : null;
+  const bestCrop = ranked[0] || null;
+  const lockedCrop = selectedCrop || bestCrop || null;
+
+  return {
+    ranked,
+    selectedCrop,
+    bestCrop,
+    lockedCrop,
+    cropSelectionMode: selectedCrop ? "manual" : "recommended",
+  };
+}
+
 function cropScore(c, st) {
   return scoreCropByFormula(c, st);
 }
@@ -941,12 +980,9 @@ function buildZoneReportHtml({
   const safeDate = escapeHtml(generatedAt);
   const modeLabel = diagMode === "eco" ? "Eco" : "Standard";
 
-  const scored = Array.isArray(crops)
-    ? crops
-        .map(c => ({ ...c, sc: cropScore(c, state), adj: cropAdj(c, state) }))
-        .sort((a, b) => b.sc - a.sc)
-    : [];
-  const selectedCrop = state.crop ? scored.find(c => String(c.id) === String(state.crop)) : null;
+  const scored = getRankedCropsForState(state, crops);
+  const lockedCropId = state.analysisCropId || state.crop || "";
+  const selectedCrop = lockedCropId ? scored.find(c => String(c.id) === String(lockedCropId)) : null;
   const bestCrop = scored[0] || null;
   const focusCrop = selectedCrop || bestCrop || null;
   const contamination = isSoilToxic(state, cultureGroupId);
@@ -1963,31 +1999,7 @@ function ResultsView({
   const scLbl = sc>=80 ? "Excellent 🎉" : sc>=60 ? "Needs improvement" : "Difficult";
 
   // âœ… NEW: Soil type compatibility filter (same or tolerated swap only)
-  const isTextureAllowed = (actual, preferred) => {
-    if (!actual || !preferred) return true;
-    if (actual === preferred) return true;
-    const compatible = new Set([
-      "limoneux|sablo-limoneux", "sablo-limoneux|limoneux",
-      "limoneux|limon-argileux", "limon-argileux|limoneux",
-      "sablo-limoneux|sableux", "sableux|sablo-limoneux",
-      "limon-argileux|argileux", "argileux|limon-argileux"
-    ]);
-    return compatible.has(`${actual}|${preferred}`);
-  };
-
-  const scored = crops
-  .map(c => ({...c, sc: cropScore(c,st), adj: cropAdj(c,st)}))
-  .filter(c => {
-    // ✅ 1. If user explicitly selected a crop, ALWAYS show it (bypass filter)
-    if (st.crop && String(c.id) === String(st.crop)) return true;
-
-    // ✅ 2. If "Recommend for me" (no crop selected), only show compatible crops
-    if (!st.crop) return isTextureAllowed(st.tex, c.prefTex);
-
-    // ✅ 3. If a crop IS selected, show other alternatives only if compatible
-    return isTextureAllowed(st.tex, c.prefTex);
-  })
-  .sort((a,b) => b.sc - a.sc);
+  const scored = getRankedCropsForState(st, crops);
 
   const tgt  = st.crop ? scored.find(c => c.id===st.crop) : null;
   const bestCrop = scored[0] || null;
@@ -2544,6 +2556,7 @@ function DashboardView({
   weatherData = null,
   analysisHistory = [],
   cultureLabel = "",
+  onLockRecommendedCrop,
 }) {
   const width = 720;
   const height = 500;
@@ -2572,7 +2585,20 @@ function DashboardView({
   }
   const isPermanentCulture = cultureLabel === "Permanent";
   const [historyDepthKey, setHistoryDepthKey] = useState("depth0_20");
-  const selectedCrop = activeZoneResult?.crop ? crops.find((crop) => String(crop.id) === String(activeZoneResult.crop)) : null;
+  const dashboardCropId =
+    activeZoneResult?.analysisCropId ||
+    activeZoneResult?.crop ||
+    currentSnapshot?.targetCropId ||
+    "";
+  const rankedCrops = activeZoneResult ? getRankedCropsForState(activeZoneResult, crops) : [];
+  const selectedCrop = dashboardCropId
+    ? crops.find((crop) => String(crop.id) === String(dashboardCropId))
+    : null;
+  const hasLockedCrop = Boolean(selectedCrop);
+  const recommendedChoices = !hasLockedCrop ? rankedCrops.slice(0, 3) : [];
+  const cropCardTitle = activeZoneResult?.crop ? "Chosen Crop" : hasLockedCrop ? "Locked Crop" : "Recommended Crops";
+  const [cropChoiceIndex, setCropChoiceIndex] = useState(0);
+  const sliderCrop = recommendedChoices[cropChoiceIndex] || recommendedChoices[0] || null;
   const displayWeather = weatherData || weather;
   const displayWeatherLoading = weatherData ? false : weatherLoading;
   const weatherDate = displayWeather?.observedAt ? new Date(displayWeather.observedAt) : new Date();
@@ -2618,6 +2644,10 @@ function DashboardView({
       setHistoryDepthKey("depth0_20");
     }
   }, [isPermanentCulture]);
+
+  useEffect(() => {
+    setCropChoiceIndex(0);
+  }, [activeZone, hasLockedCrop, recommendedChoices.length]);
 
   const currentAnalysisMetrics = [
     { key: "ph", label: "Soil pH", value: isPermanentCulture ? comparisonCurrent?.ph : comparisonCurrent?.ph, previous: isPermanentCulture ? comparisonPrevious?.ph : comparisonPrevious?.ph, unit: "pH", format: (value) => Number(value).toFixed(1) },
@@ -2695,12 +2725,58 @@ function DashboardView({
               </div>
 
               <div className="sd-studio-stat-row">
-                <article className="sd-studio-mini-card">
-                  <div className="sd-studio-mini-head"><span>Plant Health</span></div>
-                  <div className="sd-studio-mini-value">
-                    <strong>{activeZoneScore}%</strong>
-                    <span>{activeZoneScore >= 80 ? "Excellent" : activeZoneScore >= 60 ? "Stable" : "Watch"}</span>
+                <article className={`sd-studio-mini-card sd-studio-mini-card--crop ${hasLockedCrop ? "sd-studio-mini-card--locked" : "sd-studio-mini-card--select"}`}>
+                  <div className="sd-studio-mini-head sd-studio-mini-head--crop">
+                    <span>{hasLockedCrop ? "chosen crop" : "recommended crops"}</span>
                   </div>
+                  {hasLockedCrop ? (
+                    <div className="sd-studio-crop-hero">
+                      <div className="sd-studio-crop-hero-emoji">{selectedCrop?.e || "🌱"}</div>
+                      <strong className="sd-studio-crop-hero-name">{selectedCrop?.n || "Recommended"}</strong>
+                    </div>
+                  ) : (
+                    <div className="sd-studio-mini-value">
+                      <strong>Recommended</strong>
+                    </div>
+                  )}
+                  {!hasLockedCrop && recommendedChoices.length > 0 && (
+                    <div className="sd-studio-crop-slider">
+                      <div className="sd-studio-crop-slider-head">
+                        <button
+                          type="button"
+                          className="sd-studio-crop-arrow"
+                          onClick={() => setCropChoiceIndex((prev) => (prev - 1 + recommendedChoices.length) % recommendedChoices.length)}
+                          aria-label="Previous recommended crop"
+                        >
+                          ‹
+                        </button>
+                        <div
+                          className="sd-studio-crop-slide"
+                          onDoubleClick={() => sliderCrop && onLockRecommendedCrop?.(activeZone, sliderCrop.id)}
+                          title="Double-click to choose"
+                        >
+                          <strong>{sliderCrop ? `${sliderCrop.e || ""} ${sliderCrop.n}`.trim() : "Recommended"}</strong>
+                          <em>{sliderCrop ? `${cropChoiceIndex + 1}/${recommendedChoices.length} • ${sliderCrop.sc}/100` : ""}</em>
+                        </div>
+                        <button
+                          type="button"
+                          className="sd-studio-crop-arrow"
+                          onClick={() => setCropChoiceIndex((prev) => (prev + 1) % recommendedChoices.length)}
+                          aria-label="Next recommended crop"
+                        >
+                          ›
+                        </button>
+                      </div>
+                      <div className="sd-studio-crop-dots" aria-hidden="true">
+                        {recommendedChoices.map((crop, index) => (
+                          <span
+                            key={crop.id}
+                            className={`sd-studio-crop-dot ${index === cropChoiceIndex ? "sd-studio-crop-dot--active" : ""}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </article>
 
                 <article className="sd-studio-mini-card">
@@ -3340,7 +3416,14 @@ setZoneStates(prev => {
     setAnalyzing(true);
     
     // 1. Get the snapshot of the current zone
-    const snap = { ...zoneStates[activeZone] };
+    const rawSnap = { ...zoneStates[activeZone] };
+    const { selectedCrop, ranked } = resolveAnalysisCrop(rawSnap, CROPS);
+    const snap = {
+      ...rawSnap,
+      analysisCropId: selectedCrop?.id || null,
+      analysisCropMode: selectedCrop ? "manual" : "recommended",
+      recommendedCropIds: selectedCrop ? [] : ranked.slice(0, 3).map((crop) => crop.id),
+    };
     const score = calcScore(snap, CROPS); // Calculate score immediately
     
     try {
@@ -3351,7 +3434,7 @@ setZoneStates(prev => {
         parcelleId: parcelle?.id, 
         zoneIndex: activeZone,
         diagMode: diagMode,
-        targetCropId: snap.crop || null,
+        targetCropId: snap.analysisCropId || snap.crop || null,
         soilMetrics: snap, 
         compatibilityScore: score
       };
@@ -3390,6 +3473,51 @@ setZoneStates(prev => {
       setAnalyzing(false);
     }
   }, [activeZone, zoneStates, parcelle, diagMode, CROPS]);
+
+  const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
+    const zone = zoneResults[zoneIndex];
+    if (!zone || !cropId || zone.analysisCropId || zone.crop) return;
+
+    const lockedZone = {
+      ...zone,
+      analysisCropId: cropId,
+      analysisCropMode: "recommended-locked",
+    };
+
+    setZoneResults((prev) => {
+      const next = [...prev];
+      next[zoneIndex] = lockedZone;
+      return next;
+    });
+
+    if (!parcelle?.id) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE}/api/analysis/save-zone`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          parcelleId: parcelle.id,
+          zoneIndex,
+          diagMode,
+          targetCropId: cropId,
+          soilMetrics: lockedZone,
+          compatibilityScore: calcScore(lockedZone, CROPS),
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        console.error("Failed to persist locked dashboard crop:", errData);
+      }
+    } catch (error) {
+      console.error("Failed to save locked dashboard crop:", error);
+    }
+  }, [zoneResults, parcelle, diagMode, CROPS]);
 
   const resetZone = useCallback(idx => {
     setZoneResults(prev => { const next=[...prev]; next[idx]=null; return next; });
@@ -3718,6 +3846,7 @@ setAnalysisHistory([current, previous].filter(Boolean));
                   weatherLoading={parcelWeatherLoading}
                   weatherData={weatherData}
                   analysisHistory={analysisHistory}
+                  onLockRecommendedCrop={handleLockDashboardCrop}
                 />
               </div>
             </div>

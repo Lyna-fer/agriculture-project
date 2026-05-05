@@ -81,6 +81,7 @@ const buildDashboardSnapshotFromRow = (row) => {
     timestamp: row?.analyzedAt || null,
     diagMode: row?.diagMode || "standard",
     targetCropId: row?.targetCropId ?? null,
+    targetCropMode: metrics.analysisCropMode || (row?.targetCropId ? "manual" : "recommended"),
     avgScore: Number(row?.compatibilityScore || 0),
     avgPh: metrics.ph,
     avgLime: metrics.lime,
@@ -119,7 +120,16 @@ const buildDashboardSessionFromDb = ({
 
   const zoneResults = [];
   zoneEntries.forEach((entry) => {
-    zoneResults[entry.zoneIndex] = entry.latestRow.soilMetrics || null;
+    const metrics = entry.latestRow.soilMetrics || null;
+    zoneResults[entry.zoneIndex] = metrics
+      ? {
+          ...metrics,
+          analysisCropId: metrics.analysisCropId || entry.latestRow.targetCropId || null,
+          analysisCropMode:
+            metrics.analysisCropMode ||
+            (metrics.crop ? "manual" : entry.latestRow.targetCropId ? "recommended" : null),
+        }
+      : null;
   });
 
   // Collect ALL snapshots from ALL zones to build complete analysis history
