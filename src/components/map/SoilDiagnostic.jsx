@@ -2677,35 +2677,67 @@ function DashboardView({
 
   const bestZone = [...zoneCards].sort((a, b) => b.score - a.score)[0];
   const activeZoneScore = activeZoneResult ? calcScore(activeZoneResult, crops) : 0;
+  const analyzedZoneCount = zoneResults.filter(Boolean).length;
+  const analyzedZonePct = zoneResults.length ? Math.round((analyzedZoneCount / zoneResults.length) * 100) : 0;
   const growthLevel = Math.max(48, Math.min(96, Math.round(activeZoneScore + 8)));
-  const growthMax = Math.min(100, growthLevel + 5);
-  const growthMin = Math.max(0, growthLevel - 15);
-  const nutrientMix = [
-    { id: "n", value: Number(activeZoneResult?.n || 0), color: "#ff5b45" },
-    { id: "p", value: Number(activeZoneResult?.p || 0), color: "#f89e3d" },
-    { id: "k", value: Number(activeZoneResult?.k || 0), color: "#2ab36b" },
+  const focusCropForReadiness = dashboardCropId
+    ? rankedCrops.find((crop) => String(crop.id) === String(dashboardCropId)) || rankedCrops[0] || null
+    : rankedCrops[0] || null;
+  const readinessFactors = (activeZoneResult ? PARAMS : [])
+    .map((param) => {
+      const rawValue = activeZoneResult?.[param.id];
+      if (rawValue === null || rawValue === undefined || rawValue === "") return null;
+      const fit = pSt(param.id, rawValue, focusCropForReadiness);
+      if (fit === "ok") return null;
+      return {
+        id: param.id,
+        label: param.name,
+        status: statusLabel(param.id, rawValue, focusCropForReadiness),
+        severity: fit === "hi" ? 2 : 1,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.severity - a.severity)
+    .slice(0, 2);
+  const readinessBadge = activeZoneScore >= 80 ? "Ready" : activeZoneScore >= 60 ? "Almost Ready" : "Needs Work";
+  const readinessAccent = activeZoneScore >= 80 ? "#1a9b5b" : activeZoneScore >= 60 ? "#c98516" : "#d65a31";
+  const readinessTrack = activeZoneScore >= 80 ? "rgba(42, 179, 107, 0.18)" : activeZoneScore >= 60 ? "rgba(244, 182, 63, 0.22)" : "rgba(239, 122, 69, 0.18)";
+  const readinessSummary = !activeZoneResult
+    ? "Run the analysis to see whether this zone is ready."
+    : readinessFactors.length === 0
+    ? `${focusCropForReadiness?.n || "This zone"} is ready for planting with current soil conditions.`
+    : readinessFactors.length === 1
+    ? `${readinessFactors[0].label} is the main point to correct before planting.`
+    : `${readinessFactors[0].label} and ${readinessFactors[1].label} are the main points to correct before planting.`;
+  const readinessSignals = [
+    {
+      label: "Main blocker",
+      value: readinessFactors[0] ? readinessFactors[0].label : "No major blocker",
+    },
+    {
+      label: "Season",
+      value: activeZoneResult?.seas ? `${SEASON_EMOJIS[activeZoneResult.seas] || ""} ${getSeasonLabel(activeZoneResult.seas)}`.trim() : "Unknown",
+    },
   ];
 
   return (
     <section className="sd-dashboard sd-dashboard--studio">
       <div className="sd-studio-board">
         <div className="sd-studio-main">
-          <div className="sd-studio-topbar">
-            <div>
-              <h2 className="sd-studio-title">{parcelle?.name || "Parcel"}</h2>
-              <p className="sd-studio-subtitle">Your farm performance is stable. Here's today's overview.</p>
-            </div>
-          </div>
-
           <div className="sd-studio-grid">
             <div className="sd-studio-left">
               <div className="sd-studio-weather-card">
                 <div className="sd-studio-weather-main">
-                  <span className="sd-studio-weather-label">{weatherLabel}</span>
-                  <div className="sd-studio-weather-emoji">{weatherIcon}</div>
-                  <div className="sd-studio-weather-date">
-                    <strong>{weatherDay}</strong>
-                    <span>{weatherMonth}</span>
+                  <div className="sd-studio-weather-head">
+                    <span className="sd-studio-weather-kicker">Forecast</span>
+                    <span className="sd-studio-weather-label">{weatherLabel}</span>
+                  </div>
+                  <div className="sd-studio-weather-hero">
+                    <div className="sd-studio-weather-emoji">{weatherIcon}</div>
+                    <div className="sd-studio-weather-date">
+                      <strong>{weatherDay}</strong>
+                      <span>{weatherMonth}</span>
+                    </div>
                   </div>
                 </div>
                 <div className="sd-studio-weather-metrics">
@@ -2779,35 +2811,85 @@ function DashboardView({
                   )}
                 </article>
 
-                <article className="sd-studio-mini-card">
-                  <div className="sd-studio-mini-head"><span>Active Crop Zones</span></div>
-                  <div className="sd-studio-mini-value">
-                    <strong>{zoneResults.filter(Boolean).length}</strong>
-                    <span>{bestZone ? `Best zone: ${bestZone.index + 1}` : "Zones analyzed"}</span>
+                <article className="sd-studio-mini-card sd-studio-mini-card--zones">
+                  <div className="sd-studio-mini-head sd-studio-mini-head--zones">
+                    <span>Active Crop Zones</span>
+                  </div>
+                  <div className="sd-studio-zones-hero">
+                    <strong>{analyzedZoneCount}</strong>
+                    <span>of {zoneResults.length} zones analyzed</span>
+                  </div>
+                  <div className="sd-studio-zones-meta">
+                    <div className="sd-studio-zones-meta-item">
+                      <span>Best zone</span>
+                      <strong>{bestZone ? `Zone ${bestZone.index + 1}` : "—"}</strong>
+                    </div>
+                    <div className="sd-studio-zones-meta-item">
+                      <span>Current focus</span>
+                      <strong>{`Zone ${activeZone + 1}`}</strong>
+                    </div>
                   </div>
                 </article>
               </div>
 
               <article className="sd-studio-wide-card">
-                <div className="sd-studio-wide-head">
-                  <div>
-                    <strong>Soil Nutrient Status</strong>
-                    <span>Balanced nutrient composition</span>
+                <div className="sd-studio-readiness-card">
+                  <div className="sd-studio-readiness-head">
+                    <div>
+                      <strong>Zone Readiness</strong>
+                      <span>{readinessSummary}</span>
+                    </div>
+                    <em style={{ color: readinessAccent, background: readinessTrack }}>{readinessBadge}</em>
                   </div>
-                  <em>{activeZoneScore >= 75 ? "Optimal" : "Monitor"}</em>
-                </div>
-                <div className="sd-studio-nutrient-wave">
-                  {nutrientMix.map((item) => (
-                    <div key={item.id} className="sd-studio-nutrient-segment" style={{ width: `${Math.max(18, Math.min(100, item.value / 4))}%`, background: item.color }} />
-                  ))}
+                  <div className="sd-studio-readiness-body">
+                    <div
+                      className="sd-studio-readiness-score"
+                      style={{
+                        "--readiness-accent": readinessAccent,
+                        "--readiness-track": readinessTrack,
+                        "--score-angle": `${Math.max(18, Math.min(360, Math.round((activeZoneScore / 100) * 360)))}deg`,
+                      }}
+                    >
+                      <div className="sd-studio-readiness-ring">
+                        <div className="sd-studio-readiness-ring-core">
+                          <strong>{activeZoneScore}</strong>
+                          <span>score</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="sd-studio-readiness-panel">
+                      <div className="sd-studio-readiness-signals">
+                        {readinessSignals.map((item) => (
+                          <div key={item.label} className="sd-studio-readiness-signal">
+                            <span>{item.label}</span>
+                            <strong>{item.value}</strong>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="sd-studio-readiness-notes">
+                        {readinessFactors.length > 0 ? (
+                          readinessFactors.map((item) => (
+                            <div key={item.id} className={`sd-studio-readiness-note sd-studio-readiness-note--${item.severity === 2 ? "high" : "mid"}`}>
+                              <span>{item.label}</span>
+                              <strong>{item.status}</strong>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="sd-studio-readiness-note sd-studio-readiness-note--ok">
+                            <span>Readiness check</span>
+                            <strong>All core indicators are within target ranges</strong>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </article>
 
               <div className="sd-studio-growth-card">
                 <div className="sd-studio-growth-head">
                   <div>
-                    <strong>Growth Analytics</strong>
-                    <span>Strong nutrient balance</span>
+                    <strong>Plant Growth</strong>
                   </div>
                 </div>
                 <div className="sd-studio-growth-gauge">
@@ -2816,11 +2898,6 @@ function DashboardView({
                     <strong>{growthLevel}%</strong>
                     <span>Growth Level</span>
                   </div>
-                </div>
-                <div className="sd-studio-growth-stats">
-                  <div><strong>{growthMax}</strong><span>Max</span></div>
-                  <div><strong>{growthMin}</strong><span>Min</span></div>
-                  <div><strong>{activeZoneScore}</strong><span>Plant health</span></div>
                 </div>
               </div>
             </div>
