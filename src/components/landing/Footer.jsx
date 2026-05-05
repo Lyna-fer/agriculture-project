@@ -10,12 +10,7 @@ const Footer = () => {
     Insights: [
       { label: "Data insights", href: "#insights" },
       { label: "Testimonials", href: "#testimonials" },
-      { label: "Open map", href: "/map" },
-    ],
-    Actions: [
-      { label: "Login", href: "/login" },
       { label: "Back to top", href: "#hero" },
-      { label: "Start mapping", href: "/login" },
     ],
   };
 

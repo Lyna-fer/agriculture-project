@@ -184,17 +184,17 @@ function buildSeasonalSamplingTips(season, cultureName) {
   return [...(seasonTips[season] || seasonTips.spring), cropTip];
 }
 
-function buildKpis(data, parcelleHa) {
+function buildKpis(data, parcelleHa, zoneCount, requiredLayerCount) {
   const fmtHa = ha => ha < 0.1 ? `${(ha*10000).toFixed(0)} m²` : `${ha.toFixed(2)} ha`;
   return [
-    { val: `${data.depths.at(-1).label.split("–")[1].trim()}`, lbl: "Max\ndepth", icon: "⬇️", bg: "#e6f7ff", color: "#5bc4f5" },
+    { val: zoneCount, lbl: "Number\nof zones", icon: "🗺", bg: "#e6f7ff", color: "#5bc4f5" },
     { val: fmtHa(parcelleHa), lbl: "Parcel\narea", icon: "🌿", bg: "#e0faf4", color: "#00d4a0" },
-    { val: data.depths.length, lbl: "Required\nlayers", icon: "🪨", bg: "#f0eeff", color: "#9b8ff5" },
+    { val: requiredLayerCount, lbl: "Required\nlayers", icon: "🪨", bg: "#f0eeff", color: "#9b8ff5" },
   ];
 }
 
 const TABS = [
-  { id: "schema",    label: "Pattern",    icon: "🗺" },
+  { id: "schema",    label: "Strategy",   icon: "🗺" },
   { id: "depths",    label: "Layers",     icon: "⛏" },
   { id: "protocole", label: "Protocol",   icon: "📋" },
   { id: "gear",      label: "Equipment",  icon: "🧰" },
@@ -255,7 +255,8 @@ export default function ResultsPanel({
   const A = data?.color || "#4a7c2f";
   const AB = data?.colorLight || "rgba(74,124,47,0.1)";
   const Icon = data?.icon;
-  const kpis = data ? buildKpis(data, resolvedParcelleHa) : [];
+  const requiredDepths = data?.depths?.filter((depth) => depth.priority !== false) || [];
+  const kpis = data ? buildKpis(data, resolvedParcelleHa, effectiveZones, requiredDepths.length) : [];
   const seasonalTips = buildSeasonalSamplingTips(monthToSeason(new Date().getMonth() + 1), cultureName);
   const weatherAdvice = buildSamplingWeatherAdvice(weather);
   const todayWeather = weather?.forecastSummary?.[0] || null;
@@ -511,27 +512,6 @@ export default function ResultsPanel({
                 </div>
               </div>
             </div>
-            <div className="cy-slab cy-slab--formula" style={{borderColor:`${A}30`}}>
-              <div className="cy-slab-left" style={{background:`${A}10`}}>
-                <div className="cy-slab-micro">🧮 Calcul des zones</div>
-                <div className="cy-formula-eq">
-                  <span className="cy-formula-n" style={{color:A}}>{effectiveZones}</span>
-                  {samplingMode==="economic"
-                    ? <><span className="cy-formula-op">→</span><span className="cy-formula-p">Fixed thresholds (Eco)</span></>
-                    : <><span className="cy-formula-op">≈</span><span className="cy-formula-p">{fmtHa(resolvedParcelleHa)}</span><span className="cy-formula-op">/</span><span className="cy-formula-p">{zoneHa} ha</span></>}
-                </div>
-                <div className="cy-formula-note">
-                  {samplingMode==="economic"?"Subdivision optimized to reduce costs":"Subdivision based on strict agronomic standards"}
-                </div>
-              </div>
-              <div className="cy-slab-right">
-                <div className="cy-slab-micro">📌 Field rule</div>
-                <div className="cy-slab-text">
-                  The parcel is divided into <b>{effectiveZones} homogeneous management zone(s)</b>.
-                  In each zone, collect the required samples and mix them in a separate bucket.
-                </div>
-              </div>
-            </div>
             <div className="cy-alerts">
               {data.alerts?.map((a,i)=>(
                 <div key={i} className="cy-alert-toast">
@@ -549,17 +529,17 @@ export default function ResultsPanel({
               <span className="cy-intro-icon">🪨</span>
               <div>Each layer = <b>separate sample</b>. Never mix depths.</div>
             </div>
-            {data.depths?.map((d,i)=>(
+            {requiredDepths.map((d,i)=>(
               <div key={i} className="cy-hz-slab" style={{borderLeft:`5px solid ${d.color}`}}>
                 <div className="cy-hz-slab-left">
                   <div className="cy-hz-swatch" style={{background:d.color,height:i===0?60:i===1?46:34}}/>
                   <div className="cy-hz-num">H{i+1}</div>
                 </div>
                 <div className="cy-hz-slab-body">
-                  <div className="cy-hz-range" style={{color:d.color}}>{d.label} cm</div>
+                  <div className="cy-hz-range" style={{color:d.color}}>{d.label}</div>
                   <div className="cy-hz-role">{d.desc}</div>
                   <div className="cy-hz-bottom">
-                    {d.priority?<span className="cy-prio" style={{background:d.color,color:"#fff"}}>Required</span>:<span className="cy-prio cy-prio--opt">Optional</span>}
+                    <span className="cy-prio" style={{background:d.color,color:"#fff"}}>Required</span>
                     <div className="cy-hz-prog"><div className="cy-hz-prog-fill" style={{width:i===0?"100%":i===1?"65%":"40%",background:d.color}}/></div>
                     <span className="cy-hz-prog-lbl">{i===0?"Highest priority":i===1?"If deficiency":"Long term"}</span>
                   </div>
@@ -568,7 +548,7 @@ export default function ResultsPanel({
             ))}
             <div className="cy-intro-banner cy-intro-banner--green">
               <span className="cy-intro-icon">📌</span>
-              <div>For {data.nameShort?.toLowerCase()} crops, {data.depths?.filter(d=>d.priority).length===data.depths?.length?"all layers are required":`the 0-${data.depths?.[0]?.label?.split("–")[1]?.trim()} cm layer is required`}.</div>
+              <div>For {data.nameShort?.toLowerCase()} crops, {requiredDepths.length} layer{requiredDepths.length>1?"s are":" is"} required.</div>
             </div>
           </div>
         )}
@@ -623,7 +603,7 @@ export default function ResultsPanel({
           <div className="cy-footer-stats">
             <span>{fmtHa(resolvedParcelleHa)}</span>
             <span className="cy-footer-dot"/>
-            <span>{data.depths.length} horizons</span>
+            <span>{requiredDepths.length} required layers</span>
             <span className="cy-footer-dot"/>
             <span>{effectiveZones} zone{effectiveZones>1?"s":" "}</span>
           </div>

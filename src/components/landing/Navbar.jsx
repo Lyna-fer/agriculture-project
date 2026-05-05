@@ -90,12 +90,6 @@ const Navbar = ({ onEnter }) => {
 
         <div className="lnav__actions">
           <button
-            className={`lnav__login-btn ${scrolled ? "lnav__login-btn--dark" : ""}`}
-            onClick={onEnter}
-          >
-            Log In
-          </button>
-          <button
             className={`lnav__book-btn ${scrolled ? "lnav__book-btn--dark" : ""}`}
             onClick={onEnter}
           >
