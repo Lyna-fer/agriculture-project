@@ -12,7 +12,6 @@ import {
   Trash2,
   BadgeCheck,
   X,
-  Settings,
   LogOut,
 } from "lucide-react";
 import { CULTURES } from "../../data/cultures";
@@ -177,10 +176,6 @@ export default function LeftPanel({
 
             {profileMenuOpen && (
               <div className="lp-profile-menu">
-                <button type="button" className="lp-profile-item">
-                  <Settings size={18} />
-                  Paramètres du compte
-                </button>
                 <button
                   type="button"
                   className="lp-profile-item"
@@ -192,7 +187,7 @@ export default function LeftPanel({
                   }}
                 >
                   <LogOut size={18} />
-                  Déconnexion
+                  Log out
                 </button>
               </div>
             )}
