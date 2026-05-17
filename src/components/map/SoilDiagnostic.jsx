@@ -410,7 +410,7 @@ const PARAMS = [
   {id:"temp",name:"Temp. sol",  u:"°C",   mn:0, mx:40 },
   {id:"lime",name:"Active Lime",u:"%",    mn:0, mx:30 },
   {id:"wind",name:"Wind",       u:"km/h", mn:0, mx:80 },
-  {id:"pb",  name:"Lead (Pb)",   u:"mg/kg",mn:0, mx:100},
+  {id:"pb",  name:"Lead (Pb)",   u:"mg/kg",mn:0, mx:900},
   {id:"cd",  name:"Cadmium (Cd)",u:"mg/kg",mn:0, mx:100},
 ];
 
@@ -1717,7 +1717,7 @@ function PermanentDepthSection({ depth, sectionColor, isSat, st, onChange }) {
 
       <div className="sd-sec">
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:sectionColor}}>4</span>Environmental Risks</div>
-        <Slider id="pb" label="Lead (Pb)" unit="mg/kg" min={0} max={100} step={1} value={st.pb} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Clean" m="25 Alert" r="100 Critical" />
+        <Slider id="pb" label="Lead (Pb)" unit="mg/kg" min={0} max={900} step={1} value={st.pb} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Clean" m="25 Alert" r="900 Critical" />
         <Slider id="cd" label="Cadmium (Cd)" unit="mg/kg" min={0} max={20} step={0.1} value={st.cd} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Clean" m="25 Alert" r="100 Critical" />
       </div>
     </div>
