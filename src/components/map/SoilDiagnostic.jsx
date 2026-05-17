@@ -2012,68 +2012,54 @@ function ResultsView({
     <>
       {/* âœ… SEVERE CONTAMINATION WARNING - Shows when Pb>800 OR Cd>15 */}
       {contamination.isToxic && (
-        <div className="sd-toxic-alert" style={{
-          background: "linear-gradient(135deg, #1a1a1a, #2d2d2d)",
-          border: "2px solid #000",
-          borderRadius: "12px",
-          padding: "24px",
-          marginBottom: "20px",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-          color: "#fff"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{ flexShrink: 0 }}>
-              <path d="M16 2L2 28h28L16 2z" stroke="#ff4444" strokeWidth="3" fill="#2d0000" />
-              <path d="M16 10v8M16 22v2" stroke="#ff4444" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
-            <div>
-              <h3 style={{ margin: 0, fontSize: "20px", fontWeight: "700", color: "#ff6b6b" }}>
-                ⚠️ Soil Unusable - Critical Contamination
-              </h3>
-              <p style={{ margin: "4px 0 0", fontSize: "14px", color: "#ccc" }}>
-                Heavy metal levels exceed safe limits for ALL crops
+        <div className="sd-toxic-alert sd-a1">
+          <div className="sd-toxic-head">
+            <div className="sd-toxic-icon" aria-hidden="true">
+              <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+                <path d="M16 2L2 28h28L16 2z" stroke="currentColor" strokeWidth="2.6" fill="rgba(255,255,255,0.18)" />
+                <path d="M16 10v8M16 22v2" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div className="sd-toxic-copy">
+              <div className="sd-toxic-kicker">Critical contamination</div>
+              <h3 className="sd-toxic-title">Soil currently unsuitable for cultivation</h3>
+              <p className="sd-toxic-sub">
+                Heavy metal levels exceed the safe threshold for all crop recommendations in this zone.
               </p>
             </div>
+            <div className="sd-toxic-badge">Toxic soil</div>
           </div>
 
-          <div style={{
-            background: "rgba(255,68,68,0.1)",
-            border: "1px solid rgba(255,68,68,0.3)",
-            borderRadius: "8px",
-            padding: "16px",
-            marginBottom: "16px"
-          }}>
-            <div style={{ fontSize: "14px", marginBottom: "8px" }}>
-              <strong style={{ color: "#ff6b6b" }}>Detected Levels:</strong>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "13px" }}>
-              <div style={{ color: contamination.pbExcess > 0 ? "#ff6b6b" : "#aaa" }}>
-                Lead (Pb): {contamination.pb} mg/kg
-                {contamination.pbExcess > 0 && ` (+${contamination.pbExcess} over limit)`}
+          <div className="sd-toxic-grid">
+            <div className="sd-toxic-panel">
+              <div className="sd-toxic-panel-title">Detected levels</div>
+              <div className="sd-toxic-metrics">
+                <div className={`sd-toxic-metric ${contamination.pbExcess > 0 ? "sd-toxic-metric--high" : ""}`}>
+                  <span className="sd-toxic-metric-label">Lead (Pb)</span>
+                  <strong className="sd-toxic-metric-value">{contamination.pb} mg/kg</strong>
+                  <span className="sd-toxic-metric-note">
+                    {contamination.pbExcess > 0 ? `+${contamination.pbExcess} over limit` : "Within critical cap"}
+                  </span>
+                </div>
+                <div className={`sd-toxic-metric ${contamination.cdExcess > 0 ? "sd-toxic-metric--high" : ""}`}>
+                  <span className="sd-toxic-metric-label">Cadmium (Cd)</span>
+                  <strong className="sd-toxic-metric-value">{contamination.cd} mg/kg</strong>
+                  <span className="sd-toxic-metric-note">
+                    {contamination.cdExcess > 0 ? `+${contamination.cdExcess} over limit` : "Within critical cap"}
+                  </span>
+                </div>
               </div>
-              <div style={{ color: contamination.cdExcess > 0 ? "#ff6b6b" : "#aaa" }}>
-                Cadmium (Cd): {contamination.cd} mg/kg
-                {contamination.cdExcess > 0 && ` (+${contamination.cdExcess} over limit)`}
-              </div>
             </div>
-          </div>
 
-          <div style={{
-            background: "rgba(255,255,255,0.05)",
-            borderRadius: "8px",
-            padding: "16px",
-            fontSize: "14px",
-            lineHeight: "1.6"
-          }}>
-            <strong style={{ color: "#ffd700", display: "block", marginBottom: "8px" }}>
-              Required Actions Before Cultivation:
-            </strong>
-            <ul style={{ margin: 0, paddingLeft: "20px", color: "#ddd" }}>
-              <li>Conduct detailed soil testing to confirm contamination sources</li>
-              <li>Implement soil remediation (phytoremediation, soil replacement, or chemical stabilization)</li>
-              <li>Consult environmental authorities for contamination management</li>
-              <li>Do NOT plant edible crops until levels are reduced below safe thresholds</li>
-            </ul>
+            <div className="sd-toxic-panel sd-toxic-panel--actions">
+              <div className="sd-toxic-panel-title">What to do next</div>
+              <ul className="sd-toxic-list">
+                <li>Conduct detailed soil testing to confirm contamination sources.</li>
+                <li>Implement soil remediation such as phytoremediation, soil replacement, or stabilization.</li>
+                <li>Consult environmental authorities before using the parcel for food production.</li>
+                <li>Avoid planting edible crops until contamination drops below safe thresholds.</li>
+              </ul>
+            </div>
           </div>
         </div>
       )}
