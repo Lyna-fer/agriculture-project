@@ -1749,24 +1749,28 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
         </div>
       )}
 
-      {diagMode === "standard" && (
-        <button className="sd-lab-request-btn" onClick={onPrintLabRequest}>
-          <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
-            <path d="M3 2h7v9H3z" stroke="currentColor" strokeWidth="1.4"/>
-            <path d="M4.5 4.3h4M4.5 6.3h4M4.5 8.3h2.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-          </svg>
-          Download Lab Request
-        </button>
-      )}
+      {(diagMode === "standard" || (diagMode === "eco" && onPrintLabRequestEco)) && (
+        <div className="sd-lab-actions">
+          {diagMode === "standard" && (
+            <button className="sd-lab-request-btn" onClick={onPrintLabRequest}>
+              <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+                <path d="M3 2h7v9H3z" stroke="currentColor" strokeWidth="1.4"/>
+                <path d="M4.5 4.3h4M4.5 6.3h4M4.5 8.3h2.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              Download Lab Request
+            </button>
+          )}
 
-      {diagMode === "eco" && onPrintLabRequestEco && (
-        <button className="sd-lab-request-btn" onClick={onPrintLabRequestEco}>
-          <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
-            <path d="M3 2h7v9H3z" stroke="currentColor" strokeWidth="1.4"/>
-            <path d="M4.5 4.3h4M4.5 6.3h4M4.5 8.3h2.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-          </svg>
-          Download Lab Request (Eco)
-        </button>
+          {diagMode === "eco" && onPrintLabRequestEco && (
+            <button className="sd-lab-request-btn sd-lab-request-btn--eco" onClick={onPrintLabRequestEco}>
+              <svg width="12" height="12" viewBox="0 0 13 13" fill="none">
+                <path d="M3 2h7v9H3z" stroke="currentColor" strokeWidth="1.4"/>
+                <path d="M4.5 4.3h4M4.5 6.3h4M4.5 8.3h2.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+              Download Lab Request (Eco)
+            </button>
+          )}
+        </div>
       )}
 
       {isPermanentCulture ? (
