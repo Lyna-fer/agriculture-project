@@ -27,16 +27,13 @@ const CULTURES_TO_STRATEGIES = {
   2: "cereals",
   3: "trees",
 };
-
 const FIELD_COLORS = [
   "#2ecc71", "#3b82f6", "#e6970a", "#ec4899", "#06b6d4", "#a855f7", "#ef4444",
 ];
 let colorIdx = 0;
 const nextColor = () => FIELD_COLORS[colorIdx++ % FIELD_COLORS.length];
 const MAX_PARCEL_AREA_HA = 50;
-
 const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
-
 const formatApiError = (fallbackMessage, response, errData) => {
   const detail = errData?.detail;
   if (typeof detail === "string" && detail.trim()) return detail;
@@ -58,7 +55,6 @@ const formatApiError = (fallbackMessage, response, errData) => {
   }
   return response?.statusText || fallbackMessage;
 };
-
 const normalizeLatLngPairs = (latlngs) => {
   if (!Array.isArray(latlngs)) return [];
   return latlngs
@@ -73,7 +69,6 @@ const normalizeLatLngPairs = (latlngs) => {
     })
     .filter((point) => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]));
 };
-
 const buildDashboardSnapshotFromRow = (row) => {
   const metrics = row?.soilMetrics || {};
   return {
@@ -94,7 +89,6 @@ const buildDashboardSnapshotFromRow = (row) => {
     depthAverages: metrics.permanentDepths || null,
   };
 };
-
 const buildDashboardSessionFromDb = ({
   parcelle,
   parcelleName,
@@ -139,7 +133,7 @@ const buildDashboardSessionFromDb = ({
       allSnapshots.push(...entry.snapshots);
     }
   });
-  
+
   // Sort all snapshots by timestamp (newest first)
   const sortedAllSnapshots = allSnapshots.sort((a, b) => {
     const aTime = new Date(a?.timestamp || 0).getTime();
@@ -153,7 +147,6 @@ const buildDashboardSessionFromDb = ({
 
   const activeZone = activeZoneEntry?.zoneIndex ?? 0;
   const activeZoneHistory = activeZoneEntry?.snapshots || [];
-
   return {
     savedAt: new Date().toISOString(),
     activeZone,
@@ -171,11 +164,9 @@ const buildDashboardSessionFromDb = ({
     weatherData: weatherData || null,
   };
 };
-
 export default function Map() {
   useEffect(() => { document.body.className = "page-map"; }, []);
   const navigate = useNavigate();
-
   const [parcelles,          setParcelles]          = useState([]);
   const [selectedParcelleId, setSelectedParcelleId] = useState(null);
   const [pendingParcelleInfo,setPendingParcelleInfo] = useState(null);
@@ -199,9 +190,7 @@ export default function Map() {
   const [storedDashboardSession, setStoredDashboardSession] = useState(null);
   const [storedDashboardOpen, setStoredDashboardOpen] = useState(false);
   const [dashboardReadyForSelected, setDashboardReadyForSelected] = useState(false);
-
   const toastTimer = useRef(null);
-
   // Fetch parcelles from DB on mount
   useEffect(() => {
     const fetchUserParcelles = async () => {
@@ -222,26 +211,23 @@ export default function Map() {
           }
         }
       } catch (error) {
-        console.warn("⚠️ Could not fetch parcelles from DB:", error);
+        console.warn("⚠️ Could not fetch parcelles from DB: ", error);
       }
     };
     fetchUserParcelles();
   }, []);
-
   useEffect(() => {
     (async () => {
       try { await authenticateGEE(); setGeeReady(true); }
       catch (err) { console.log("GEE auth stub:", err?.message || "OK"); }
     })();
   }, []);
-
   // Check if selected parcel has a complete analysis
   useEffect(() => {
     if (!selectedParcelleId) {
       setDashboardReadyForSelected(false);
       return;
     }
-
     const selectedParcelle = parcelles.find(p => p.id === selectedParcelleId);
     if (!selectedParcelle) {
       setDashboardReadyForSelected(false);
@@ -259,7 +245,6 @@ export default function Map() {
 
     setDashboardReadyForSelected(isComplete);
   }, [selectedParcelleId, parcelles]);
-
   // Listen for dashboard updates to refresh the ready status
   useEffect(() => {
     const handleDashboardUpdated = () => {
@@ -278,13 +263,11 @@ export default function Map() {
         }
       }
     };
-
     window.addEventListener(SOIL_DASHBOARD_UPDATED_EVENT, handleDashboardUpdated);
     return () => {
       window.removeEventListener(SOIL_DASHBOARD_UPDATED_EVENT, handleDashboardUpdated);
     };
   }, [selectedParcelleId, parcelles]);
-
   const showToast = useCallback((msg) => {
     clearTimeout(toastTimer.current);
     setToast({ msg, visible: true });
@@ -293,7 +276,6 @@ export default function Map() {
       3200
     );
   }, []);
-
   const handleParcelleChange = useCallback((info) => {
     if (info.type === "marker") {
       showToast("📍 Marker placed - draw a polygon to calculate area");
@@ -320,13 +302,11 @@ export default function Map() {
     const ha = info.area || 0;
     showToast(`✅ Parcel drawn - ${ha < 0.1 ? info.areaM2?.toFixed(0) + " m²" : ha.toFixed(2) + " ha"} · Give it a name`);
   }, [showToast]);
-
   const {
     mapRef, placeSamplePoints, clearSampleMarkers, activateDrawTool, clearAll,
     flyToWilaya, displayZones, clearZones, drawParcelleFromLatLngs,
     clearSamplingMarkers, drawAllParcelles, clearAllParcelles, clearSelectedParcelle, getMapSnapshot,
   } = useMap({ onParcelleChange: handleParcelleChange, maxParcelAreaHa: MAX_PARCEL_AREA_HA });
-
   // Listen for parcel click events dispatched by the map hook and select parcel in UI
   useEffect(() => {
     const el = mapRef.current;
@@ -348,7 +328,6 @@ export default function Map() {
     el.addEventListener('parcelle-click', handler);
     return () => el.removeEventListener('parcelle-click', handler);
   }, [mapRef, parcelles, clearZones, clearSampleMarkers, clearSamplingMarkers, drawParcelleFromLatLngs, pendingColor, selectedGroupId]);
-
   useEffect(() => {
     if (parcelles.length > 0) {
       drawAllParcelles(parcelles, selectedParcelleId);
@@ -356,13 +335,11 @@ export default function Map() {
       clearAllParcelles();
     }
   }, [parcelles, selectedParcelleId, drawAllParcelles, clearAllParcelles]);
-
   // Clear any previously-loaded stored dashboard when user selects a different parcel
   useEffect(() => {
     setStoredDashboardSession(null);
     setStoredDashboardOpen(false);
   }, [selectedParcelleId]);
-
   // Also clear stored dashboard when the user starts editing/creating a new parcel
   useEffect(() => {
     if (pendingParcelleInfo) {
@@ -370,13 +347,11 @@ export default function Map() {
       setStoredDashboardOpen(false);
     }
   }, [pendingParcelleInfo]);
-
   const handleActivateTool = useCallback((tool) => {
     setActiveTool(tool);
     if (tool) { activateDrawTool(tool); setPendingParcelleInfo(null); setResultsOpen(false); }
     else { activateDrawTool(null); }
   }, [activateDrawTool]);
-
   const handleSaveParcelle = useCallback(async ({ name, groupId }) => {
     if (!pendingParcelleInfo) return;
     if ((pendingParcelleInfo.area || 0) > MAX_PARCEL_AREA_HA) {
@@ -388,7 +363,6 @@ export default function Map() {
       showToast("❌ Please sign in first");
       return;
     }
-
     try {
       const response = await fetch(`${API_BASE}/api/parcels`, {
         method: "POST",
@@ -414,26 +388,52 @@ export default function Map() {
         ...savedParcel,
         color: pendingColor,
       };
+// ... inside handleSaveParcelle, after response.ok check and before showToast ...
+// ✅ MIGRATE TEMP LOCALSTORAGE KEY TO PERMANENT DB ID KEY
+try {
+const oldTempKey = getDashboardStateKey(parcelleName, { id: undefined, name: pendingParcelleInfo.name }, cultureGroupId);
+const oldHistoryKey = getHistoryKey(parcelleName, { id: undefined, name: pendingParcelleInfo.name }, cultureGroupId);
+const oldCurrentKey = getCurrentAnalysisKey(parcelleName, { id: undefined, name: pendingParcelleInfo.name }, cultureGroupId);
+// If temp keys exist, copy them to permanent keys & cleanup
+const tempState = localStorage.getItem(oldTempKey);
+if (tempState && newP.id) {
+const newPermKey = getDashboardStateKey(name, newP, cultureGroupId);
+const newHistKey = getHistoryKey(name, newP, cultureGroupId);
+const newCurrKey = getCurrentAnalysisKey(name, newP, cultureGroupId);
+localStorage.setItem(newPermKey, tempState);
+const tempHist = localStorage.getItem(oldHistoryKey);
+if (tempHist) localStorage.setItem(newHistKey, tempHist);
+const tempCurr = localStorage.getItem(oldCurrentKey);
+if (tempCurr) localStorage.setItem(newCurrKey, tempCurr);
 
-      setParcelles((prev) => {
-        const withoutDuplicate = prev.filter((parcel) => parcel.id !== newP.id);
-        return [...withoutDuplicate, newP];
-      });
-      setSelectedParcelleId(newP.id);
-      setSelectedGroupId(groupId);
-      setPendingParcelleInfo(null);
-      setParcelleInfo(null);
-      setAnalyzedParcelle(null);
-      setAnalysisMapSnapshot(null);
-      setResultsOpen(false);
-      clearSelectedParcelle();
-      showToast(`✅ ${name} saved`);
-    } catch (error) {
-      console.error("Parcel save error:", error);
-      showToast(`❌ ${error.message}`);
-    }
-  }, [pendingParcelleInfo, pendingColor, showToast, clearSelectedParcelle]);
-
+// Clean up old temp keys
+localStorage.removeItem(oldTempKey);
+localStorage.removeItem(oldHistoryKey);
+localStorage.removeItem(oldCurrentKey);
+console.log("🔄 Migrated dashboard storage from temp key to permanent ID key");
+}
+} catch (e) {
+console.warn("⚠️ Key migration failed (non-critical):", e);
+}
+// ... continue with existing setParcelles, setSelectedParcelleId, etc.
+setParcelles((prev) => {
+const withoutDuplicate = prev.filter((parcel) => parcel.id !== newP.id);
+return [...withoutDuplicate, newP];
+});
+setSelectedParcelleId(newP.id);
+setSelectedGroupId(groupId);
+setPendingParcelleInfo(null);
+setParcelleInfo(null);
+setAnalyzedParcelle(null);
+setAnalysisMapSnapshot(null);
+setResultsOpen(false);
+clearSelectedParcelle();
+showToast(`✅ ${name} saved`);
+} catch (error) {
+console.error("Parcel save error:", error);
+showToast(`❌ ${error.message}`);
+}
+}, [pendingParcelleInfo, pendingColor, showToast, clearSelectedParcelle]);
   const handleCancelDraw = useCallback(() => {
     setActiveTool(null);
     activateDrawTool(null);
@@ -444,13 +444,11 @@ export default function Map() {
     if (!parcelles.length) { clearAll(); setParcelleInfo(null); }
     showToast("✕ Drawing canceled");
   }, [activateDrawTool, clearAll, parcelles.length, showToast, clearSelectedParcelle]);
-
   // ✅ FIXED: Delete single parcelle immediately (UI + Map + DB)
   const handleDeleteParcelle = useCallback(
     async (id) => {
       if (!id) return;
       const token = localStorage.getItem("token");
-
       // 1. Optimistic UI update
       const next = parcelles.filter((p) => p.id !== id);
       setParcelles(next);
@@ -475,8 +473,8 @@ export default function Map() {
           const response = await fetch(`${API_BASE}/api/parcels/${id}`, {
             method: "DELETE",
             headers: {
-               "Authorization": `Bearer ${token}`,
-               "Content-Type": "application/json"
+                "Authorization": `Bearer ${token}`,
+                "Content-Type": "application/json"
             },
           });
 
@@ -496,13 +494,11 @@ export default function Map() {
     },
     [selectedParcelleId, showToast, parcelles, clearSelectedParcelle, clearSampleMarkers, drawAllParcelles, clearZones]
   );
-
   // ✅ FIXED: Bulk delete - uses snapshot of IDs to ensure ALL are deleted
   const handleClearAll = useCallback(async () => {
     clearAll();
     clearZones();
     const token = localStorage.getItem("token");
-
     // Take a snapshot of IDs to delete to avoid state staleness issues
     const idsToDelete = parcelles.map(p => p.id);
 
@@ -514,8 +510,8 @@ export default function Map() {
             fetch(`${API_BASE}/api/parcels/${id}`, {
               method: "DELETE",
               headers: {
-                 "Authorization": `Bearer ${token}`,
-                 "Content-Type": "application/json"
+                  "Authorization": `Bearer ${token}`,
+                  "Content-Type": "application/json"
               },
             }).then(async (res) => {
               if (!res.ok) {
@@ -535,7 +531,7 @@ export default function Map() {
           showToast("🗑 Everything cleared");
         }
       } catch (error) {
-        console.error("❌ Bulk delete error:", error);
+        console.error("❌ Bulk delete error: ", error);
         showToast("❌ Error during deletion");
       }
     } else if (idsToDelete.length > 0 && !token) {
@@ -558,7 +554,6 @@ export default function Map() {
     setSamplingColor("#2ecc71");
     setParcelWeather(null);
   }, [parcelles, clearAll, clearZones, showToast, setNZonesFromBackend]);
-
   const handleSelectParcelle = useCallback((id) => {
     if (id === selectedParcelleId) {
       setSelectedParcelleId(null);
@@ -567,7 +562,6 @@ export default function Map() {
       clearSelectedParcelle();
       return;
     }
-
     // Clear any sampling overlays from previously selected parcel
     try {
       clearZones();
@@ -586,19 +580,16 @@ export default function Map() {
     }
     setResultsOpen(false);
   }, [parcelles, selectedGroupId, drawParcelleFromLatLngs, pendingColor, selectedParcelleId, clearSelectedParcelle]);
-
   const handleGroupChange = useCallback((groupId) => {
     setSelectedGroupId(groupId); setResultsOpen(false);
     const c = CULTURES.find(c => c.id === groupId);
     if (c) showToast(`${c.iconEmoji} ${c.nameShort} selected`);
   }, [showToast]);
-
   const handleAnalyze = useCallback(async () => {
     const token = localStorage.getItem("token");
     if (!token) { showToast("❌ Please sign in first"); return; }
     if (isAnalyzing) return;
     setIsAnalyzing(true);
-
     const isExistingParcelle = selectedParcelleId && !pendingParcelleInfo;
     const targetParcelle = isExistingParcelle ? parcelles.find(p => p.id === selectedParcelleId) : null;
     const geometry = isExistingParcelle && targetParcelle?.latlngs
@@ -703,7 +694,7 @@ export default function Map() {
           });
           setParcelWeather(weatherResponse.ok ? await weatherResponse.json() : null);
         } catch (weatherError) {
-          console.warn("Parcel weather fetch failed:", weatherError);
+           console.warn("Parcel weather fetch failed: ", weatherError);
           setParcelWeather(null);
         }
 
@@ -758,7 +749,7 @@ export default function Map() {
         showToast("⚠️ No zone generated");
       }
     } catch (error) {
-      console.error("Network Error:", error);
+      console.error("Network Error: ", error);
       showToast("❌ Network error");
     } finally {
       setIsAnalyzing(false);
@@ -768,13 +759,11 @@ export default function Map() {
     selectedParcelleId, parcelles, displayZones, placeSamplePoints,
     showToast, isAnalyzing, clearSampleMarkers, clearSamplingMarkers, getMapSnapshot,
   ]);
-
   const exportSamplingKml = useCallback(async () => {
     if (!analyzedZones || analyzedZones.length === 0) {
       showToast("❌ Aucune parcelle analysée");
       return;
     }
-
     const token = localStorage.getItem("token");
     if (!token) {
       showToast("❌ Veuillez vous connecter d'abord");
@@ -810,11 +799,10 @@ export default function Map() {
       window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000);
       showToast("✅ Fichier KML téléchargé");
     } catch (error) {
-      console.error("KML export error:", error);
+      console.error("KML export error: ", error);
       showToast(`❌ ${error.message}`);
     }
   }, [analyzedZones, parcelleInfo, pendingParcelleInfo, showToast]);
-
   const handleStartSampling = useCallback(() => {
     if (!analyzedZones || analyzedZones.length === 0) {
       showToast("❌ Aucune parcelle analysée");
@@ -826,13 +814,11 @@ export default function Map() {
     exportSamplingKml,
     showToast,
   ]);
-
   const handleSelectWilaya = useCallback((wilaya) => {
     setSelectedWilaya(wilaya); flyToWilaya(wilaya);
     const zoneLabel = ZONE_COLORS[wilaya.zone]?.label || wilaya.zone;
     showToast(`📍 ${wilaya.name} Province · Zone ${zoneLabel}`);
   }, [flyToWilaya, showToast]);
-
   const selectedCulture = CULTURES.find(c => c.id === selectedGroupId);
   const selectedParcelle = parcelles.find(p => p.id === selectedParcelleId) ?? null;
   const selectedParcelDashboardReady = dashboardReadyForSelected;
@@ -842,7 +828,6 @@ export default function Map() {
       showToast("❌ Select a parcel first");
       return;
     }
-
     const token = localStorage.getItem("token");
     if (!token) {
       showToast("❌ Please sign in again to load the dashboard");
@@ -850,57 +835,59 @@ export default function Map() {
     }
 
     const cultureGroupId = Number(selectedParcelle.groupId || selectedGroupId);
-    
-    // ✅ First, check if data exists in localStorage
     const cachedStateKey = getDashboardStateKey(selectedParcelle.name, selectedParcelle, cultureGroupId);
-    const coordsEqual = (a = [], b = []) => {
-      try {
-        if (!Array.isArray(a) || !Array.isArray(b)) return false;
-        if (a.length !== b.length) return false;
-        for (let i = 0; i < a.length; i++) {
-          const aa = a[i];
-          const bb = b[i];
-          const alat = Number(aa?.lat ?? aa?.[0]);
-          const alng = Number(aa?.lng ?? aa?.[1]);
-          const blat = Number(bb?.lat ?? bb?.[0]);
-          const blng = Number(bb?.lng ?? bb?.[1]);
-          if (Number.isNaN(alat) || Number.isNaN(alng) || Number.isNaN(blat) || Number.isNaN(blng)) return false;
-          if (Math.abs(alat - blat) > 1e-6 || Math.abs(alng - blng) > 1e-6) return false;
-        }
-        return true;
-      } catch (err) { return false; }
+
+    // 🔍 Robust parcel matching (ID-first, then normalized coordinates)
+    const isParcelMatch = (cached, current) => {
+      if (!cached || !current) return false;
+
+      // 1. Match by ID (100% reliable for saved parcels)
+      if (cached.id && current.id) {
+        return String(cached.id) === String(current.id);
+      }
+
+      // 2. Fallback: Match by normalized coordinates
+      const normalize = (coords) => {
+        if (!Array.isArray(coords)) return [];
+        return coords.map(pt => {
+          if (Array.isArray(pt)) return { lat: Number(pt[0]), lng: Number(pt[1]) };
+          if (pt && typeof pt === "object") return { lat: Number(pt.lat ?? pt[0]), lng: Number(pt.lng ?? pt[1]) };
+          return null;
+        }).filter(Boolean);
+      };
+
+      const a = normalize(cached.latlngs);
+      const b = normalize(current.latlngs);
+      if (a.length === 0 || b.length === 0 || a.length !== b.length) return false;
+
+      const EPSILON = 0.00001; // ~1 meter precision tolerance
+      return a.every((pa, i) =>
+        Math.abs(pa.lat - b[i].lat) < EPSILON && Math.abs(pa.lng - b[i].lng) < EPSILON
+      );
     };
 
     try {
-      const cachedState = localStorage.getItem(cachedStateKey);
-      if (cachedState) {
-        const parsedState = JSON.parse(cachedState);
-        if (!parsedState) return;
-
-        const cachedParcel = parsedState.parcelle || null;
-        // Accept cached state only when parcel id matches or polygon coordinates match
-        const idsMatch = cachedParcel && cachedParcel.id && selectedParcelle && selectedParcelle.id && String(cachedParcel.id) === String(selectedParcelle.id);
-        const coordsMatch = cachedParcel && cachedParcel.latlngs && selectedParcelle && selectedParcelle.latlngs && coordsEqual(cachedParcel.latlngs, selectedParcelle.latlngs);
-
-        if ((idsMatch || coordsMatch) && parsedState?.zoneResults?.length > 0) {
-          console.log("✅ Loading dashboard from local cache (verified parcel match)");
-          setStoredDashboardSession(parsedState);
-          setStoredDashboardOpen(true);
-          return;
+      const rawCache = localStorage.getItem(cachedStateKey);
+      if (rawCache) {
+        const parsedState = JSON.parse(rawCache);
+        if (parsedState && parsedState.zoneResults?.length > 0) {
+          if (isParcelMatch(parsedState.parcelle, selectedParcelle)) {
+            console.log("✅ Loading dashboard from local cache (verified parcel match)");
+            setStoredDashboardSession(parsedState);
+            setStoredDashboardOpen(true);
+            return;
+          }
+          console.log("⚠️ Ignoring cached dashboard: parcel did not match by id or coordinates");
         }
-
-        console.log("⚠️ Ignoring cached dashboard: parcel did not match by id or coordinates");
       }
     } catch (e) {
       console.warn("⚠️ Could not load from localStorage:", e);
     }
 
-    // ✅ If not in cache, fetch from database
+    // 🌐 Fallback: Fetch from DB if not in cache or parcel mismatched
     try {
       const response = await fetch(`${API_BASE}/api/analysis/parcel/${selectedParcelle.id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) {
@@ -927,28 +914,21 @@ export default function Map() {
         weatherData: parcelWeather,
       });
 
-      // ✅ Persist the loaded dashboard data to localStorage for offline access
+      // 💾 Cache DB response for offline/future use
       try {
-        localStorage.setItem(
-          getDashboardStateKey(selectedParcelle.name, selectedParcelle, cultureGroupId),
-          JSON.stringify(storedSession)
-        );
-        
-        if (storedSession.analysisHistory && storedSession.analysisHistory.length > 0) {
+        localStorage.setItem(cachedStateKey, JSON.stringify(storedSession));
+        if (storedSession.analysisHistory?.length > 0) {
           localStorage.setItem(
             getHistoryKey(selectedParcelle.name, selectedParcelle, cultureGroupId),
             JSON.stringify(storedSession.analysisHistory)
           );
         }
-        
         if (storedSession.currentAnalysis) {
           localStorage.setItem(
             getCurrentAnalysisKey(selectedParcelle.name, selectedParcelle, cultureGroupId),
             JSON.stringify(storedSession.currentAnalysis)
           );
         }
-        
-        console.log("✅ Dashboard data cached to localStorage for offline access");
       } catch (e) {
         console.warn("⚠️ Could not cache dashboard to localStorage:", e);
       }
@@ -966,7 +946,6 @@ export default function Map() {
     localStorage.removeItem("user");
     navigate("/login", { replace: true });
   }, [navigate]);
-
   return (
     <>
       <div style={{ display: "flex", height: "100vh" }}>
@@ -1019,9 +998,9 @@ export default function Map() {
         open={storedDashboardOpen}
         onClose={() => setStoredDashboardOpen(false)}
         parcelleName={storedDashboardSession?.parcelleName || selectedParcelle?.name || pendingParcelleInfo?.name || "Parcel"}
-          parcelleHa={storedDashboardSession?.parcelleHa || (selectedParcelle?.area || pendingParcelleInfo?.area || 0) / 10000}
-          cultureGroupId={storedDashboardSession?.cultureGroupId || Number(selectedParcelle?.groupId || selectedGroupId || 1)}
-          parcelle={pendingParcelleInfo || storedDashboardSession?.parcelle || selectedParcelle}
+        parcelleHa={storedDashboardSession?.parcelleHa || (selectedParcelle?.area || pendingParcelleInfo?.area || 0) / 10000}
+        cultureGroupId={storedDashboardSession?.cultureGroupId || Number(selectedParcelle?.groupId || selectedGroupId || 1)}
+        parcelle={pendingParcelleInfo || storedDashboardSession?.parcelle || selectedParcelle}
         mapSnapshot={storedDashboardSession?.mapSnapshot || null}
         zones={storedDashboardSession?.zones || []}
         nZones={storedDashboardSession?.nZones || storedDashboardSession?.zoneResults?.length || 1}

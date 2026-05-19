@@ -170,9 +170,10 @@ function textureLevel(preferred, actual) {
 
 function organicMatterPoints(level, groupKey) {
   const table = {
-    vegetables: { excellent: 16, bon: 12, moyen: 8, bas: 4, "tres-bas": 3.2 },
-    cereals:    { excellent: 10, bon: 7.5, moyen: 5, bas: 2.5, "tres-bas": 2 },
-    trees:      { excellent: 7, bon: 7, moyen: 3.5, bas: 3.5, "tres-bas": 1.4 },
+    // Capped at new weights: Veg=18, Cer=13, Trees=8
+    vegetables: { excellent: 18, bon: 13.5, moyen: 9, bas: 4.5, "tres-bas": 3.6 },
+    cereals:    { excellent: 13, bon: 9.75, moyen: 6.5, bas: 3.25, "tres-bas": 2.6 },
+    trees:      { excellent: 8, bon: 7, moyen: 3.5, bas: 3.5, "tres-bas": 1.4 },
   };
   return table[groupKey]?.[level] ?? table[groupKey]?.moyen ?? 0;
 }
@@ -244,105 +245,87 @@ function scoreCropByFormula(crop, st) {
   const phMin = Number(crop.ph?.[0] ?? 6);
   const phMax = Number(crop.ph?.[1] ?? 7.5);
   const phCenter = (phMin + phMax) / 2;
-  const seasonFit = seasonLevel(st.seas, crop.ss);
   const texFit = textureLevel(crop.prefTex, st.tex);
-
   let base = 0;
   let maxPoints = 0;
+
   const add = (weight, level) => {
     maxPoints += weight;
     base += pointsByLevel(weight, level);
   };
 
   if (groupKey === "vegetables") {
+    // ✅ SUM = 100 (Season 8pts redistributed to EC+2, OM+2, N+2, Texture+2)
     add(18, within(st.ph, phMin, phMax) ? "optimal" : within(st.ph, phMin - 2, phMax + 2) ? "stress" : "destroyable");
-    add(16, st.ce <= crop.ce ? "optimal" : st.ce <= crop.ce + 1.5 ? "stress" : "destroyable");
-    maxPoints += 16; base += organicMatterPoints(st.mo, groupKey);
-    add(12, texFit);
-    add(8, seasonFit);
+    add(18, st.ce <= crop.ce ? "optimal" : st.ce <= crop.ce + 1.5 ? "stress" : "destroyable");
+    maxPoints += 18; base += organicMatterPoints(st.mo, groupKey);
+    add(14, texFit);
     add(7, st.lime <= crop.limeMx ? "optimal" : st.lime <= crop.limeMx + 5 ? "stress" : "destroyable");
     add(4, st.wind <= crop.maxWindKmh ? "optimal" : st.wind <= crop.maxWindKmh + 25 ? "stress" : "destroyable");
-    add(8, nutrientLevel(st.n, crop.nReq, 10, 20));
+    add(10, nutrientLevel(st.n, crop.nReq, 10, 20));
     add(5, nutrientLevel(st.p, crop.pReq, 15, 30));
     add(6, nutrientLevel(st.k, crop.kReq, 80, 150));
   } else if (groupKey === "cereals") {
-    add(15, within(st.ph, phCenter - 1, phCenter + 1) ? "optimal" : within(st.ph, phCenter - 2, phCenter + 2) ? "stress" : "destroyable");
-    add(12, st.ce <= crop.ce ? "optimal" : st.ce <= crop.ce + 4 ? "stress" : "destroyable");
-    maxPoints += 10; base += organicMatterPoints(st.mo, groupKey);
-    add(12, nutrientLevel(st.n, crop.nReq, 60, 80));
-    add(9, nutrientLevel(st.p, crop.pReq, 15, 30));
-    add(8, nutrientLevel(st.k, crop.kReq, 80, 150));
-    add(8, st.lime <= crop.limeMx ? "optimal" : st.lime <= crop.limeMx + 7 ? "stress" : "destroyable");
-    add(7, seasonFit);
+    // ✅ SUM = 100 (Season 7pts redistributed to pH+4, EC+4, N+4, Lime+3, P+3, K+2, OM+3)
+    add(19, within(st.ph, phCenter - 1, phCenter + 1) ? "optimal" : within(st.ph, phCenter - 2, phCenter + 2) ? "stress" : "destroyable");
+    add(16, st.ce <= crop.ce ? "optimal" : st.ce <= crop.ce + 4 ? "stress" : "destroyable");
+    maxPoints += 13; base += organicMatterPoints(st.mo, groupKey);
+    add(16, nutrientLevel(st.n, crop.nReq, 60, 80));
+    add(12, nutrientLevel(st.p, crop.pReq, 15, 30));
+    add(10, nutrientLevel(st.k, crop.kReq, 80, 150));
+    add(11, st.lime <= crop.limeMx ? "optimal" : st.lime <= crop.limeMx + 7 ? "stress" : "destroyable");
     add(3, st.wind <= crop.maxWindKmh ? "optimal" : st.wind <= crop.maxWindKmh + 30 ? "stress" : "destroyable");
- } else if (groupKey === "trees") {
-  // ✅ UPDATED: Two-depth scoring for Permanent crops (0-20cm & 20-40cm)
-  const top = st.permanentDepths?.depth0_20 || st;
-  const sub = st.permanentDepths?.depth20_40 || st;
-
-  // Depth-specific weights (normalized to 1.0 per parameter)
-  const W = {
-    tex:  { top: 0.375, sub: 0.625 },
-    ph:   { top: 0.571, sub: 0.429 },
-    ec:   { top: 0.429, sub: 0.571 },
-    lime: { top: 0.429, sub: 0.571 },
-    om:   { top: 0.833, sub: 0.167 },
-    n:    { top: 0.667, sub: 0.333 },
-    p:    { top: 0.571, sub: 0.429 },
-    k:    { top: 0.333, sub: 0.667 },
-  };
-
-  const getPoints = (param, s) => {
-    if (param === 'tex') return pointsByLevel(20, textureLevel(crop.prefTex, s.tex));
-    if (param === 'ph') {
-      const lvl = within(s.ph, phMin, phMax) ? 'optimal' : within(s.ph, phCenter - 1, phCenter + 1) ? 'stress' : 'destroyable';
-      return pointsByLevel(15, lvl);
-    }
-    if (param === 'ec') {
-      const lvl = s.ce <= crop.ce ? 'optimal' : s.ce <= crop.ce + 3 ? 'stress' : 'destroyable';
-      return pointsByLevel(12, lvl);
-    }
-    if (param === 'lime') {
-      const lvl = s.lime <= crop.limeMx ? 'optimal' : s.lime <= crop.limeMx + 5 ? 'stress' : 'destroyable';
-      return pointsByLevel(13, lvl);
-    }
-    if (param === 'om') return organicMatterPoints(s.mo, 'trees'); // Max 7
-    if (param === 'n') return pointsByLevel(4, nutrientLevel(s.n, crop.nReq, 20, 50));
-    if (param === 'p') return pointsByLevel(4, nutrientLevel(s.p, crop.pReq, 20, 50));
-    if (param === 'k') return pointsByLevel(8, nutrientLevel(s.k, crop.kReq, 60, 100));
-    return 0;
-  };
-
-  let baseSoilScore = 0;
-  for (const param of Object.keys(W)) {
-    const topPts = getPoints(param, top);
-    const subPts = getPoints(param, sub);
-    let combined = (topPts * W[param].top) + (subPts * W[param].sub);
-
-    // Step 3: Critical Texture Override (Subsoil destroyable caps texture at 6.0)
-    if (param === 'tex') {
-      if (textureLevel(crop.prefTex, sub.tex) === 'destroyable') {
-        combined = Math.min(combined, 6.0); // 30% of max 20
+  } else if (groupKey === "trees") {
+    const top = st.permanentDepths?.depth0_20 || st;
+    const sub = st.permanentDepths?.depth20_40 || st;
+    const W = {
+      tex:  { top: 0.375, sub: 0.625 }, ph:   { top: 0.571, sub: 0.429 },
+      ec:   { top: 0.429, sub: 0.571 }, lime: { top: 0.429, sub: 0.571 },
+      om:   { top: 0.833, sub: 0.167 }, n:    { top: 0.667, sub: 0.333 },
+      p:    { top: 0.571, sub: 0.429 }, k:    { top: 0.333, sub: 0.667 },
+    };
+    const getPoints = (param, s) => {
+      if (param === 'tex') return pointsByLevel(22, textureLevel(crop.prefTex, s.tex));
+      if (param === 'ph') {
+        const lvl = within(s.ph, phMin, phMax) ? 'optimal' : within(s.ph, phCenter - 1, phCenter + 1) ? 'stress' : 'destroyable';
+        return pointsByLevel(17, lvl);
       }
+      if (param === 'ec') {
+        const lvl = s.ce <= crop.ce ? 'optimal' : s.ce <= crop.ce + 3 ? 'stress' : 'destroyable';
+        return pointsByLevel(14, lvl);
+      }
+      if (param === 'lime') {
+        const lvl = s.lime <= crop.limeMx ? 'optimal' : s.lime <= crop.limeMx + 5 ? 'stress' : 'destroyable';
+        return pointsByLevel(15, lvl);
+      }
+      if (param === 'om') return organicMatterPoints(s.mo, 'trees'); // Max 8
+      if (param === 'n') return pointsByLevel(5, nutrientLevel(s.n, crop.nReq, 20, 50));
+      if (param === 'p') return pointsByLevel(5, nutrientLevel(s.p, crop.pReq, 20, 50));
+      if (param === 'k') return pointsByLevel(9, nutrientLevel(s.k, crop.kReq, 60, 100));
+      return 0;
+    };
+
+    let baseSoilScore = 0;
+    for (const param of Object.keys(W)) {
+      const topPts = getPoints(param, top);
+      const subPts = getPoints(param, sub);
+      let combined = (topPts * W[param].top) + (subPts * W[param].sub);
+      // Critical Texture Override: 30% of new max 22 = 6.6
+      if (param === 'tex' && textureLevel(crop.prefTex, sub.tex) === 'destroyable') {
+        combined = Math.min(combined, 6.6);
+      }
+      baseSoilScore += combined;
     }
-    baseSoilScore += combined;
+
+    const windLvl = st.wind <= crop.maxWindKmh ? 'optimal' : st.wind <= crop.maxWindKmh + 20 ? 'stress' : 'destroyable';
+    const windPts = pointsByLevel(9, windLvl); // ✅ Season 6pts redistributed: Wind+2, Texture+2, EC+2, Lime+2
+    const baseTotal = baseSoilScore + windPts; // Max possible = 100
+
+    const F_top = pollutionMultiplier(top, crop);
+    const F_sub = pollutionMultiplier(sub, crop);
+    const F_final = Math.min(F_top, F_sub);
+    return clampScore(baseTotal * F_final);
   }
-
-  // Step 4: Add canopy-level parameters (Wind & Season)
-  const windLvl = st.wind <= crop.maxWindKmh ? 'optimal' : st.wind <= crop.maxWindKmh + 20 ? 'stress' : 'destroyable';
-  const windPts = pointsByLevel(7, windLvl);
-  const seasonPts = pointsByLevel(6, seasonLevel(st.seas, crop.ss));
-
-  const baseTotal = baseSoilScore + windPts + seasonPts;
-
-  // Step 5: Pollution Multiplier (Limiting Factor Principle across both depths)
-  const F_top = pollutionMultiplier(top, crop);
-  const F_sub = pollutionMultiplier(sub, crop);
-  const F_final = Math.min(F_top, F_sub);
-
-  // Return immediately to bypass generic scoring at the end
-  return clampScore(baseTotal * F_final);
-}
 
   const normalizedBase = maxPoints > 0 ? (base / maxPoints) * 100 : 0;
   return clampScore(normalizedBase * pollutionMultiplier(st, crop));
@@ -625,10 +608,25 @@ function isTextureAllowedForCrop(actual, preferred) {
 function getRankedCropsForState(st, crops = []) {
   if (!st || !Array.isArray(crops) || crops.length === 0) return [];
 
-  return crops
+  const isManual = st.crop && String(st.crop).trim() !== "";
+
+  // ✅ IMPROVED: ALWAYS filter by season first (for both manual AND recommended)
+  let candidates = crops.filter(c => Array.isArray(c.ss) && c.ss.includes(st.seas));
+
+  // ✅ BUT: If user manually selected a crop, add it back even if out of season
+  // This allows showing the user's selection with a "wrong season" warning
+  if (isManual && st.crop) {
+    const selectedCrop = crops.find(c => String(c.id) === String(st.crop));
+    // Only add if not already in candidates (avoid duplicates)
+    if (selectedCrop && !candidates.find(c => String(c.id) === String(selectedCrop.id))) {
+      candidates = [selectedCrop, ...candidates];
+    }
+  }
+
+  return candidates
     .map(c => ({ ...c, sc: cropScore(c, st), adj: cropAdj(c, st) }))
     .filter(c => {
-      if (st.crop && String(c.id) === String(st.crop)) return true;
+      if (isManual && String(c.id) === String(st.crop)) return true;
       return isTextureAllowedForCrop(st.tex, c.prefTex);
     })
     .sort((a, b) => b.sc - a.sc);
@@ -2011,6 +2009,25 @@ function ResultsView({
   const recs = tgt ? null : scored.slice(1,4);
   const alts = tgt ? scored.filter(c => c.id!==st.crop && c.id!==bestCrop?.id).slice(0,3) : [];
   const sn   = SN[st.seas], iw = st.seas==="hiver";
+// 🔍 DEBUG: Find crops with missing season data (ADD THIS)
+console.log("📊 CROPS DATA AUDIT - TREES:");
+const treeCrops = crops.filter(c => c.category === "trees");
+treeCrops.forEach(crop => {
+  const hasSS = crop.ss !== undefined && crop.ss !== null;
+  const isSeasonsArray = Array.isArray(crop.ss);
+  const seasonCount = isSeasonsArray ? crop.ss.length : 0;
+
+  console.log(`${crop.e} ${crop.n}:`, {
+    has_ss_field: hasSS,
+    is_array: isSeasonsArray,
+    season_count: seasonCount,
+    seasons: crop.ss,
+    status: hasSS && isSeasonsArray && seasonCount > 0 ? "✅ GOOD" : "❌ MISSING"
+  });
+});
+
+// 🔍 END DEBUG
+
 
   return (
     <>
@@ -2096,7 +2113,8 @@ function ResultsView({
                   <div className="sd-rec-bottom">
                     <div className="sd-rec-chip-row">
                       <span className="sd-rec-chip">TOP CROP</span>
-                      {bestCrop?.ss?.includes(st.seas) ? (
+                      {/* ✅ FIXED: Check focusCrop (selected or best), not always bestCrop */}
+                      {focusCrop?.ss?.includes(st.seas) ? (
                         <span className="sd-rec-chip">SEASON MATCH</span>
                       ) : (
                         <span className="sd-rec-chip" style={{ background: "#ffe0e0", color: "#c02020", border: "1px solid #ffc8c8" }}>
@@ -2111,18 +2129,43 @@ function ResultsView({
             </div>
           )}
 
-          {/* Season alert */}
-          {sn && (
-            <div className="sd-sea-alert sd-a2"
-              style={{background:iw?"rgba(160,200,255,.18)":"rgba(255,220,120,.18)",borderColor:iw?"rgba(100,160,240,.3)":"rgba(220,160,40,.3)",color:iw?"#1e40af":"#92400e"}}>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <path d="M8 2L1 14h14L8 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-                <path d="M8 6.5v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                <circle cx="8" cy="12" r=".7" fill="currentColor" />
-              </svg>
-              {sn}
-            </div>
-          )}
+                {/* Dynamic Season Alert replacing generic SN */}
+     {/* Dynamic Season Alert replacing generic SN */}
+{(() => {
+  const focusCrop = tgt || bestCrop || null;
+  if (!focusCrop) return null;
+
+  // Map French seasons to English for display
+  const seasonMap = { printemps: "Spring", ete: "Summer", automne: "Autumn", hiver: "Winter" };
+  const currentSeasonEn = seasonMap[st.seas] || st.seas;
+  const seasonsText = focusCrop.ss
+    ? focusCrop.ss.map(s => seasonMap[s] || s).join(" or ")
+    : "appropriate season";
+
+  const isMatch = focusCrop.ss && focusCrop.ss.includes(st.seas);
+
+  if (isMatch) {
+    return (
+      <div className="sd-sea-alert sd-a2" style={{ background: "#e3f8ea", borderColor: "#c8f5e0", color: "#1a7a50" }}>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M2.5 7.5l3.5 3.5 6.5-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        ✓ Seasonal compatibility confirmed: {currentSeasonEn}
+      </div>
+    );
+  } else {
+    return (
+      <div className="sd-sea-alert sd-a2" style={{ background: "#fff3c8", borderColor: "#ffe0e0", color: "#b06010" }}>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M8 2L1 14h14L8 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+          <path d="M8 6.5v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          <circle cx="8" cy="12" r=".7" fill="currentColor" />
+        </svg>
+        ⚠ Current season ({currentSeasonEn}) is not recommended. Preferred: {seasonsText}
+      </div>
+    );
+  }
+})()}
 
           {/* 6 param pills */}
           <div className="sd-param-pills sd-a2">
@@ -2180,7 +2223,14 @@ function ResultsView({
                     </div>
                     <div className="sd-rec-bottom">
                       <div className="sd-rec-chip-row">
-                        <span className="sd-rec-chip">Season match</span>
+                        {/* ✅ FIXED: Make season badge dynamic instead of hardcoded */}
+                        {c?.ss?.includes(st.seas) ? (
+                          <span className="sd-rec-chip">✓ Season match</span>
+                        ) : (
+                          <span className="sd-rec-chip" style={{ background: "#ffe0e0", color: "#c02020", border: "1px solid #ffc8c8" }}>
+                            ⚠️ Wrong season
+                          </span>
+                        )}
                         <span className="sd-rec-chip">Field-ready</span>
                       </div>
                       <div className="sd-rec-mini-bars">
@@ -2426,6 +2476,8 @@ function buildAnalysisSnapshot({ zoneResults, crops, parcelleName, parcelleHa, c
     k: Number(zone.k),
     temp: Number(zone.temp),
     lime: Number(zone.lime),
+    analysisCropId: zone.analysisCropId || null,
+
   }));
   const avgScore = scores.length
     ? Math.round(scores.reduce((sum, item) => sum + item.score, 0) / scores.length)
@@ -2604,7 +2656,7 @@ function DashboardView({
   const previousDepthMetrics = isPermanentCulture
     ? previousSnapshot?.depthAverages?.[historyDepthKey] || null
     : null;
-  
+
   // Helper: Extract zone metrics, normalizing property names
   const extractZoneMetrics = (zoneData) => {
     if (!zoneData) return null;
@@ -2624,7 +2676,7 @@ function DashboardView({
   const currentZoneMetrics = extractZoneMetrics(activeZoneResult);
   const previousZoneFromHistory = previousSnapshot?.zoneResults?.[activeZone];
   const previousZoneMetrics = extractZoneMetrics(previousZoneFromHistory);
-  
+
   // Comparison uses zone-level metrics for non-permanent, depth metrics for permanent
   const comparisonCurrent = isPermanentCulture ? activeDepthResult : currentZoneMetrics;
   const comparisonPrevious = isPermanentCulture ? previousDepthMetrics : previousZoneMetrics;
@@ -3009,11 +3061,11 @@ function DashboardView({
                                 {item.format(previousValue)}
                               </span>
                             )}
-                            
+
                             {/* Current Value (Bold, Black/Green) */}
                             <strong>
-                              {hasValue 
-                                ? (item.unit ? `${item.format(displayValue)} ${item.unit}` : item.format(displayValue)) 
+                              {hasValue
+                                ? (item.unit ? `${item.format(displayValue)} ${item.unit}` : item.format(displayValue))
                                 : "—"}
                             </strong>
                           </div>
@@ -3091,7 +3143,7 @@ export default function SoilDiagnostic({
 
         if (!cancelled) {
           const allCrops = Array.isArray(data) ? data : [];
-          
+
           // Determine the target category based on the selected tab
           const targetCategory = cultureGroupId === 1 ? "vegetables" :
                                  cultureGroupId === 2 ? "cereals" : "trees";
@@ -3106,12 +3158,12 @@ export default function SoilDiagnostic({
 
             // Fallback: Check the category string (French or English)
             const cat = String(crop.category || "").toLowerCase();
-            
+
             if (targetCategory === "vegetables") return cat.includes("vegetable") || cat.includes("maraich") || cat.includes("maraîch");
             if (targetCategory === "cereals") return cat.includes("cereal") || cat.includes("forage") || cat.includes("céréal");
             if (targetCategory === "trees") return cat.includes("tree") || cat.includes("permanent") || cat.includes("fruit");
-            
-            return true; 
+
+            return true;
           });
 
           // Fallback: If the filter is too strict and returns 0, just show ALL crops
@@ -3204,52 +3256,49 @@ export default function SoilDiagnostic({
   }, [open, parcelWeatherCentroid, parcelWeatherPoints]);
 
   /* Reset on open */
-  useEffect(() => {
-    if (open) {
-      setDiagMode(initialDiagMode);
-      // Default dashboard to show first zone (zone 0)
-      setActiveZone(0);
-      setAnalyzing(false);
-      setZoneStates(
-        Array.from({ length: n }, () => freshSt(initialDiagMode))
-      );
-      
-      // When loading stored dashboard data (startInDashboard), preserve all zone results
-      if (startInDashboard && persistedDashboardData) {
-        // Loading dashboard view - keep all stored zone results
-        if (Array.isArray(persistedDashboardData?.zoneResults)) {
-          const results = persistedDashboardData.zoneResults.slice(0, n);
-          setZoneResults(results);
-        } else {
-          setZoneResults(Array(n).fill(null));
-        }
-        
-        // Load analysis history from persistedDashboardData or localStorage
-        // ✅ PASTE THIS INSTEAD:
-const parcelNameForLoad = (parcelle?.name) || parcelleName;
-const { current, previous } = getDashboardHistory(
-  parcelNameForLoad,
-  parcelle || persistedDashboardData?.parcelle || null,
-  cultureGroupId
-);
+ /* Reset on open */
+useEffect(() => {
+  if (open) {
+    setDiagMode(initialDiagMode);
+    setActiveZone(0);
+    setAnalyzing(false);
+    setZoneStates(Array.from({ length: n }, () => freshSt(initialDiagMode)));
 
-const historyArray = [current, previous].filter(Boolean);
-setAnalysisHistory(historyArray);
-setCurrentAnalysis(current || persistedDashboardData?.currentAnalysis || null);
-        setShowDashboard(true);
+    if (startInDashboard && persistedDashboardData) {
+      // Loading dashboard view - keep all stored zone results
+      if (Array.isArray(persistedDashboardData?.zoneResults)) {
+        setZoneResults(persistedDashboardData.zoneResults.slice(0, n));
       } else {
-        // Entering analysis mode - clear all zones for fresh analysis
         setZoneResults(Array(n).fill(null));
-        setAnalysisHistory([]);
-        setCurrentAnalysis(null);
-        setShowDashboard(false);
       }
-      
-      lastStoredFingerprintRef.current =
-        persistedDashboardData?.currentAnalysis?.fingerprint || "";
-    }
-  }, [open, initialDiagMode, n, persistedDashboardData, startInDashboard]);
 
+      // Load analysis history from localStorage
+      const parcelNameForLoad = (parcelle?.name) || parcelleName;
+      const { current, previous } = getDashboardHistory(
+        parcelNameForLoad,
+        parcelle || persistedDashboardData?.parcelle || null,
+        cultureGroupId
+      );
+      const historyArray = [current, previous].filter(Boolean);
+      setAnalysisHistory(historyArray);
+      setCurrentAnalysis(current || persistedDashboardData?.currentAnalysis || null);
+      setShowDashboard(true);
+
+      // Notify other components
+      dispatchDashboardUpdated({
+        parcelId: parcelle?.id,
+        cultureGroupId,
+      });
+    } else {
+      // Entering analysis mode - clear all zones
+      setZoneResults(Array(n).fill(null));
+      setAnalysisHistory([]);
+      setCurrentAnalysis(null);
+      setShowDashboard(false);
+    }
+    lastStoredFingerprintRef.current = persistedDashboardData?.currentAnalysis?.fingerprint || "";
+  }
+}, [open, initialDiagMode, n, persistedDashboardData, startInDashboard, parcelle, parcelleName, cultureGroupId]);
   useEffect(() => {
     // Dashboard state is restored from localStorage; do not overwrite it from the DB.
     if (open && persistedDashboardData) {
@@ -3477,11 +3526,11 @@ setZoneStates(prev => {
     });
   }, [open, activeZone, zoneStates, CROPS, windByMonth]);
 
-  
+
   /* Analyze and Save to Database */
   const handleAnalyze = useCallback(async () => {
     setAnalyzing(true);
-    
+
     // 1. Get the snapshot of the current zone
     const rawSnap = { ...zoneStates[activeZone] };
     const { selectedCrop, ranked } = resolveAnalysisCrop(rawSnap, CROPS);
@@ -3492,17 +3541,17 @@ setZoneStates(prev => {
       recommendedCropIds: selectedCrop ? [] : ranked.slice(0, 3).map((crop) => crop.id),
     };
     const score = calcScore(snap, CROPS); // Calculate score immediately
-    
+
     try {
       // 2. Send it to your new Python FastAPI endpoint
       const token = localStorage.getItem("token"); // Assuming you use JWT auth
-      
+
       const payload = {
-        parcelleId: parcelle?.id, 
+        parcelleId: parcelle?.id,
         zoneIndex: activeZone,
         diagMode: diagMode,
         targetCropId: snap.analysisCropId || snap.crop || null,
-        soilMetrics: snap, 
+        soilMetrics: snap,
         compatibilityScore: score
       };
 
@@ -3540,25 +3589,25 @@ setZoneStates(prev => {
       setAnalyzing(false);
     }
   }, [activeZone, zoneStates, parcelle, diagMode, CROPS]);
+const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
+  const zone = zoneResults[zoneIndex];
+  if (!zone || !cropId || zone.analysisCropId || zone.crop) return;
 
-  const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
-    const zone = zoneResults[zoneIndex];
-    if (!zone || !cropId || zone.analysisCropId || zone.crop) return;
+  const lockedZone = {
+    ...zone,
+    analysisCropId: cropId,
+    analysisCropMode: "recommended-locked",
+  };
 
-    const lockedZone = {
-      ...zone,
-      analysisCropId: cropId,
-      analysisCropMode: "recommended-locked",
-    };
+  // Update UI state immediately
+  setZoneResults((prev) => {
+    const next = [...prev];
+    next[zoneIndex] = lockedZone;
+    return next;
+  });
 
-    setZoneResults((prev) => {
-      const next = [...prev];
-      next[zoneIndex] = lockedZone;
-      return next;
-    });
-
-    if (!parcelle?.id) return;
-
+  // 1. Save to backend (if parcel exists)
+  if (parcelle?.id) {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`${API_BASE}/api/analysis/save-zone`, {
@@ -3576,23 +3625,43 @@ setZoneStates(prev => {
           compatibilityScore: calcScore(lockedZone, CROPS),
         }),
       });
-
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
         console.error("Failed to persist locked dashboard crop:", errData);
       }
     } catch (error) {
-      console.error("Failed to save locked dashboard crop:", error);
+      console.error("Failed to save locked dashboard crop to DB:", error);
     }
-  }, [zoneResults, parcelle, diagMode, CROPS]);
+  }
+
+  // 2. Always save to localStorage for cross-session persistence
+  try {
+    const parcelNameForSave = (parcelle?.name) || parcelleName;
+    const snapshot = buildAnalysisSnapshot({
+      zoneResults: zoneResults.map((z, i) => i === zoneIndex ? lockedZone : z),
+      crops: CROPS,
+      parcelleName: parcelNameForSave,
+      parcelleHa,
+      cultureLabel,
+    });
+
+    saveDashboardState(parcelNameForSave, parcelle, cultureGroupId, snapshot);
+    setCurrentAnalysis(snapshot);
+    const { current, previous } = getDashboardHistory(parcelNameForSave, parcelle, cultureGroupId);
+    setAnalysisHistory([current, previous].filter(Boolean));
+  } catch (error) {
+    console.warn("localStorage save failed for locked crop:", error);
+  }
+}, [zoneResults, parcelle, diagMode, CROPS, parcelleName, parcelleHa, cultureLabel, cultureGroupId]);
+
 
   const resetZone = useCallback(idx => {
     setZoneResults(prev => { const next=[...prev]; next[idx]=null; return next; });
     // Also reset the zone state to clear the selected crop and start fresh
-    setZoneStates(prev => { 
-      const next=[...prev]; 
+    setZoneStates(prev => {
+      const next=[...prev];
       next[idx] = freshSt(diagMode);
-      return next; 
+      return next;
     });
     setShowDashboard(false);
   }, [diagMode]);
@@ -3704,10 +3773,10 @@ setZoneStates(prev => {
 
   useEffect(() => {
     if (!open) return;
-    
+
     // Only run this if ALL zones have been analyzed
     if (zoneResults.some((item) => !item)) return;
-    
+
     const snapshot = buildAnalysisSnapshot({
       zoneResults,
       crops: CROPS,
@@ -3715,7 +3784,7 @@ setZoneStates(prev => {
       parcelleHa,
       cultureLabel,
     });
-    
+
     if (!snapshot.fingerprint || lastStoredFingerprintRef.current === snapshot.fingerprint) return;
 
     setCurrentAnalysis(snapshot);
@@ -3777,7 +3846,7 @@ setAnalysisHistory([current, previous].filter(Boolean));
 
     lastStoredFingerprintRef.current = snapshot.fingerprint;
   }, [open, zoneResults, CROPS, parcelleName, parcelle, cultureGroupId, parcelleHa, cultureLabel, analysisHistory, activeZone, diagMode, mapSnapshot, zones, n, weatherData, parcelWeather]);
-  
+
   const parcelImageUrls = buildParcelImageUrls(parcelle?.latlngs || [], mapSnapshot);
 
   if (!open) return null;
@@ -3993,5 +4062,3 @@ function mapSoilTypeToTexture(soilType) {
   };
   return map[soilType] || "limon-argileux";
 }
-
-

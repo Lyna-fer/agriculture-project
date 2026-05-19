@@ -261,7 +261,7 @@ class CropRequirementOut(BaseModel):
     dbId: int
     category: str
     crop_name: str
-
+    season: Optional[str] = None  # ✅ ADD THIS
 
 class WindExpectationOut(BaseModel):
     monthId: int
