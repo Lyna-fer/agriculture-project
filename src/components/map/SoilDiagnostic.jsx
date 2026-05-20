@@ -3635,6 +3635,7 @@ const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
   }
 
   // 2. Always save to localStorage for cross-session persistence
+  // 2. Always save to localStorage for cross-session persistence
   try {
     const parcelNameForSave = (parcelle?.name) || parcelleName;
     const snapshot = buildAnalysisSnapshot({
@@ -3643,12 +3644,33 @@ const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
       parcelleName: parcelNameForSave,
       parcelleHa,
       cultureLabel,
+      // ✅ FIX: Ensure the parcel object itself is passed into the snapshot
+      parcelle: parcelle, 
     });
 
-    saveDashboardState(parcelNameForSave, parcelle, cultureGroupId, snapshot);
+    // ✅ FIX: Directly update the dashboard state in localStorage to ensure the parcelle object isn't lost
+    const cachedStateKey = getDashboardStateKey(parcelNameForSave, parcelle, cultureGroupId);
+    const existingCache = localStorage.getItem(cachedStateKey);
+    
+    if (existingCache) {
+       const parsedCache = JSON.parse(existingCache);
+       // Update ONLY the zoneResults, currentAnalysis, and history. Keep the parcelle exactly as it was!
+       parsedCache.zoneResults = zoneResults.map((z, i) => i === zoneIndex ? lockedZone : z);
+       parsedCache.currentAnalysis = snapshot;
+       parsedCache.analysisHistory = Array.isArray(parsedCache.analysisHistory) 
+          ? [snapshot, ...parsedCache.analysisHistory.filter(i => i.fingerprint !== snapshot.fingerprint)].slice(0,8) 
+          : [snapshot];
+          
+       localStorage.setItem(cachedStateKey, JSON.stringify(parsedCache));
+    } else {
+       // Fallback if no cache existed
+       saveDashboardState(parcelNameForSave, parcelle, cultureGroupId, snapshot);
+    }
+
     setCurrentAnalysis(snapshot);
     const { current, previous } = getDashboardHistory(parcelNameForSave, parcelle, cultureGroupId);
     setAnalysisHistory([current, previous].filter(Boolean));
+    
   } catch (error) {
     console.warn("localStorage save failed for locked crop:", error);
   }
