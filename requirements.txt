@@ -47,3 +47,12 @@ cachetools==5.3.2                   # Caching for GEE tokens (optional)
 #
 # 4. Security: Always audit dependencies with `pip-audit` or `safety`
 # ─────────────────────────────────────────────────────────────────────────────
+
+# JWT Authentication
+python-jose[cryptography]==3.5.0
+
+# Form data handling for FastAPI
+python-multipart==0.0.9
+
+# NumPy compatibility fix for shapely (temporary until shapely supports NumPy 2.x)
+numpy<2.0

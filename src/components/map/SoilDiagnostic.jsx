@@ -2006,9 +2006,10 @@ function ResultsView({
   const tgt  = st.crop ? scored.find(c => c.id===st.crop) : null;
   const bestCrop = scored[0] || null;
   const focusCrop = tgt || scored[0] || null;
-  const recs = tgt ? null : scored.slice(1,4);
-  const alts = tgt ? scored.filter(c => c.id!==st.crop && c.id!==bestCrop?.id).slice(0,3) : [];
-  const sn   = SN[st.seas], iw = st.seas==="hiver";
+const recs = tgt ? null : scored.slice(0, 4);
+
+// ✅ Exclude ONLY the manually selected crop, but KEEP the best crop in alternatives
+const alts = tgt ? scored.filter(c => c.id !== st.crop).slice(0, 3) : [];
 // 🔍 DEBUG: Find crops with missing season data (ADD THIS)
 console.log("📊 CROPS DATA AUDIT - TREES:");
 const treeCrops = crops.filter(c => c.category === "trees");
