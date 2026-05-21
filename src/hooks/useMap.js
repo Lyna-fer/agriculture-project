@@ -504,6 +504,48 @@ export function useMap({ onParcelleChange, maxParcelAreaHa = 50, onParcelleClick
         }
       }
 
+      points.forEach((pt, idx) => {
+        try {
+          const pointNum = idx + 1;
+          const icon = L.divIcon({
+            className: " ",
+            html: `<div style="
+  width:20px;
+  height:20px;
+  background:rgba(255,255,255,0.95);
+  border:1.5px solid ${color};
+  color:${color};
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:0.65rem;
+  font-family:'Geist Mono',monospace;
+  box-shadow:0 0 0 3px rgba(255,255,255,0.4);
+">${pointNum}</div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 10],
+          });
+
+          const marker = L.marker(pt, { icon })
+            .addTo(map)
+            .bindPopup(`
+              <b>${zone.id} - Point ${pointNum}</b><br>
+              Sample #${pointNum} / ${points.length}<br>
+              <span style="color:#7a5230;font-size:0.75rem">Lat: ${pt[0].toFixed(5)}, Lng: ${pt[1].toFixed(5)}</span>
+            `);
+
+          sampleMarkersRef.current.push(marker);
+        } catch (e) {
+          console.error(
+            "Error rendering sample point marker for zone",
+            zone.id,
+            idx,
+            e,
+          );
+        }
+      });
+
     });
 
     // mark sampling visible and hide parcel labels while samples are shown
