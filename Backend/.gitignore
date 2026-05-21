@@ -1,0 +1,1 @@
+﻿\n# Backend local DB and env (keep local copy but don't track)\nBackend/local.db\nBackend/.env\n
