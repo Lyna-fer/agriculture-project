@@ -132,7 +132,7 @@ const TARGET_CROP_ICON_OVERRIDES = {
 function getTargetCropIconFilename(crop) {
   if (!crop) return null;
   const directFilename = crop.iconFilename || crop.icon_filename;
-  if (typeof directFilename === "string" && directFilename.trim()) {
+  if (typeof directFilename === "string" && /\.(png|jpg|jpeg|webp|gif)$/i.test(directFilename.trim())) {
     return directFilename.trim();
   }
 
