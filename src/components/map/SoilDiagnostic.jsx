@@ -2256,7 +2256,14 @@ function ResultsView({
   const tgt  = st.crop ? scored.find(c => c.id===st.crop) : null;
   const bestCrop = scored[0] || null;
   const focusCrop = tgt || scored[0] || null;
-const recs = tgt ? null : scored.slice(0, 4);
+
+  // When no crop is selected, show alternatives excluding the best crop
+  // When a crop is selected, show alternatives excluding that crop
+  const recs = tgt 
+    ? null  // When crop is selected, show alternatives below instead
+    : scored.length > 1 
+      ? scored.slice(1, 5)  // Exclude best crop, show next 4 alternatives
+      : null;
 
 // ✅ Exclude ONLY the manually selected crop, but KEEP the best crop in alternatives
 const alts = tgt ? scored.filter(c => c.id !== st.crop).slice(0, 3) : [];
