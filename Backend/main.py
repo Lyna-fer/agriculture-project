@@ -47,7 +47,22 @@ if os.path.exists(DOTENV_PATH):
         except Exception:
             continue
 
-DATABASE_URL = os.getenv("DATABASE_URL") or f"sqlite:///{os.path.join(BASE_DIR, 'local.db')}"
+DATABASE_URL = os.getenv("DATABASE_URL")
+# By default do NOT fall back to a local SQLite file to avoid accidental
+# connections to a local DB containing sensitive data. To allow using the
+# bundled `local.db` you must explicitly set `ALLOW_LOCAL_DB=1` in the
+# environment. This keeps the file on disk for security/archive purposes
+# while preventing the app from connecting to it unless allowed.
+ALLOW_LOCAL_DB = os.getenv("ALLOW_LOCAL_DB", "0") == "1"
+if not DATABASE_URL and ALLOW_LOCAL_DB:
+    DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'local.db')}"
+
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not set. Set DATABASE_URL to your Postgres URL, "
+        "or set ALLOW_LOCAL_DB=1 to explicitly enable the bundled local.db"
+    )
+
 SQLITE_MODE = DATABASE_URL.startswith("sqlite")
 
 engine = create_engine(
