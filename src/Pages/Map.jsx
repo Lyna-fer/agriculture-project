@@ -69,11 +69,27 @@ const normalizeLatLngPairs = (latlngs) => {
     })
     .filter((point) => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]));
 };
+
+const buildParcelSignature = (parcelle, parcelleName = "") => {
+  if (!parcelle) return "";
+
+  const idPart = parcelle.id != null ? `id:${String(parcelle.id)}` : "id:unknown";
+  const namePart = `name:${String(parcelle.name || parcelleName || "").trim().toLowerCase()}`;
+  const groupPart = parcelle.groupId != null ? `group:${String(parcelle.groupId)}` : "group:unknown";
+  const coordsPart = Array.isArray(parcelle.latlngs) && parcelle.latlngs.length > 0
+    ? `coords:${JSON.stringify(normalizeLatLngPairs(parcelle.latlngs))}`
+    : "coords:empty";
+
+  return [idPart, namePart, groupPart, coordsPart].join("|");
+};
+
 const buildDashboardSnapshotFromRow = (row) => {
   const metrics = row?.soilMetrics || {};
   return {
+    id: String(row?.id ?? ""),
     fingerprint: String(row?.id ?? ""),
     timestamp: row?.analyzedAt || null,
+    zoneIndex: Number.isFinite(Number(row?.zoneIndex)) ? Number(row.zoneIndex) : null,
     diagMode: row?.diagMode || "standard",
     targetCropId: row?.targetCropId ?? null,
     targetCropMode: metrics.analysisCropMode || (row?.targetCropId ? "manual" : "recommended"),
@@ -107,7 +123,10 @@ const buildDashboardSessionFromDb = ({
       return {
         zoneIndex,
         latestRow,
-        snapshots: zoneRows.slice(0, 2).map(buildDashboardSnapshotFromRow).filter(Boolean),
+        snapshots: zoneRows.slice(0, 2).map((row) => ({
+          ...buildDashboardSnapshotFromRow(row),
+          zoneIndex,
+        })).filter(Boolean),
       };
     })
     .filter((entry) => Number.isInteger(entry.zoneIndex) && entry.latestRow);
@@ -141,14 +160,23 @@ const buildDashboardSessionFromDb = ({
     return bTime - aTime;
   });
 
+  // Annotate snapshots with parcel identity so history can't cross parcels
+  const annotatedSnapshots = sortedAllSnapshots.map(s => ({
+    ...s,
+    parcelleId: parcelle?.id ?? null,
+    parcelleName: parcelleName ?? null,
+  }));
+
   const activeZoneEntry = zoneEntries
     .slice()
     .sort((a, b) => new Date(b.latestRow.analyzedAt).getTime() - new Date(a.latestRow.analyzedAt).getTime())[0] || null;
 
   const activeZone = activeZoneEntry?.zoneIndex ?? 0;
   const activeZoneHistory = activeZoneEntry?.snapshots || [];
+  const parcelSignature = buildParcelSignature(parcelle, parcelleName);
   return {
     savedAt: new Date().toISOString(),
+    parcelSignature,
     activeZone,
     diagMode: activeZoneHistory[0]?.diagMode || "standard",
     parcelleName,
@@ -160,7 +188,7 @@ const buildDashboardSessionFromDb = ({
     nZones: Math.max(1, zoneResults.length || zones?.length || 1),
     zoneResults: zoneResults.length ? zoneResults : Array(Math.max(1, zones?.length || 1)).fill(null),
     currentAnalysis: activeZoneHistory[0] || null,
-    analysisHistory: sortedAllSnapshots,
+    analysisHistory: annotatedSnapshots,
     weatherData: weatherData || null,
   };
 };
@@ -245,6 +273,12 @@ export default function Map() {
 
     setDashboardReadyForSelected(isComplete);
   }, [selectedParcelleId, parcelles]);
+  const selectedParcelle = parcelles.find((p) => p.id === selectedParcelleId) ?? null;
+  const selectedParcelSignature = buildParcelSignature(
+    selectedParcelle || pendingParcelleInfo,
+    selectedParcelle?.name || pendingParcelleInfo?.name || "Parcel"
+  );
+  const activeDashboardParcelSignature = storedDashboardSession?.parcelSignature || selectedParcelSignature;
   // Listen for dashboard updates to refresh the ready status
   useEffect(() => {
     const handleDashboardUpdated = () => {
@@ -820,7 +854,6 @@ showToast(`❌ ${error.message}`);
     showToast(`📍 ${wilaya.name} Province · Zone ${zoneLabel}`);
   }, [flyToWilaya, showToast]);
   const selectedCulture = CULTURES.find(c => c.id === selectedGroupId);
-  const selectedParcelle = parcelles.find(p => p.id === selectedParcelleId) ?? null;
   const selectedParcelDashboardReady = dashboardReadyForSelected;
 
   const handleOpenStoredDashboard = useCallback(async () => {
@@ -836,6 +869,29 @@ showToast(`❌ ${error.message}`);
 
     const cultureGroupId = Number(selectedParcelle.groupId || selectedGroupId);
     const cachedStateKey = getDashboardStateKey(selectedParcelle.name, selectedParcelle, cultureGroupId);
+    const selectedParcelSignature = buildParcelSignature(selectedParcelle, selectedParcelle?.name || "Parcel");
+
+    const findStoredDashboardFallback = () => {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key || !key.startsWith("soil-dashboard-state:")) continue;
+          const raw = localStorage.getItem(key);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+          const cachedParcel = parsed?.parcelle || null;
+          const cachedSignature = parsed?.parcelSignature || buildParcelSignature(cachedParcel, parsed?.parcelleName || "Parcel");
+          const idMatch = cachedParcel?.id != null && selectedParcelle?.id != null && String(cachedParcel.id) === String(selectedParcelle.id);
+          const signatureMatch = cachedSignature && cachedSignature === selectedParcelSignature;
+          if ((idMatch || signatureMatch) && parsed?.zoneResults?.length > 0) {
+            return parsed;
+          }
+        }
+      } catch (error) {
+        console.warn("⚠️ Could not search local dashboard fallback:", error);
+      }
+      return null;
+    };
 
     // 🔍 Robust parcel matching (ID-first, then normalized coordinates)
     const isParcelMatch = (cached, current) => {
@@ -870,14 +926,21 @@ showToast(`❌ ${error.message}`);
       const rawCache = localStorage.getItem(cachedStateKey);
       if (rawCache) {
         const parsedState = JSON.parse(rawCache);
-        if (parsedState && parsedState.zoneResults?.length > 0) {
-          if (isParcelMatch(parsedState.parcelle, selectedParcelle)) {
-            console.log("✅ Loading dashboard from local cache (verified parcel match)");
-            setStoredDashboardSession(parsedState);
-            setStoredDashboardOpen(true);
-            return;
-          }
-          console.log("⚠️ Ignoring cached dashboard: parcel did not match by id or coordinates");
+        console.debug('[Map] loaded cached dashboard', { cachedStateKey, parsedParcelId: parsedState?.parcelle?.id, parsedParcelSignature: parsedState?.parcelSignature, selectedParcelleId: selectedParcelle?.id });
+        if (!parsedState) return;
+
+        const cachedParcel = parsedState.parcelle || null;
+        const cachedParcelSignature = parsedState.parcelSignature || buildParcelSignature(cachedParcel, parsedState?.parcelleName || "Parcel");
+        const selectedParcelSignature = buildParcelSignature(selectedParcelle, selectedParcelle?.name || "Parcel");
+        const idsMatch = cachedParcel && cachedParcel.id && selectedParcelle && selectedParcelle.id && String(cachedParcel.id) === String(selectedParcelle.id);
+        const coordsMatch = cachedParcel && cachedParcel.latlngs && selectedParcelle && selectedParcelle.latlngs && coordsEqual(cachedParcel.latlngs, selectedParcelle.latlngs);
+        const signatureMatch = cachedParcelSignature && selectedParcelSignature && cachedParcelSignature === selectedParcelSignature;
+
+        if ((signatureMatch || idsMatch || coordsMatch) && parsedState?.zoneResults?.length > 0) {
+          console.log("✅ Loading dashboard from local cache (verified parcel match)");
+          setStoredDashboardSession(parsedState);
+          setStoredDashboardOpen(true);
+          return;
         }
       }
     } catch (e) {
@@ -891,6 +954,13 @@ showToast(`❌ ${error.message}`);
       });
 
       if (!response.ok) {
+        const fallbackSession = findStoredDashboardFallback();
+        if (fallbackSession) {
+          setStoredDashboardSession(fallbackSession);
+          setStoredDashboardOpen(true);
+          console.log("✅ Loaded dashboard from local fallback after DB miss");
+          return;
+        }
         showToast("❌ This parcel does not have a saved dashboard yet");
         return;
       }
@@ -899,6 +969,13 @@ showToast(`❌ ${error.message}`);
       const hasData = data && Object.values(data).some((rows) => Array.isArray(rows) && rows.length > 0);
 
       if (!hasData) {
+        const fallbackSession = findStoredDashboardFallback();
+        if (fallbackSession) {
+          setStoredDashboardSession(fallbackSession);
+          setStoredDashboardOpen(true);
+          console.log("✅ Loaded dashboard from local fallback after empty DB response");
+          return;
+        }
         showToast("❌ This parcel does not have a saved dashboard yet");
         return;
       }
@@ -995,6 +1072,7 @@ showToast(`❌ ${error.message}`);
         weatherData={parcelWeather}
       />
       <SoilDiagnostic
+        key={activeDashboardParcelSignature || `${storedDashboardOpen ? "dashboard" : "analysis"}`}
         open={storedDashboardOpen}
         onClose={() => setStoredDashboardOpen(false)}
         parcelleName={storedDashboardSession?.parcelleName || selectedParcelle?.name || pendingParcelleInfo?.name || "Parcel"}

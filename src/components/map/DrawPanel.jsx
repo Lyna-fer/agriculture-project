@@ -277,7 +277,11 @@ export default function DrawPanel({
                     onClick={() => setGroupId(g.id)}
                   >
                     <span className="dp-culture-btn-emoji">
-                      <Icon color={g.iconColor} size={20} />
+                      {g.iconImage ? (
+                        <img src={g.iconImage} alt={g.nameShort} className="dp-culture-btn-image" />
+                      ) : Icon ? (
+                        <Icon color={g.iconColor} size={20} />
+                      ) : null}
                     </span>
                     <span
                       className="dp-culture-btn-label"

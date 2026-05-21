@@ -349,6 +349,13 @@
   width: fit-content;
 }
 
+.lp-field-culture-image {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  display: block;
+}
+
 .lp-field-del {
   width: 30px;
   height: 30px;

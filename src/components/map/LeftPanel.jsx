@@ -114,6 +114,11 @@ export default function LeftPanel({
   const drawPanelOpen = !!activeTool || !!pendingParcelleInfo;
   const drawPhase = pendingParcelleInfo ? "confirm" : "drawing";
   const existingNames = parcelles.map((parcel) => parcel.name || "");
+  const nameCounts = parcelles.reduce((acc, p) => {
+    const n = p.name || "";
+    acc[n] = (acc[n] || 0) + 1;
+    return acc;
+  }, {});
 
   const handleConfirmClear = () => {
     setShowClearConfirm(false);
@@ -285,7 +290,12 @@ export default function LeftPanel({
                         )}
                         <FieldThumb color={parcel.color} latlngs={parcel.latlngs} index={index} />
                         <div className="lp-field-info">
-                          <div className="lp-field-name">{parcel.name}</div>
+                          <div className="lp-field-name">
+                            {parcel.name}
+                            {nameCounts[parcel.name] > 1 && (
+                              <span className="lp-field-id"> #{parcel.id}</span>
+                            )}
+                          </div>
                           <div className="lp-field-area">
                             {fmtArea(parcel.area)}
                             {culture && (
@@ -293,7 +303,11 @@ export default function LeftPanel({
                                 className="lp-field-culture-tag"
                                 style={{ color: culture.color, background: culture.colorLight }}
                               >
-                                {Icon && <Icon size={14} color={culture.iconColor} />}
+                                {culture.iconImage ? (
+                                  <img src={culture.iconImage} alt={culture.nameShort} className="lp-field-culture-image" />
+                                ) : Icon ? (
+                                  <Icon size={14} color={culture.iconColor} />
+                                ) : null}
                                 {culture.nameShort}
                               </span>
                             )}

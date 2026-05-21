@@ -251,6 +251,12 @@
   background: #fff;
   cursor: pointer;
   font-family: inherit;
+.dp-culture-btn-image {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  display: block;
+}
   text-align: left;
   transition: all 0.14s;
   position: relative;

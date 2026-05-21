@@ -1,0 +1,8 @@
+[
+  {
+    "crop_slug": "example_crop_slug",
+    "crop_name": "Example crop name",
+    "filename": "example-crop-slug.png",
+    "url": "https://example.com/path/to/example-crop.png"
+  }
+]

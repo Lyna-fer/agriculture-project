@@ -1,337 +1,251 @@
-# Project Class Diagrams
+# Project Class Diagram
 
-This document provides complete UML-style class diagrams for the project.
-Only essential functions are shown.
-
-## 1) Backend Domain Model (SQLAlchemy + Pydantic)
+This diagram uses the real source file names as class names, and only functions that actually exist in the codebase.
 
 ```mermaid
 classDiagram
     direction LR
 
-    class AuthUser {
-        +id: int
-        +username: str
-        +email: str
-        +password: str
-        +is_active: bool
-        +date_joined: datetime
-    }
-
-    class Farmer {
-        +id: int
-        +nom: str
-        +prenom: str
-        +email: str
-    }
-
-    class Parcelle {
-        +id: int
-        +user_id: int
-        +farmerid: int
-        +nom: str
-        +surface: numeric
-        +location: POLYGON
-    }
-
-    class SoilSample {
-        +id: int
-        +parcelle_id: int
-        +zone_name: str
-        +geometrie: POINT
-        +depth: numeric
-        +date_echantillon: date
-        +statut: str
-    }
-
-    class UserCreate {
-        +username: str
-        +email: str
-        +password: str
-    }
-
-    class Token {
-        +access_token: str
-        +token_type: str
-        +user_id: int
-        +username: str
-    }
-
-    class SamplingRequest {
-        +polygonPoints: list
-        +cropType: str
-        +samplingMode: str
-        +parcelleName: str?
-    }
-
-    class SatelliteSoilRequest {
-        +polygonPoints: list
-    }
-
-    AuthUser "1" --> "0..*" Parcelle : owns
-    Parcelle "1" --> "0..*" SoilSample : contains
-    Farmer "0..1" --> "0..*" Parcelle : linked by farmerid
-```
-
-## 2) Backend Service and API Layer
-
-```mermaid
-classDiagram
-    direction TB
-
-    class FastAPIApp {
-        <<controller>>
-        +register(user, db)
-        +login(form_data, db)
-        +run_and_save(request, current_user, db)
-        +get_satellite_soil_metrics(request, current_user)
-        +get_parcels(current_user, db)
-        +delete_parcel(parcel_id, current_user, db)
-    }
-
-    class AuthService {
-        <<service>>
-        +verify_django_password(plain, hashed) bool
-        +create_access_token(data, expires_delta) str
-        +get_current_user(token, db) AuthUser
-    }
-
-    class SamplingPipeline {
-        <<service>>
-        +run_sampling_pipeline(polygon_points, crop_type, sampling_mode) dict
-        +compute_num_zones(total_area_ha, strategy, sampling_mode) int
-        +build_zones(drawn_polygon, total_area_ha, num_zones, strategy, sampling_mode) list
-        +generate_points(poly, area_ha, strategy, density_factor) list
-    }
-
-    class GeometryUtils {
-        <<utility>>
-        +safe_intersect(poly_a, poly_b) Polygon
-        +calculate_area_hectares(coords) float
-    }
-
-    class SatelliteMetricsService {
-        <<service>>
-        +_to_ee_polygon(latlngs) ee.Geometry
-        +_compute_satellite_metrics(geometry) dict
-    }
-
-    class PersistenceService {
-        <<service>>
-        +_compute_geometry_hash(coords) str
-    }
-
-    FastAPIApp --> AuthService
-    FastAPIApp --> SamplingPipeline
-    FastAPIApp --> SatelliteMetricsService
-    FastAPIApp --> PersistenceService
-    SamplingPipeline --> GeometryUtils
-```
-
-## 3) Frontend App and Routing Structure
-
-```mermaid
-classDiagram
-    direction TB
-
-    class MainEntry {
-        <<bootstrap>>
-        +render()
-    }
-
     class App {
-        <<component>>
-        +isAuthenticated() bool
+        <<file>>
+        +isAuthenticated()
+        +ProtectedRoute()
     }
 
-    class ProtectedRoute {
-        <<component>>
-        +render(children)
-    }
-
-    class LandingPage {
-        <<component>>
-        +onEnter()
+    class Landing {
+        <<file>>
     }
 
     class LoginPage {
-        <<component>>
-        +handleSubmit(event)
+        <<file>>
+        +mode: string
+        +email: string
+        +username: string
+        +password: string
+        +handleSubmit()
     }
 
-    class MapPage {
-        <<component>>
-        +handleAnalyze()
-        +handleStartSampling()
-        +handleDeleteParcelle(id)
-        +handleClearAll()
+    class Map {
+        <<file>>
+        +parcelles: Array
+        +selectedParcelleId: number | null
+        +selectedGroupId: number | null
+        +isAnalyzing: boolean
+        +buildDashboardSnapshotFromRow()
+        +buildDashboardSessionFromDb()
     }
 
-    class LandingNavbar {
-        <<component>>
-    }
-
-    class Hero {
-        <<component>>
-    }
-
-    class Products {
-        <<component>>
-    }
-
-    class Industries {
-        <<component>>
-    }
-
-    class Stats {
-        <<component>>
-    }
-
-    class Testimonials {
-        <<component>>
-    }
-
-    class Footer {
-        <<component>>
-    }
-
-    MainEntry --> App
-    App --> ProtectedRoute
-    App --> LandingPage
-    App --> LoginPage
-    App --> MapPage
-
-    LandingPage --> LandingNavbar
-    LandingPage --> Hero
-    LandingPage --> Products
-    LandingPage --> Industries
-    LandingPage --> Stats
-    LandingPage --> Testimonials
-    LandingPage --> Footer
-```
-
-## 4) Frontend Map Module (Core Flow)
-
-```mermaid
-classDiagram
-    direction LR
-
-    class MapPage {
-        <<component>>
-        +handleAnalyze()
-        +handleStartSampling()
-        +renderSamplingPoints(state)
-        +openGoogleMapsForBatch(state)
-    }
-
-    class useMap {
-        <<hook>>
-        +activateDrawTool(tool)
-        +drawParcelleFromLatLngs(latlngs, color)
-        +displayZones(zones, samplingMode)
-        +placeSamplePoints(zones, color, options)
-        +clearAll()
+    class SoilDiagnostic {
+        <<file>>
+        +SAT_DEFAULTS: object
+        +SAT_FIELDS: object
+        +ZONE_COLORS: string[]
+        +tab: string
+        +weather: object | null
+        +buildLabRequestHtml()
+        +buildZoneReportHtml()
+        +buildAnalysisSnapshot()
     }
 
     class LeftPanel {
-        <<component>>
-        +onGenerate()
-        +onSaveParcelle()
-        +onClearAll()
-    }
-
-    class MapView {
-        <<component>>
-        +onSelectWilaya(wilaya)
+        <<file>>
+        +showClearConfirm: boolean
+        +profileMenuOpen: boolean
+        +canGenerate: boolean
+        +drawPanelOpen: boolean
+        +handleConfirmClear()
+        +handleDashboardClick()
     }
 
     class ResultsPanel {
-        <<component>>
-        +buildKpis(data, nSamples, parcelleHa)
-        +onStartSampling()
+        <<file>>
+        +TABS: Array
+        +PALETTE: string[]
+        +tab: string
+        +weather: object | null
+        +buildSamplingWeatherAdvice()
+        +buildSeasonalSamplingTips()
+        +buildKpis()
     }
 
-    class DrawPanel {
-        <<component>>
-        +onSave()
-        +onCancel()
+    class useMap {
+        <<file>>
+        +mapRef: RefObject
+        +mapInstanceRef: RefObject
+        +drawnItemsRef: RefObject
+        +MIN_ZOOM_FOR_MARKERS: number
+        +mapReady: boolean
+        +computeStats()
+        +drawAllParcelles()
+        +clearAllParcelles()
     }
 
-    class SearchBar {
-        <<component>>
-        +handleInput(event)
-        +handleSelect(wilaya)
+    class soilDashboardStorage {
+        <<file>>
+        +SOIL_DASHBOARD_UPDATED_EVENT: string
     }
 
-    class WilayaInfoPanel {
-        <<component>>
-        +handleClose()
+    class samplingEngine {
+        <<file>>
+        +GEE_CLIENT_ID: string
+        +GEE_PROJECT_ID: string
+        +CROP_STRATEGIES: object
+        +MAX_PARCEL_AREA_HA: number
+        +generatePoints()
+        +computeNumZones()
+        +buildZones()
+        +runSamplingPipeline()
     }
 
-    class SoilDiagnostic {
-        <<component>>
-        +onAnalyze()
-        +onReset()
+    class main {
+        <<file>>
+        +NEON_URL: string
+        +engine: object
+        +SessionLocal: object
+        +app: FastAPI
+        +get_db()
+        +register()
+        +login()
+        +run_and_save()
+        +create_parcel()
+        +get_parcels()
+        +delete_parcel()
+        +save_zone_analysis()
+        +get_parcel_analyses()
     }
 
-    class SamplingLogicService {
-        <<service>>
-        +initializeSamplingState(zones)
-        +getCurrentBatchPoints(zones, state)
-        +markPointDone(state, batchIndex)
-        +advanceSamplingBatch(zones, state, batchSize)
+    class sampling {
+        <<file>>
+        +MAX_PARCEL_AREA_HA: number
+        +calculate_area_hectares()
+        +compute_num_zones()
+        +build_zones()
+        +run_sampling_pipeline()
     }
 
-    class SamplingEngine {
-        <<library>>
-        +computePreview(polygonPoints, cropType, samplingMode)
-        +computeNumZones(totalAreaHa, strategy, samplingMode)
-        +authenticateGEE()
+    class kml_export {
+        <<file>>
+        +build_sampling_kml()
     }
 
-    class DataCatalog {
-        <<data>>
-        +CULTURES
-        +WILAYAS
-        +ZONE_COLORS
+    App "1" --> "1" Landing : route
+    App "1" --> "1" LoginPage : route
+    App "1" --> "1" Map : route
+
+    Map "1" --> "1" SoilDiagnostic : uses
+    Map "1" --> "1" LeftPanel : uses
+    Map "1" --> "1" ResultsPanel : uses
+    Map "1" --> "1" useMap : uses
+    Map "1" --> "1" soilDashboardStorage : uses
+    Map "1" --> "1" samplingEngine : uses
+
+    main "1" --> "1" sampling : imports
+    main "1" --> "1" kml_export : imports
+
+    %% Database models and cardinalities (verified from Backend/main.py)
+    class AuthUser {
+        <<db model>>
+        +id: int
+        +username: string
+        +email: string
+        +is_active: boolean
     }
 
-    MapPage --> useMap
-    MapPage --> LeftPanel
-    MapPage --> MapView
-    MapPage --> ResultsPanel
-    MapPage --> SamplingLogicService
-    MapPage --> SamplingEngine
+    class Parcelle {
+        <<db model>>
+        +id: int
+        +user_id: int
+        +surface: number
+        +location: Geometry
+    }
 
-    LeftPanel --> DrawPanel
-    MapView --> SearchBar
-    MapView --> WilayaInfoPanel
-    ResultsPanel --> SoilDiagnostic
-    SearchBar --> DataCatalog
-    ResultsPanel --> DataCatalog
+    class SoilSample {
+        <<db model>>
+        +id: int
+        +parcelle_id: int
+        +geometrie: Point
+        +date_echantillon: Date
+    }
+
+    class ZoneAnalysis {
+        <<db model>>
+        +id: int
+        +parcelle_id: int
+        +user_id: int
+        +soil_metrics: JSON
+        +analyzed_at: DateTime
+    }
+
+    AuthUser "1" --> "*" Parcelle : owns
+    Parcelle "1" --> "*" SoilSample : contains
+    Parcelle "1" --> "*" ZoneAnalysis : analyzed
+    AuthUser "1" --> "*" ZoneAnalysis : performs
+
 ```
 
-## 5) Crop Requirements API Module
+## What Each Function Does
 
-```mermaid
-classDiagram
-    direction LR
+### App
+- `isAuthenticated()` checks whether a token exists in `localStorage`.
+- `ProtectedRoute()` blocks protected pages unless the user is authenticated.
 
-    class CropRequirementsAPI {
-        <<backend-endpoint>>
-        +GET /api/crops/requirements?groupId=
-    }
+### LoginPage
+- `handleSubmit()` sends the login or register request and stores the token on success.
 
-    class CropRequirementsTable {
-        <<postgres-table>>
-        +crop_requirements
-    }
+### Landing
+- `Landing()` is the landing-page component; it sets the page body class and navigates to login when the user enters.
 
-    class SoilDiagnostic {
-        <<component>>
-        +fetch crop requirements by group
-    }
+### Map
+- `buildDashboardSnapshotFromRow()` turns one analysis row into a dashboard snapshot object.
+- `buildDashboardSessionFromDb()` rebuilds the full dashboard session from saved database rows.
 
-    SoilDiagnostic --> CropRequirementsAPI
-    CropRequirementsAPI --> CropRequirementsTable
-```
+### SoilDiagnostic
+- `buildLabRequestHtml()` creates the HTML used for the lab request print/export view.
+- `buildZoneReportHtml()` creates the HTML report for a zone analysis.
+- `buildAnalysisSnapshot()` packages the analysis state into a snapshot for storage or export.
+
+### LeftPanel
+- `handleConfirmClear()` confirms the clear-all action and then clears the parcels.
+- `handleDashboardClick()` opens the dashboard only when it is available.
+
+### ResultsPanel
+- `buildSamplingWeatherAdvice()` creates sampling advice from weather conditions.
+- `buildSeasonalSamplingTips()` creates crop-season sampling tips.
+- `buildKpis()` creates the KPI cards shown in the results panel.
+
+### useMap
+- `computeStats()` computes parcel area, perimeter, and bounds.
+- `drawAllParcelles()` redraws every parcel polygon and its label.
+- `clearAllParcelles()` removes every parcel layer from the map.
+
+### soilDashboardStorage
+- `getDashboardHistory()` returns the latest and previous analysis entries.
+- `saveDashboardState()` stores the latest dashboard state and keeps only the last two entries.
+- `isParcelleAnalysisComplete()` checks whether the required zone results are complete.
+- `clearDashboardHistory()` removes all saved dashboard data for one parcel.
+
+### samplingEngine
+- `generatePoints()` generates sampling points inside a polygon.
+- `computeNumZones()` decides how many zones to create based on area and sampling mode.
+- `buildZones()` splits a parcel into zones and generates points for each zone.
+- `runSamplingPipeline()` is the frozen frontend stub that returns mock sampling results.
+
+### main
+- `get_db()` opens a database session and closes it after use.
+- `register()` creates a new auth user and farmer record.
+- `login()` verifies credentials and returns a JWT token.
+- `run_and_save()` runs the sampling pipeline and stores soil samples in the database.
+- `create_parcel()` creates or reuses a parcel record.
+- `get_parcels()` returns all parcels owned by the current user.
+- `delete_parcel()` deletes one parcel and its related data.
+- `save_zone_analysis()` stores one analyzed zone result.
+- `get_parcel_analyses()` returns the latest two analyses per zone for a parcel.
+
+### sampling
+- `calculate_area_hectares()` computes polygon area in hectares.
+- `compute_num_zones()` decides the number of zones for a parcel.
+- `build_zones()` splits the parcel into sampling zones.
+- `run_sampling_pipeline()` runs the full backend sampling process.
+
+### kml_export
+- `build_sampling_kml()` builds the full KML document for all zones and points.

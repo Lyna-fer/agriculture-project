@@ -1,5 +1,8 @@
 import { Carrot, Wheat, Apple } from "lucide-react";
 
+const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const cropIconUrl = (filename) => `${API_BASE}/static/crop-icons/${filename}`;
+
 export const CULTURES = [
   {
     id: 1,

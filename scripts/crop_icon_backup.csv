@@ -1,0 +1,29 @@
+id,crop_name,crop_slug,icon_filename
+7,Zucchini,courgette,🥒
+11,Turnip,navet,🍋
+13,Common Wheat,ble_tendre,🌾
+14,Barley,orge,🌾
+15,Oats,avoine,🌾
+17,Sorghum,sorgho,🌾
+18,Triticale,triticale,🌾
+19,Rye,seigle,🌾
+20,Millet,millet,🌾
+21,Quinoa,quinoa,🌾
+24,Date Palm,palmier,🍋
+26,Mandarin Tree,mandarinier,🍋
+29,Fig Tree,figuier,🍋
+31,Apricot Tree,abricotier,🍑
+38,Broad Bean,feve,🫘
+42,Lentil,lentille,🫘
+43,Chickpea,pois_chiche,🫘
+44,Faba Bean,feve_cereale,🫘
+45,Vetch,vesce,🌿
+46,Alfalfa,luzerne,🌿
+48,Forage Maize,mais_fourrage,🌽
+50,Fenugreek,fenugrec,🌿
+52,Pomegranate Tree,grenadier,🍋
+55,Plum Tree,prunier,🍋
+56,Nectarine Tree,nectarinier,🍋
+57,Quince Tree,cognassier,🍋
+59,Pistachio Tree,pistachier,🍋
+60,Walnut Tree,noyer,🍋
