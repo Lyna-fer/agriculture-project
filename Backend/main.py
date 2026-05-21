@@ -1,5 +1,6 @@
 import ee
 import os
+import json
 import math
 import hashlib
 import base64
@@ -11,9 +12,11 @@ from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from jose import JWTError, jwt
 import httpx
+from dotenv import load_dotenv
 
 try:
     from Backend.services.sampling import run_sampling_pipeline
@@ -25,22 +28,115 @@ except ModuleNotFoundError:
     from services.kml_export import build_sampling_kml
 import asyncio
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, Numeric, Date, ForeignKey, DateTime, select, text, func, JSON
+from sqlalchemy import create_engine, Column, Integer, String, Float, Numeric, Date, ForeignKey, DateTime, select, text, func, JSON, Text
 
 # ─── DATABASE SETUP ───────────────────────────────────────────────────────────
 from sqlalchemy import create_engine, Column, Integer, String, Float, Numeric, Date, ForeignKey, DateTime, select, text, func
 from sqlalchemy.orm import sessionmaker, declarative_base, Session, relationship
 from sqlalchemy.sql import func as sql_func
 from geoalchemy2 import Geometry
+from shapely import wkt as shapely_wkt
 
-NEON_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://neondb_owner:npg_aH8xNI0goWJX@ep-jolly-dawn-allib500-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DOTENV_PATH = os.path.join(BASE_DIR, ".env")
+if os.path.exists(DOTENV_PATH):
+    for dotenv_encoding in ("utf-16", "utf-8"):
+        try:
+            load_dotenv(DOTENV_PATH, override=False, encoding=dotenv_encoding)
+            break
+        except Exception:
+            continue
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+# By default do NOT fall back to a local SQLite file to avoid accidental
+# connections to a local DB containing sensitive data. To allow using the
+# bundled `local.db` you must explicitly set `ALLOW_LOCAL_DB=1` in the
+# environment. This keeps the file on disk for security/archive purposes
+# while preventing the app from connecting to it unless allowed.
+ALLOW_LOCAL_DB = os.getenv("ALLOW_LOCAL_DB", "0") == "1"
+if not DATABASE_URL and ALLOW_LOCAL_DB:
+    DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'local.db')}"
+
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not set. Set DATABASE_URL to your Postgres URL, "
+        "or set ALLOW_LOCAL_DB=1 to explicitly enable the bundled local.db"
+    )
+
+SQLITE_MODE = DATABASE_URL.startswith("sqlite")
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    connect_args={"check_same_thread": False} if SQLITE_MODE else {},
 )
-
-engine = create_engine(NEON_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+EE_INITIALIZED = False
+
+
+def geometry_to_latlngs(geometry_value):
+    if not geometry_value:
+        return []
+
+    try:
+        if SQLITE_MODE or isinstance(geometry_value, str):
+                raw_geometry = str(geometry_value)
+                if raw_geometry.startswith("SRID=") and ";" in raw_geometry:
+                        raw_geometry = raw_geometry.split(";", 1)[1]
+                geom = shapely_wkt.loads(raw_geometry)
+        else:
+            from geoalchemy2.shape import to_shape
+            geom = to_shape(geometry_value)
+
+        if geom.geom_type == "Polygon":
+            return [[coord[1], coord[0]] for coord in list(geom.exterior.coords)[:-1]]
+    except Exception as exc:
+        print(f"⚠️ Could not decode geometry: {exc}")
+
+    return []
+
+
+def initialize_earth_engine() -> bool:
+    global EE_INITIALIZED
+    if EE_INITIALIZED:
+        return True
+
+    project_id = os.getenv("GEE_PROJECT_ID", "isil-b-agri-project")
+    service_account_key = os.getenv("GEE_SERVICE_ACCOUNT_KEY")
+    service_account_email = os.getenv("GEE_SERVICE_ACCOUNT_EMAIL")
+
+    try:
+        if service_account_key:
+            key_path = service_account_key
+            if not os.path.isabs(key_path):
+                key_path = os.path.join(BASE_DIR, key_path)
+
+            if os.path.exists(key_path):
+                if not service_account_email:
+                    try:
+                        with open(key_path, "r", encoding="utf-8") as key_file:
+                            service_data = json.load(key_file)
+                        service_account_email = service_data.get("client_email")
+                    except Exception as exc:
+                        print(f"⚠️ Could not read Earth Engine key metadata: {exc}")
+
+                if service_account_email:
+                    credentials = ee.ServiceAccountCredentials(service_account_email, key_path)
+                    ee.Initialize(credentials, project=project_id)
+                    EE_INITIALIZED = True
+                    print(f"✅ Earth Engine initialized with service account: {service_account_email}")
+                    return True
+
+        ee.Initialize(project=project_id)
+        EE_INITIALIZED = True
+        print(f"✅ Earth Engine initialized with project: {project_id}")
+        return True
+    except Exception as exc:
+        EE_INITIALIZED = False
+        print(f"⚠️ Earth Engine initialization failed: {exc}")
+        return False
 
 
 def get_db():
@@ -89,7 +185,7 @@ class Parcelle(Base):
     user_id = Column(Integer, ForeignKey("auth_user.id"))
     nom = Column(String)
     surface = Column(Numeric)
-    location = Column(Geometry("POLYGON", srid=4326))
+    location = Column(Text if SQLITE_MODE else Geometry("POLYGON", srid=4326))
     group_id = Column(Integer, nullable=True, default=1)  # ✅ NEW
     soil_samples = relationship("SoilSample", back_populates="parcelle")
 
@@ -101,7 +197,7 @@ class SoilSample(Base):
     id = Column(Integer, primary_key=True)
     parcelle_id = Column(Integer, ForeignKey("parcelles.id"))
     zone_name = Column(String)
-    geometrie = Column(Geometry("POINT", srid=4326))
+    geometrie = Column(Text if SQLITE_MODE else Geometry("POINT", srid=4326))
     depth = Column(Numeric)
     date_echantillon = Column(Date)
     statut = Column(String)
@@ -273,6 +369,8 @@ class WindExpectationOut(BaseModel):
 # ─── FASTAPI APP ──────────────────────────────────────────────────────────────
 app = FastAPI(title="AgriTech Auth + Sampling", version="2.0")
 
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -282,9 +380,89 @@ app.add_middleware(
 )
 
 
+def create_sqlite_support_tables() -> None:
+    if not SQLITE_MODE:
+        return
+
+    support_tables = [
+        """
+        CREATE TABLE IF NOT EXISTS crop_requirements (
+            id INTEGER PRIMARY KEY,
+            category TEXT,
+            crop_name TEXT,
+            ph_min NUMERIC,
+            ph_max NUMERIC,
+            ec_max NUMERIC,
+            n_req INTEGER,
+            p_req INTEGER,
+            k_req INTEGER,
+            soil_type TEXT,
+            om_min NUMERIC,
+            active_lime_max NUMERIC,
+            max_wind_kmh INTEGER,
+            wind_critical_start_days INTEGER,
+            pollution_accumulation_risk TEXT,
+            name_ar TEXT,
+            icon_filename TEXT,
+            crop_slug TEXT,
+            temp_min NUMERIC,
+            temp_max NUMERIC,
+            season TEXT,
+            icon TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS wind_expectations (
+            month_id INTEGER PRIMARY KEY,
+            month_name TEXT,
+            avg_wind_speed_kmh NUMERIC,
+            season TEXT
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS economic_thresholds (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            max_ha INTEGER NOT NULL,
+            zones INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS soil_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parcelle_id INTEGER NOT NULL,
+            sat_ph NUMERIC,
+            sat_ec NUMERIC,
+            sat_temp NUMERIC,
+            sat_soil_type TEXT,
+            sat_soil_type_code INTEGER,
+            lab_ph NUMERIC,
+            lab_ec NUMERIC,
+            lab_nitrogen NUMERIC,
+            lab_phosphorus NUMERIC,
+            lab_potassium NUMERIC,
+            lab_organic_matter NUMERIC,
+            test_date DATE,
+            health_score NUMERIC,
+            best_crop_suitability NUMERIC,
+            recommended_crop_id TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            source TEXT DEFAULT 'satellite'
+        )
+        """,
+    ]
+
+    with engine.begin() as conn:
+        for ddl in support_tables:
+            conn.execute(text(ddl))
+
+
 @app.on_event("startup")
 def startup_event():
-    ee.Initialize(project="isil-b-agri-project")
+    if SQLITE_MODE:
+        Base.metadata.create_all(bind=engine)
+        create_sqlite_support_tables()
+    initialize_earth_engine()
 
 
 # ─── AUTH ENDPOINTS ───────────────────────────────────────────────────────────
@@ -734,6 +912,15 @@ async def run_and_save(
         db: Session = Depends(get_db)
 ):
     try:
+        if not initialize_earth_engine():
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Earth Engine is not initialized. Set GEE_SERVICE_ACCOUNT_KEY to a valid JSON key file "
+                    "and optionally GEE_SERVICE_ACCOUNT_EMAIL / GEE_PROJECT_ID in Backend/.env, then restart the backend."
+                ),
+            )
+
         if not request.parcelleId:
             raise HTTPException(400, "Parcelle must be saved before generating sampling guide")
 
@@ -771,7 +958,7 @@ async def run_and_save(
         samples_created = 0
         for zone in result['zones']:
             for point in zone.get('points', []):
-                point_wkt = f"SRID=4326;POINT({point[1]} {point[0]})"
+                point_wkt = f"POINT({point[1]} {point[0]})" if SQLITE_MODE else f"SRID=4326;POINT({point[1]} {point[0]})"
                 db.add(SoilSample(
                     parcelle_id=parcelle_record.id,
                     zone_name=zone.get('id', 'Unknown'),
@@ -833,39 +1020,12 @@ def create_parcel(
         raise HTTPException(400, detail="Parcel geometry is required")
 
     parcelle_name = request.name.strip()
-    existing = db.query(Parcelle).filter(
-        Parcelle.user_id == current_user.id,
-        Parcelle.nom == parcelle_name
-    ).first()
-    if existing:
-        from geoalchemy2.shape import to_shape
-
-        latlngs = []
-        if existing.location:
-          try:
-              geom = to_shape(existing.location)
-              if geom.geom_type == 'Polygon':
-                  latlngs = [[coord[1], coord[0]] for coord in list(geom.exterior.coords)[:-1]]
-          except:
-              pass
-
-        return {
-            "id": existing.id,
-            "name": existing.nom or f"Parcelle #{existing.id}",
-            "area": float(existing.surface) * 10000 if existing.surface else 0,
-            "color": "#2ecc71",
-            "groupId": existing.group_id or request.groupId or 1,
-            "latlngs": latlngs,
-            "bounds": None,
-            "user_id": existing.user_id,
-            "farmerid": existing.farmerid
-        }
 
     from shapely.geometry import Polygon
 
     coords = [[p[1], p[0]] for p in request.polygonPoints]
     coords.append(coords[0])
-    location_wkt = f"SRID=4326;{Polygon(coords).wkt}"
+    location_wkt = Polygon(coords).wkt if SQLITE_MODE else f"SRID=4326;{Polygon(coords).wkt}"
 
     farmer_record = db.query(Farmer).filter(Farmer.email == current_user.email).first()
     farmer_id_for_parcelle = farmer_record.id if farmer_record else None
@@ -935,20 +1095,11 @@ def export_sampling_kml(
 # ─── PERSISTENT PARCELLE ENDPOINTS ─────────────────────────────────────────────
 @app.get("/api/parcels")
 def get_parcels(current_user: AuthUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    from geoalchemy2.shape import to_shape
-
     parcels = db.query(Parcelle).filter(Parcelle.user_id == current_user.id).all()
 
     result = []
     for p in parcels:
-        latlngs = []
-        if p.location:
-            try:
-                geom = to_shape(p.location)
-                if geom.geom_type == 'Polygon':
-                    latlngs = [[coord[1], coord[0]] for coord in list(geom.exterior.coords)[:-1]]
-            except:
-                pass
+        latlngs = geometry_to_latlngs(p.location)
 
         result.append({
             "id": p.id,

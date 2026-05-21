@@ -61,6 +61,116 @@ const OM_LEVEL_VALUES = {
 };
 const POLLUTION_RISK_SHIFT = { low: 10, medium: 0, high: -10 };
 
+const TARGET_CROP_ICON_OVERRIDES = {
+  ble_dur: "durumwheat.png",
+  ble_tendre: "commonwheat.png",
+  orge: "barley.png",
+  avoine: "oats.png",
+  oats: "oats.png",
+  millet: "millet.png",
+  sorgho: "sorghum.png",
+  triticale: "triticale.png",
+  seigle: "rye.png",
+  quinoa: "quinoa.png",
+  riz: "rice.png",
+  tomate: "tomato.png",
+  pomme_terre: "potato.png",
+  oignon: "onion.png",
+  ail: "garlic.png",
+  poivron: "bell-pepper.png",
+  piment: "chilli-pepper.png",
+  courgette: "zucchini.png",
+  concombre: "cucumber.png",
+  aubergine: "eggplant.png",
+  carotte: "carrot.png",
+  feve: "fababean.png",
+  feve_cereale: "fababean.png",
+  lentille: "lentils.png",
+  pois_chiche: "chickpeas.png",
+  fenugrec: "fenugreek.png",
+  luzerne: "alfalfa.png",
+  vesce: "vetch.png",
+  palmier: "dates.png",
+  figuier: "fig.png",
+    mandarinier: "mandarine.png",
+    mandarine: "mandarine.png",
+    melon: "melon.png",
+  citronnier: "lemon.png",
+  lemon: "lemon.png",
+  oranger: "orange.png",
+  olivier: "olives.png",
+  grenadier: "pomegrenate.png",
+  cognassier: "quince.png",
+  abricotier: "apricot.png",
+  amandier: "almond.png",
+  nectarinier: "nectarine.png",
+  prunier: "plum.png",
+  pistachier: "pistachio.png",
+  noyer: "walnut.png",
+  navet: "turnip.png",
+  cerisier: "cherry.png",
+  pecher: "peach.png",
+  poirier: "pear.png",
+  pommier: "apple.png",
+  betterave: "beetroot.png",
+  chou_fleur: "cauliflower.png",
+  laitue: "lettuce.png",
+  haricot_vert: "green-beans.png",
+  petits_pois: "peas.png",
+  trefle: "clover.png",
+  artichaut: "artichoke.png",
+  pasteque: "watermelon.png",
+  pois_fourrage: "foragepea.png",
+  neflier: "loquat.png",
+  mais: "corn.png",
+  maize: "corn.png",
+  mais_fourrage: "corn_2.png",
+  vigne: "grape.png",
+  grape: "grape.png",
+};
+
+function getTargetCropIconFilename(crop) {
+  if (!crop) return null;
+  const directFilename = crop.iconFilename || crop.icon_filename;
+  if (typeof directFilename === "string" && directFilename.trim()) {
+    return directFilename.trim();
+  }
+
+  const explicitFile = crop.emoji || crop.e;
+  if (typeof explicitFile === "string" && /\.(png|jpg|jpeg|webp|gif)$/i.test(explicitFile.trim())) {
+    return explicitFile.trim();
+  }
+
+  const normalizedId = String(crop.id || crop.lat || crop.n || crop.nameEn || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_")
+    .replace(/[^a-z0-9_]/g, "");
+  return TARGET_CROP_ICON_OVERRIDES[normalizedId] || null;
+}
+
+function isLikelyEmoji(value) {
+  if (!value || typeof value !== "string") return false;
+  return /\p{Extended_Pictographic}/u.test(value);
+}
+
+function getTargetCropVisual(crop) {
+  if (!crop) return { type: "emoji", value: "🌱" };
+  const filename = getTargetCropIconFilename(crop);
+  if (filename) {
+    return { type: "image", src: `${API_BASE}/static/crop-icons/${filename}`, alt: crop.n || crop.nameEn || "Target crop" };
+  }
+
+  if (isLikelyEmoji(crop.e)) {
+    return { type: "emoji", value: crop.e };
+  }
+
+  return {
+    type: "emoji",
+    value: crop.e || "🌱",
+  };
+}
+
 const GROUP_SCORE_WEIGHTS = {
   vegetables: {
     texture: 0.12,
@@ -347,6 +457,7 @@ function toCrop(c) {
     id: c.id,
     n: c.nameEn,
     ar: c.nameAr || c.nameEn,
+    iconFilename: c.emoji,
     e: c.emoji,
     bg: EMOJI_BG[c.emoji] || "#f0f0f0",
     lat: c.nameEn,
@@ -1026,33 +1137,37 @@ function buildZoneReportHtml({
     <li><span class="bullet">•</span><span>${escapeHtml(item.t)}</span></li>
   `).join("");
 
-  const cropCards = scored.slice(0, 5).map((crop, index) => {
+    const cropCards = scored.slice(0, 5).map((crop, index) => {
     const rank = index + 1;
     const tone = rank === 1 ? "rank--top" : rank === 2 ? "rank--mid" : "rank--low";
     const seasonMatch = crop?.ss?.includes(state.seas);
-    return `
-      <article class="crop-card ${tone}">
-        <div class="crop-head">
-          <div class="rank">#${rank}</div>
-          <div class="crop-emoji" style="background:${crop.bg}">${escapeHtml(crop.e)}</div>
-          <div class="crop-info">
-            <h3>${escapeHtml(crop.n)}</h3>
-            <p>${escapeHtml(crop.ar || crop.lat || crop.n)}</p>
+      const filename = getTargetCropIconFilename(crop);
+      const mediaHtml = filename
+        ? `<img src="${API_BASE}/static/crop-icons/${filename}" alt="${escapeHtml(crop.n)}" />`
+        : escapeHtml(crop.e);
+      return `
+        <article class="crop-card ${tone}">
+          <div class="crop-head">
+            <div class="rank">#${rank}</div>
+            <div class="crop-emoji" style="background:${crop.bg}">${mediaHtml}</div>
+            <div class="crop-info">
+              <h3>${escapeHtml(crop.n)}</h3>
+              <p>${escapeHtml(crop.ar || crop.lat || crop.n)}</p>
+            </div>
+            <div class="crop-score">
+              <strong style="color:${mc(crop.sc)}">${crop.sc}/100</strong>
+              <span>compatibility</span>
+            </div>
           </div>
-          <div class="crop-score">
-            <strong style="color:${mc(crop.sc)}">${crop.sc}/100</strong>
-            <span>compatibility</span>
+          <div class="crop-body">
+            <div class="tags">
+              <span class="tag">${rank === 1 ? "Best match" : "Alternative"}</span>
+              <span class="tag ${seasonMatch ? "tag--ok" : "tag--warn"}">${seasonMatch ? "Season match" : "Season gap"}</span>
+            </div>
+            <p>${escapeHtml(crop.note || "No note available.")}</p>
           </div>
-        </div>
-        <div class="crop-body">
-          <div class="tags">
-            <span class="tag">${rank === 1 ? "Best match" : "Alternative"}</span>
-            <span class="tag ${seasonMatch ? "tag--ok" : "tag--warn"}">${seasonMatch ? "Season match" : "Season gap"}</span>
-          </div>
-          <p>${escapeHtml(crop.note || "No note available.")}</p>
-        </div>
-      </article>
-    `;
+        </article>
+      `;
   }).join("");
 
   const reportState = contamination.isToxic
@@ -1381,6 +1496,7 @@ function buildZoneReportHtml({
       font-size: 24px;
       flex-shrink: 0;
     }
+    .crop-emoji img { width:60%; height:60%; object-fit:contain; display:block }
     .crop-info h3 {
       margin: 0 0 2px;
       font-size: 15px;
@@ -1725,9 +1841,78 @@ function PermanentDepthSection({ depth, sectionColor, isSat, st, onChange }) {
 /* ZONE FORM */
 function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultureLabel, onAnalyze, analyzing, hasResult, onPrintLabRequest, onPrintLabRequestEco }) {
   const isSat = id => diagMode === "eco" && id in SAT_FIELDS;
+  const cropMenuWrapRef = useRef(null);
+  const cropMenuPortalRef = useRef(null);
+  const [cropMenuOpen, setCropMenuOpen] = useState(false);
+  const [cropMenuStyle, setCropMenuStyle] = useState(null);
   const seasonLabel = getSeasonLabel(st.seas);
   const seasonEmoji = SEASON_EMOJIS[st.seas] || "📅";
   const isPermanentCulture = cultureLabel === "Permanent";
+  const selectedCrop = crops.find((crop) => String(crop.id) === String(st.crop)) || null;
+  const selectedCropVisual = selectedCrop ? getTargetCropVisual(selectedCrop) : null;
+  const selectedCropLabel = selectedCrop ? selectedCrop.n || selectedCrop.ar || "Selected crop" : "Recommend for me";
+
+  const updateCropMenuPosition = useCallback(() => {
+    const wrapper = cropMenuWrapRef.current;
+    if (!wrapper) return;
+
+    const rect = wrapper.getBoundingClientRect();
+    const menuWidth = Math.min(Math.max(rect.width, 320), window.innerWidth - 24);
+    const left = Math.max(12, Math.min(rect.left, window.innerWidth - menuWidth - 12));
+    const bottom = Math.max(12, window.innerHeight - rect.top + 8);
+
+    setCropMenuStyle({
+      position: "fixed",
+      top: "auto",
+      bottom,
+      left,
+      width: menuWidth,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!cropMenuOpen) return;
+
+    const handlePointerDown = (event) => {
+      const wrapper = cropMenuWrapRef.current;
+      const portalMenu = cropMenuPortalRef.current;
+      const target = event.target;
+
+      if ((wrapper && wrapper.contains(target)) || (portalMenu && portalMenu.contains(target))) {
+        return;
+      }
+
+      if (wrapper && !wrapper.contains(target)) {
+        setCropMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setCropMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    updateCropMenuPosition();
+    window.addEventListener("resize", updateCropMenuPosition);
+    window.addEventListener("scroll", updateCropMenuPosition, true);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", updateCropMenuPosition);
+      window.removeEventListener("scroll", updateCropMenuPosition, true);
+    };
+  }, [cropMenuOpen, updateCropMenuPosition]);
+
+  useEffect(() => {
+    if (!cropMenuOpen) {
+      setCropMenuStyle(null);
+    }
+  }, [cropMenuOpen]);
 
   return (
     <div className="sd-fc">
@@ -1938,14 +2123,79 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
         <div className="sd-crops-count">
           <span>{crops.length} crops · {cultureLabel}</span>
         </div>
-        <div className="sd-select-wrap">
-          <select className="sd-sel" value={st.crop} onChange={e => onChange("crop", e.target.value)}>
-            <option value="">Recommend for me</option>
-            {crops.map(c => <option key={c.id} value={c.id}>{c.e} {c.n} / {c.ar}</option>)}
-          </select>
-          <svg className="sd-sel-arrow" width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path d="M2 4.5l4.5 4.5 4.5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+        <div className="sd-select-wrap" ref={cropMenuWrapRef}>
+          <button
+            type="button"
+            className="sd-sel sd-sel-trigger"
+            aria-haspopup="listbox"
+            aria-expanded={cropMenuOpen}
+            onClick={() => setCropMenuOpen((open) => !open)}
+          >
+            <span className="sd-sel-trigger-content">
+              {selectedCropVisual ? (
+                <span className="sd-sel-trigger-icon">
+                  {selectedCropVisual.type === "image" ? <img src={selectedCropVisual.src} alt={selectedCropVisual.alt} /> : selectedCropVisual.value}
+                </span>
+              ) : (
+                <span className="sd-sel-trigger-icon">✨</span>
+              )}
+              <span className="sd-sel-trigger-text">{selectedCropLabel}</span>
+            </span>
+            <svg className="sd-sel-arrow" width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M2 4.5l4.5 4.5 4.5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          {cropMenuOpen && cropMenuStyle && (
+            <PortalOverlay zIndex={2500}>
+              <div
+                ref={cropMenuPortalRef}
+                className="sd-sel-menu"
+                role="listbox"
+                aria-label="Target crop options"
+                style={cropMenuStyle}
+              >
+                <button
+                  type="button"
+                  className={`sd-sel-option ${!st.crop ? "is-active" : ""}`}
+                  onClick={() => {
+                    onChange("crop", "");
+                    setCropMenuOpen(false);
+                  }}
+                >
+                  <span className="sd-sel-option-icon">✨</span>
+                  <span className="sd-sel-option-copy">
+                    <strong>Recommend for me</strong>
+                    <span>Auto-selected crop</span>
+                  </span>
+                </button>
+                {crops.map((c) => {
+                  const visual = getTargetCropVisual(c);
+                  const active = String(st.crop) === String(c.id);
+
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={`sd-sel-option ${active ? "is-active" : ""}`}
+                      onClick={() => {
+                        onChange("crop", String(c.id));
+                        setCropMenuOpen(false);
+                      }}
+                    >
+                      <span className="sd-sel-option-icon">
+                        {visual.type === "image" ? <img src={visual.src} alt={visual.alt} /> : visual.value}
+                      </span>
+                      <span className="sd-sel-option-copy">
+                        <strong>{c.n}</strong>
+                        <span>{c.ar}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </PortalOverlay>
+          )}
         </div>
       </div>
 
@@ -2100,10 +2350,19 @@ treeCrops.forEach(crop => {
                 <div className="sd-rec-card sd-rec-card--top">
                   <div className="sd-rec-top">
                     <div className="sd-rec-rank">#1</div>
-                    <div className="sd-rec-emoji" style={{background:bestCrop.bg}}>{bestCrop.e}</div>
-                    <div className="sd-rec-info">
-                      <div className="sd-rec-name">{bestCrop.n}</div>
-                      <div className="sd-rec-lat">{bestCrop.ar}</div>
+                    <div className="sd-rec-media">
+                      {(() => {
+                        const visual = getTargetCropVisual(bestCrop);
+                        return (
+                          <div className="sd-rec-emoji" style={{background:bestCrop.bg}}>
+                            {visual.type === "image" ? <img src={visual.src} alt={visual.alt} /> : visual.value}
+                          </div>
+                        );
+                      })()}
+                      <div className="sd-rec-info">
+                        <div className="sd-rec-name">{bestCrop.n}</div>
+                        <div className="sd-rec-lat">{bestCrop.ar}</div>
+                      </div>
                     </div>
                     <div className="sd-rec-score">
                       <div className="sd-rec-pct" style={{color:mc(bestCrop.sc)}}>{bestCrop.sc}/100</div>
@@ -2210,17 +2469,26 @@ treeCrops.forEach(crop => {
                 {recs.map((c,i) => (
                   <div key={c.id} className={`sd-rec-card ${i===0?"sd-rec-card--top":""}`}>
                     <div className="sd-rec-top">
-                      <div className="sd-rec-rank">#{i + 1}</div>
-                      <div className="sd-rec-emoji" style={{background:c.bg}}>{c.e}</div>
-                      <div className="sd-rec-info">
-                        <div className="sd-rec-name">{c.n}</div>
-                        <div className="sd-rec-lat">{c.ar}</div>
-                      </div>
-                      <div className="sd-rec-score">
-                        <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}/100</div>
-                        <div className="sd-rec-pct-lbl">compatibility</div>
-                        {i===0 && <div className="sd-rec-best-tag">★ Best choice</div>}
-                      </div>
+                        <div className="sd-rec-rank">#{i + 1}</div>
+                        <div className="sd-rec-media">
+                          {(() => {
+                            const visual = getTargetCropVisual(c);
+                            return (
+                              <div className="sd-rec-emoji" style={{background:c.bg}}>
+                                {visual.type === "image" ? <img src={visual.src} alt={visual.alt} /> : visual.value}
+                              </div>
+                            );
+                          })()}
+                          <div className="sd-rec-info">
+                            <div className="sd-rec-name">{c.n}</div>
+                            <div className="sd-rec-lat">{c.ar}</div>
+                          </div>
+                        </div>
+                        <div className="sd-rec-score">
+                          <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}/100</div>
+                          <div className="sd-rec-pct-lbl">compatibility</div>
+                          {i===0 && <div className="sd-rec-best-tag">★ Best choice</div>}
+                        </div>
                     </div>
                     <div className="sd-rec-bottom">
                       <div className="sd-rec-chip-row">
@@ -2273,7 +2541,14 @@ treeCrops.forEach(crop => {
                   <div className="sd-verd-card">
                     <div className="sd-verd-top">
                       <div className="sd-verd-chip">Selected crop</div>
-                      <div className="sd-verd-emoji" style={{background:tgt.bg}}>{tgt.e}</div>
+                      {(() => {
+                        const visual = getTargetCropVisual(tgt);
+                        return (
+                          <div className="sd-verd-emoji" style={{background:tgt.bg}}>
+                            {visual.type === "image" ? <img src={visual.src} alt={visual.alt} /> : visual.value}
+                          </div>
+                        );
+                      })()}
                       <div className="sd-verd-info">
                         <div className="sd-verd-name">{tgt.n}</div>
                         <div className="sd-verd-lat">{tgt.lat}</div>
@@ -2312,16 +2587,25 @@ treeCrops.forEach(crop => {
                       {alts.map(c => (
                         <div key={c.id} className="sd-rec-card">
                           <div className="sd-rec-top">
-                            <div className="sd-rec-rank">Alt</div>
-                            <div className="sd-rec-emoji" style={{background:c.bg}}>{c.e}</div>
-                            <div className="sd-rec-info">
-                              <div className="sd-rec-name">{c.n}</div>
-                              <div className="sd-rec-lat">{c.ar}</div>
-                            </div>
-                            <div className="sd-rec-score">
-                              <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}/100</div>
-                              <div className="sd-rec-pct-lbl">compatibility</div>
-                            </div>
+                              <div className="sd-rec-rank">Alt</div>
+                              <div className="sd-rec-media">
+                                {(() => {
+                                  const visual = getTargetCropVisual(c);
+                                  return (
+                                    <div className="sd-rec-emoji" style={{background:c.bg}}>
+                                      {visual.type === "image" ? <img src={visual.src} alt={visual.alt} /> : visual.value}
+                                    </div>
+                                  );
+                                })()}
+                                <div className="sd-rec-info">
+                                  <div className="sd-rec-name">{c.n}</div>
+                                  <div className="sd-rec-lat">{c.ar}</div>
+                                </div>
+                              </div>
+                              <div className="sd-rec-score">
+                                <div className="sd-rec-pct" style={{color:mc(c.sc)}}>{c.sc}/100</div>
+                                <div className="sd-rec-pct-lbl">compatibility</div>
+                              </div>
                           </div>
                           <div className="sd-rec-bottom">
                             <div className="sd-rec-chip-row">
@@ -2465,7 +2749,7 @@ function averageMetric(zoneResults, key, parser = Number) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function buildAnalysisSnapshot({ zoneResults, crops, parcelleName, parcelleHa, cultureLabel }) {
+function buildAnalysisSnapshot({ zoneResults, crops, parcelleName, parcelleHa, cultureLabel, activeZone }) {
   const completed = zoneResults.filter(Boolean);
   const scores = completed.map((zone, index) => ({
     zone: index + 1,
@@ -2488,6 +2772,7 @@ function buildAnalysisSnapshot({ zoneResults, crops, parcelleName, parcelleHa, c
   return {
     id: `${Date.now()}-${fingerprint}`,
     timestamp: new Date().toISOString(),
+    zoneIndex: Number.isInteger(activeZone) ? activeZone : null,
     parcelleName,
     parcelleHa,
     cultureLabel,
@@ -2610,21 +2895,38 @@ function DashboardView({
   const bounds = getParcelBounds(parcelLatLngs);
   const activeZoneResult = zoneResults[activeZone] || null;
   const safeHistory = Array.isArray(analysisHistory) ? analysisHistory.filter(Boolean) : [];
-  const orderedHistory = [...safeHistory].sort((a, b) => {
+  const zoneScopedHistory = safeHistory.filter((item) => {
+    if (item == null) return false;
+    if (item.zoneIndex == null) return true;
+    return Number(item.zoneIndex) === Number(activeZone);
+  });
+  const orderedHistory = [...zoneScopedHistory].sort((a, b) => {
     const aTime = new Date(a?.timestamp || 0).getTime();
     const bTime = new Date(b?.timestamp || 0).getTime();
     return bTime - aTime;
   });
   const currentSnapshot =
+    (currentAnalysis?.id && orderedHistory.find((item) => String(item?.id) === String(currentAnalysis.id))) ||
     (currentAnalysis?.fingerprint && orderedHistory.find((item) => item?.fingerprint === currentAnalysis.fingerprint)) ||
     orderedHistory[0] ||
     currentAnalysis ||
     null;
-  let previousSnapshot = orderedHistory.find((item) => item?.fingerprint !== currentSnapshot?.fingerprint) || null;
+  let previousSnapshot = orderedHistory.find((item) => String(item?.id) !== String(currentSnapshot?.id)) || null;
 
   // If there's no meaningful history (first-time analysis), do not show a previous snapshot
   if (!orderedHistory || orderedHistory.length <= 1) {
     previousSnapshot = null;
+  }
+  // Prevent using a snapshot that belongs to a different parcel
+  try {
+    if (previousSnapshot && previousSnapshot.parcelleId != null && parcelle && parcelle.id != null) {
+      if (Number(previousSnapshot.parcelleId) !== Number(parcelle.id)) {
+        console.warn('[SoilDiagnostic] previousSnapshot rejected (parcel id mismatch)', { prevParcelleId: previousSnapshot.parcelleId, activeParcelleId: parcelle.id, fingerprint: previousSnapshot.fingerprint });
+        previousSnapshot = null;
+      }
+    }
+  } catch (err) {
+    // ignore and continue
   }
   const isPermanentCulture = cultureLabel === "Permanent";
   const [historyDepthKey, setHistoryDepthKey] = useState("depth0_20");
@@ -2806,7 +3108,16 @@ function DashboardView({
                   </div>
                   {hasLockedCrop ? (
                     <div className="sd-studio-crop-hero">
-                      <div className="sd-studio-crop-hero-emoji">{selectedCrop?.e || "🌱"}</div>
+                      {(() => {
+                        const visual = getTargetCropVisual(selectedCrop);
+                        return visual.type === "image" ? (
+                          <div className="sd-studio-crop-hero-emoji">
+                            <img src={visual.src} alt={visual.alt} />
+                          </div>
+                        ) : (
+                          <div className="sd-studio-crop-hero-emoji">{visual.value}</div>
+                        );
+                      })()}
                       <strong className="sd-studio-crop-hero-name">{selectedCrop?.n || "Recommended"}</strong>
                     </div>
                   ) : (
@@ -2830,7 +3141,19 @@ function DashboardView({
                           onDoubleClick={() => sliderCrop && onLockRecommendedCrop?.(activeZone, sliderCrop.id)}
                           title="Double-click to choose"
                         >
-                          <strong>{sliderCrop ? `${sliderCrop.e || ""} ${sliderCrop.n}`.trim() : "Recommended"}</strong>
+                          {sliderCrop ? (() => {
+                            const visual = getTargetCropVisual(sliderCrop);
+                            return (
+                              <>
+                                {visual.type === "image" ? (
+                                  <span className="sd-studio-crop-slide-icon"><img src={visual.src} alt={visual.alt} /></span>
+                                ) : (
+                                  <span className="sd-studio-crop-slide-icon">{visual.value}</span>
+                                )}
+                                <strong>{sliderCrop.n}</strong>
+                              </>
+                            );
+                          })() : <strong>Recommended</strong>}
                           <em>{sliderCrop ? `${cropChoiceIndex + 1}/${recommendedChoices.length} • ${sliderCrop.sc}/100` : ""}</em>
                         </div>
                         <button
@@ -3806,6 +4129,7 @@ const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
       parcelleName: (parcelle && parcelle.name) || parcelleName,
       parcelleHa,
       cultureLabel,
+      activeZone,
     });
 
     if (!snapshot.fingerprint || lastStoredFingerprintRef.current === snapshot.fingerprint) return;
@@ -3830,8 +4154,11 @@ const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
     // ✅ PASTE THIS INSTEAD:
 const parcelNameForSave = (parcelle?.name) || parcelleName;
 
-// Automatically shifts old 'current' → 'previous' & keeps max 2 in localStorage
-saveDashboardState(parcelNameForSave, parcelle, cultureGroupId, snapshot);
+  // Ensure snapshot is annotated with parcel identity to avoid cross-parcel history
+  snapshot.parcelleId = parcelle?.id ?? null;
+  snapshot.parcelleName = (parcelle && parcelle.name) || parcelleName;
+  // Automatically shifts old 'current' → 'previous' & keeps max 2 in localStorage
+  saveDashboardState(parcelNameForSave, parcelle, cultureGroupId, snapshot);
 
 // Sync React state for UI rendering
 const { current, previous } = getDashboardHistory(parcelNameForSave, parcelle, cultureGroupId);

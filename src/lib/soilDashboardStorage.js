@@ -55,7 +55,9 @@ export function readStoredDashboardState(parcelleName, parcelle, cultureGroupId)
 export function getDashboardHistory(parcelleName, parcelle, cultureGroupId) {
   if (!parcelle || !cultureGroupId) return { current: null, previous: null };
   try {
-    const raw = localStorage.getItem(getHistoryKey(parcelleName, parcelle, cultureGroupId));
+    const historyKey = getHistoryKey(parcelleName, parcelle, cultureGroupId);
+    console.debug("[soilDashboardStorage] getDashboardHistory reading key=", historyKey);
+    const raw = localStorage.getItem(historyKey);
     if (!raw) {
       const legacy = readStoredDashboardState(parcelleName, parcelle, cultureGroupId);
       return { current: legacy, previous: null };
@@ -63,7 +65,34 @@ export function getDashboardHistory(parcelleName, parcelle, cultureGroupId) {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) return { current: null, previous: null };
 
-    const history = parsed.slice(-2);
+    // If we have a parcelle id (preferred), filter history to entries that belong to this parcel
+    let filtered = parsed;
+    try {
+      const expectedSig = buildParcelStorageBase(parcelleName, parcelle, cultureGroupId);
+      filtered = parsed.filter(item => {
+        if (!item) return false;
+        if (parcelle && parcelle.id != null && item.parcelleId != null) {
+          const match = Number(item.parcelleId) === Number(parcelle.id);
+          if (!match) console.debug('[soilDashboardStorage] history item parcelleId mismatch', { itemParcelleId: item.parcelleId, expectedParcelleId: parcelle.id, fingerprint: item.fingerprint });
+          return match;
+        }
+        if (item.parcelSignature) {
+          const match = item.parcelSignature === expectedSig;
+          if (!match) console.debug('[soilDashboardStorage] history item parcelSignature mismatch', { itemSignature: item.parcelSignature, expectedSignature: expectedSig, fingerprint: item.fingerprint });
+          return match;
+        }
+        if (parcelleName && item.parcelleName) {
+          const match = item.parcelleName === parcelleName;
+          if (!match) console.debug('[soilDashboardStorage] history item parcelleName mismatch', { itemName: item.parcelleName, expectedName: parcelleName, fingerprint: item.fingerprint });
+          return match;
+        }
+        return false;
+      });
+    } catch (err) {
+      filtered = parsed;
+    }
+
+    const history = filtered.slice(-2);
     return {
       previous: history.length > 1 ? history[0] : null,
       current: history.length > 0 ? history[history.length - 1] : null,
@@ -84,16 +113,31 @@ export function saveDashboardState(parcelleName, parcelle, cultureGroupId, newSt
     const raw = localStorage.getItem(historyKey);
     let historyArray = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(historyArray)) historyArray = [];
+    // Annotate newState with parcel identity so it cannot be reused for another parcel
+    const parcelSig = buildParcelStorageBase(parcelleName, parcelle, cultureGroupId);
+    const annotatedState = {
+      ...newState,
+      parcelleId: parcelle?.id ?? null,
+      parcelleName: parcelleName ?? null,
+      parcelSignature: parcelSig,
+      zoneIndex: Number.isFinite(Number(newState?.zoneIndex)) ? Number(newState.zoneIndex) : Number.isFinite(Number(newState?.activeZone)) ? Number(newState.activeZone) : null,
+    };
 
-    historyArray.push(newState);
+    console.debug('[soilDashboardStorage] saveDashboardState writing key=', historyKey, { parcelleId: annotatedState.parcelleId, parcelSignature: parcelSig, fingerprint: annotatedState.fingerprint });
+
+    historyArray.push(annotatedState);
     const trimmed = historyArray.slice(-2); // Keep only last 2
 
     localStorage.setItem(historyKey, JSON.stringify(trimmed));
-    localStorage.setItem(getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId), JSON.stringify(newState));
-    localStorage.setItem(getDashboardStateKey(parcelleName, parcelle, cultureGroupId), JSON.stringify({
-      ...newState,
-      analysisHistory: trimmed
-    }));
+    localStorage.setItem(getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId), JSON.stringify(annotatedState));
+    localStorage.setItem(
+      getDashboardStateKey(parcelleName, parcelle, cultureGroupId),
+      JSON.stringify({
+        ...annotatedState,
+        analysisHistory: trimmed,
+        parcelSignature: parcelSig,
+      })
+    );
   } catch (error) {
     console.warn("Dashboard state save failed:", error);
   }
