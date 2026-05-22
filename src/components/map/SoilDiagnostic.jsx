@@ -1803,16 +1803,16 @@ function PermanentDepthSection({ depth, sectionColor, isSat, st, onChange }) {
 
       <div className="sd-sec">
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:sectionColor}}>1</span>Soil Chemistry</div>
-        <Slider id="ph" label="Soil pH" unit="pH" min={4} max={9} step={0.1} value={st.ph} onChange={(id, value) => onChange(id, value, depth.key)} zones l="4.0 Acidic" m="6.5 Neutral" r="9.0 Alkaline" />
-        <Slider id="ce" label="Salinity (EC)" unit="dS/m" min={0} max={6} step={0.1} value={st.ce} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 None" m="2.0 Limit" r="6.0 Critical" locked={isSat("ce")} src={SAT_FIELDS.ce} />
+        <Slider id="ph" label="Soil pH" unit="pH" min={4} max={9} step={0.1} value={st.ph} onChange={(id, value) => onChange(id, value, depth.key)} zones l="4.0 Acidic" r="9.0 Alkaline" />
+        <Slider id="ce" label="Salinity (EC)" unit="dS/m" min={0} max={6} step={0.1} value={st.ce} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 None" r="6.0" locked={isSat("ce")} src={SAT_FIELDS.ce} />
       </div>
 
       <div className="sd-sec">
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:sectionColor}}>2</span>NPK Fertility</div>
-        <Slider id="n" label="Nitrogen (N)" unit="kg/ha" min={0} max={400} step={1} value={st.n} onChange={(id, value) => onChange(id, value, depth.key)} zones l="Low" m="30-60 Optimal" r="400" />
-        <Slider id="p" label="Phosphorus (P)" unit="kg/ha" min={0} max={400} step={1} value={st.p} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0" m="15-30 Optimal" r="400" />
-        <Slider id="k" label="Potassium (K)" unit="kg/ha" min={0} max={400} step={5} value={st.k} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0" m="130-250 Opt." r="400" />
-        <Slider id="lime" label="Active Lime" unit="%" min={0} max={30} step={1} value={st.lime} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Low" m="8-12 Preferred" r="30 High" />
+        <Slider id="n" label="Nitrogen (N)" unit="kg/ha" min={0} max={400} step={1} value={st.n} onChange={(id, value) => onChange(id, value, depth.key)} zones l="Low" r="400" />
+        <Slider id="p" label="Phosphorus (P)" unit="kg/ha" min={0} max={400} step={1} value={st.p} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0" r="400" />
+        <Slider id="k" label="Potassium (K)" unit="kg/ha" min={0} max={400} step={5} value={st.k} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0" r="400" />
+        <Slider id="lime" label="Active Lime" unit="%" min={0} max={30} step={1} value={st.lime} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Low" r="30 High" />
       </div>
 
       <div className="sd-sec">
@@ -1898,8 +1898,8 @@ function PermanentDepthSection({ depth, sectionColor, isSat, st, onChange }) {
 
       <div className="sd-sec">
         <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:sectionColor}}>4</span>Environmental Risks</div>
-        <Slider id="pb" label="Lead (Pb)" unit="mg/kg" min={0} max={900} step={1} value={st.pb} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Clean" m="25 Alert" r="900 Critical" />
-        <Slider id="cd" label="Cadmium (Cd)" unit="mg/kg" min={0} max={20} step={0.1} value={st.cd} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Clean" m="25 Alert" r="100 Critical" />
+        <Slider id="pb" label="Lead (Pb)" unit="mg/kg" min={0} max={900} step={1} value={st.pb} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Clean" r="900" />
+        <Slider id="cd" label="Cadmium (Cd)" unit="mg/kg" min={0} max={20} step={0.1} value={st.cd} onChange={(id, value) => onChange(id, value, depth.key)} zones l="0 Clean" r="100" />
       </div>
     </div>
   );
@@ -2059,16 +2059,16 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
         <>
           <div className="sd-sec">
             <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>1</span>Soil Chemistry</div>
-            <Slider id="ph" label="Soil pH" unit="pH" min={4} max={9} step={0.1} value={st.ph} onChange={onChange} zones l="4.0 Acidic" m="6.5 Neutral" r="9.0 Alkaline" />
-            <Slider id="ce" label="Salinity (EC)" unit="dS/m" min={0} max={6} step={0.1} value={st.ce} onChange={onChange} zones l="0 None" m="2.0 Limit" r="6.0 Critical" locked={isSat("ce")} src={SAT_FIELDS.ce} />
+            <Slider id="ph" label="Soil pH" unit="pH" min={4} max={9} step={0.1} value={st.ph} onChange={onChange} zones l="4.0 Acidic" r="9.0 Alkaline" />
+            <Slider id="ce" label="Salinity (EC)" unit="dS/m" min={0} max={6} step={0.1} value={st.ce} onChange={onChange} zones l="0 None" r="6.0" locked={isSat("ce")} src={SAT_FIELDS.ce} />
           </div>
 
           <div className="sd-sec">
             <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>2</span>NPK Fertility</div>
-            <Slider id="n" label="Nitrogen (N)" unit="kg/ha" min={0} max={400} step={1} value={st.n} onChange={onChange} zones l="Low" m="30-60 Optimal" r="400" />
-            <Slider id="p" label="Phosphorus (P)" unit="kg/ha" min={0} max={400} step={1} value={st.p} onChange={onChange} zones l="0" m="15-30 Optimal" r="400" />
-            <Slider id="k" label="Potassium (K)" unit="kg/ha" min={0} max={400} step={5} value={st.k} onChange={onChange} zones l="0" m="130-250 Opt." r="400" />
-            <Slider id="lime" label="Active Lime" unit="%" min={0} max={30} step={1} value={st.lime} onChange={onChange} zones l="0 Low" m="8-12 Preferred" r="30 High" />
+            <Slider id="n" label="Nitrogen (N)" unit="kg/ha" min={0} max={400} step={1} value={st.n} onChange={onChange} zones l="Low" r="400" />
+            <Slider id="p" label="Phosphorus (P)" unit="kg/ha" min={0} max={400} step={1} value={st.p} onChange={onChange} zones l="0" r="400" />
+            <Slider id="k" label="Potassium (K)" unit="kg/ha" min={0} max={400} step={5} value={st.k} onChange={onChange} zones l="0" r="400" />
+            <Slider id="lime" label="Active Lime" unit="%" min={0} max={30} step={1} value={st.lime} onChange={onChange} zones l="0 Low" r="30 High" />
           </div>
 
           <div className="sd-sec">
@@ -2150,8 +2150,8 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
 
           <div className="sd-sec">
             <div className="sd-sec-lbl"><span className="sd-sec-num" style={{background:color}}>4</span>Environmental Risks</div>
-            <Slider id="pb" label="Lead (Pb)" unit="mg/kg" min={0} max={900} step={1} value={st.pb} onChange={onChange} zones l="0 Clean" m="25 Alert" r="900 Critical" />
-            <Slider id="cd" label="Cadmium (Cd)" unit="mg/kg" min={0} max={20} step={0.1} value={st.cd} onChange={onChange} zones l="0 Clean" m="25 Alert" r="20 Critical" />
+            <Slider id="pb" label="Lead (Pb)" unit="mg/kg" min={0} max={900} step={1} value={st.pb} onChange={onChange} zones l="0 Clean" r="900" />
+            <Slider id="cd" label="Cadmium (Cd)" unit="mg/kg" min={0} max={20} step={0.1} value={st.cd} onChange={onChange} zones l="0 Clean" r="20" />
           </div>
         </>
       )}
