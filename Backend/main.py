@@ -220,6 +220,75 @@ class ZoneAnalysis(Base):
 
     parcelle = relationship("Parcelle", backref="analyses")
 
+    # ─── CROP HARVEST DAYS DATA (From Crop_Harvest_Days.xlsx) ─────────────────────
+CROP_HARVEST_DAYS = {
+    # Vegetables
+    "tomate": 75, "tomato": 75,
+    "pomme_terre": 100, "potato": 100,
+    "oignon": 110, "onion": 110,
+    "ail": 240, "garlic": 240,
+    "poivron": 75, "bell_pepper": 75,
+    "piment": 80, "chili_pepper": 80,
+    "courgette": 50, "zucchini": 50,
+    "aubergine": 80, "eggplant": 80,
+    "concombre": 60, "cucumber": 60,
+    "carotte": 75, "carrot": 75,
+    "navet": 50, "turnip": 50,
+    "betterave": 60, "beetroot": 60,
+    "chou_fleur": 70, "cauliflower": 70,
+    "laitue": 50, "lettuce": 50,
+    "artichaut": 120, "artichoke": 120,
+    "pasteque": 85, "watermelon": 85,
+    "melon": 85,
+    "haricot_vert": 55, "green_bean": 55,
+    "petits_pois": 65, "green_pea": 65,
+    "feve": 90, "broad_bean": 90,
+    "feve_cereale": 110, "faba_bean": 110,
+    "lentille": 100, "lentil": 100,
+    "pois_chiche": 100, "chickpea": 100,
+    "vesce": 90, "vetch": 90,
+    "luzerne": 60, "alfalfa": 60,
+    "trefle": 60, "egyptian_clover": 60,
+    "mais_fourrage": 90, "forage_maize": 90,
+    "pois_fourrage": 70, "forage_pea": 70,
+    "fenugrec": 130, "fenugreek": 130,
+    
+    # Cereals & Grains
+    "ble_dur": 120, "durum_wheat": 120,
+    "ble_tendre": 120, "common_wheat": 120,
+    "orge": 90, "barley": 90,
+    "avoine": 100, "oats": 100,
+    "mais": 110, "grain_maize": 110,
+    "sorgho": 110, "sorghum": 110,
+    "triticale": 120,
+    "seigle": 120, "rye": 120,
+    "millet": 75,
+    "quinoa": 100,
+    "riz": 130, "rice": 130,
+    
+    # Trees & Perennials
+    "olivier": 1095, "olive_tree": 1095,
+    "palmier": 1460, "date_palm": 1460,
+    "oranger": 1095, "orange_tree": 1095,
+    "mandarinier": 1095, "mandarin_tree": 1095,
+    "citronnier": 1095, "lemon_tree": 1095,
+    "vigne": 1095, "grapevine": 1095,
+    "figuier": 1095, "fig_tree": 1095,
+    "amandier": 1095, "almond_tree": 1095,
+    "abricotier": 1095, "apricot_tree": 1095,
+    "pommier": 1095, "apple_tree": 1095,
+    "poirier": 1460, "pear_tree": 1460,
+    "grenadier": 1095, "pomegranate_tree": 1095,
+    "cerisier": 1460, "cherry_tree": 1460,
+    "pecher": 1095, "peach_tree": 1095,
+    "prunier": 1095, "plum_tree": 1095,
+    "nectarinier": 1095, "nectarine_tree": 1095,
+    "cognassier": 1095, "quince_tree": 1095,
+    "neflier": 1460, "loquat_tree": 1460,
+    "pistachier": 1825, "pistachio_tree": 1825,
+    "noyer": 1825, "walnut_tree": 1825,
+}
+
 # ─── DJANGO PASSWORD VERIFICATION ─────────────────────────────────────────────
 def verify_django_password(plain_password: str, hashed: str) -> bool:
     """

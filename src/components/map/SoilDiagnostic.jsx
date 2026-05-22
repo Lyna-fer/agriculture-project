@@ -11,7 +11,74 @@ import {
   getDashboardHistory, // ✅ ADD
   saveDashboardState,  // ✅ ADD
 } from "../../lib/soilDashboardStorage";
-
+// ─── CROP HARVEST DAYS (From Excel) ──────────────────────────────────────
+const CROP_HARVEST_DAYS = {
+  // Vegetables
+  "tomate": 75, "tomato": 75,
+  "pomme_terre": 100, "potato": 100,
+  "oignon": 110, "onion": 110,
+  "ail": 240, "garlic": 240,
+  "poivron": 75, "bell_pepper": 75,
+  "piment": 80, "chili_pepper": 80,
+  "courgette": 50, "zucchini": 50,
+  "aubergine": 80, "eggplant": 80,
+  "concombre": 60, "cucumber": 60,
+  "carotte": 75, "carrot": 75,
+  "navet": 50, "turnip": 50,
+  "betterave": 60, "beetroot": 60,
+  "chou_fleur": 70, "cauliflower": 70,
+  "laitue": 50, "lettuce": 50,
+  "artichaut": 120, "artichoke": 120,
+  "pasteque": 85, "watermelon": 85,
+  "melon": 85,
+  "haricot_vert": 55, "green_bean": 55,
+  "petits_pois": 65, "green_pea": 65,
+  "feve": 90, "broad_bean": 90,
+  "feve_cereale": 110, "faba_bean": 110,
+  "lentille": 100, "lentil": 100,
+  "pois_chiche": 100, "chickpea": 100,
+  "vesce": 90, "vetch": 90,
+  "luzerne": 60, "alfalfa": 60,
+  "trefle": 60, "egyptian_clover": 60,
+  "mais_fourrage": 90, "forage_maize": 90,
+  "pois_fourrage": 70, "forage_pea": 70,
+  "fenugrec": 130, "fenugreek": 130,
+  
+  // Cereals & Grains
+  "ble_dur": 120, "durum_wheat": 120,
+  "ble_tendre": 120, "common_wheat": 120,
+  "orge": 90, "barley": 90,
+  "avoine": 100, "oats": 100,
+  "mais": 110, "grain_maize": 110,
+  "sorgho": 110, "sorghum": 110,
+  "triticale": 120,
+  "seigle": 120, "rye": 120,
+  "millet": 75,
+  "quinoa": 100,
+  "riz": 130, "rice": 130,
+  
+  // Trees & Perennials
+  "olivier": 1095, "olive_tree": 1095,
+  "palmier": 1460, "date_palm": 1460,
+  "oranger": 1095, "orange_tree": 1095,
+  "mandarinier": 1095, "mandarin_tree": 1095,
+  "citronnier": 1095, "lemon_tree": 1095,
+  "vigne": 1095, "grapevine": 1095,
+  "figuier": 1095, "fig_tree": 1095,
+  "amandier": 1095, "almond_tree": 1095,
+  "abricotier": 1095, "apricot_tree": 1095,
+  "pommier": 1095, "apple_tree": 1095,
+  "poirier": 1460, "pear_tree": 1460,
+  "grenadier": 1095, "pomegranate_tree": 1095,
+  "cerisier": 1460, "cherry_tree": 1460,
+  "pecher": 1095, "peach_tree": 1095,
+  "prunier": 1095, "plum_tree": 1095,
+  "nectarinier": 1095, "nectarine_tree": 1095,
+  "cognassier": 1095, "quince_tree": 1095,
+  "neflier": 1460, "loquat_tree": 1460,
+  "pistachier": 1825, "pistachio_tree": 1825,
+  "noyer": 1825, "walnut_tree": 1825,
+};
 /* ─── Satellite defaults ─────────────────────────────────────────────────── */
 const SAT_DEFAULTS = { ce: 1.2, temp: 22, tex: "limon-argileux", om: "moyen" };
 const SAT_FIELDS   = {
@@ -2267,24 +2334,6 @@ function ResultsView({
 
 // ✅ Exclude ONLY the manually selected crop, but KEEP the best crop in alternatives
 const alts = tgt ? scored.filter(c => c.id !== st.crop).slice(0, 3) : [];
-// 🔍 DEBUG: Find crops with missing season data (ADD THIS)
-console.log("📊 CROPS DATA AUDIT - TREES:");
-const treeCrops = crops.filter(c => c.category === "trees");
-treeCrops.forEach(crop => {
-  const hasSS = crop.ss !== undefined && crop.ss !== null;
-  const isSeasonsArray = Array.isArray(crop.ss);
-  const seasonCount = isSeasonsArray ? crop.ss.length : 0;
-
-  console.log(`${crop.e} ${crop.n}:`, {
-    has_ss_field: hasSS,
-    is_array: isSeasonsArray,
-    season_count: seasonCount,
-    seasons: crop.ss,
-    status: hasSS && isSeasonsArray && seasonCount > 0 ? "✅ GOOD" : "❌ MISSING"
-  });
-});
-
-// 🔍 END DEBUG
 
 
   return (
@@ -2893,7 +2942,75 @@ function DashboardView({
   cultureLabel = "",
   onLockRecommendedCrop,
 }) {
-  const width = 720;
+  // Inside DashboardView component, add these helpers:
+
+const getStatusClass = (status) => {
+  switch(status) {
+    case 'ready_for_harvest': return 'sd-studio-growth-status--ready';
+    case 'nearly_ready': return 'sd-studio-growth-status--nearly';
+    case 'mid_growth': return 'sd-studio-growth-status--mid';
+    case 'early_growth': return 'sd-studio-growth-status--early';
+    default: return '';
+  }
+};
+
+const getStatusLabel = (status) => {
+  switch(status) {
+    case 'ready_for_harvest': return 'Ready for Harvest';
+    case 'nearly_ready': return 'Nearly Ready';
+    case 'mid_growth': return 'Mid Growth';
+    case 'early_growth': return 'Early Growth';
+    default: return 'Not Started';
+  }
+};
+// ─── CALCULATE GROWTH DATA ─────────────────────────────────────────────
+const activeResult = zoneResults[activeZone];
+const plantingDateStr = activeResult?.date;
+const targetCropId = activeResult?.analysisCropId || activeResult?.crop;
+const targetCrop = targetCropId ? crops.find(c => String(c.id) === String(targetCropId)) : null;
+
+let growthData = null;
+// Only calculate growth when a specific crop is selected and a valid planting date exists
+if (plantingDateStr && targetCrop) {
+  const startDate = new Date(plantingDateStr);
+  if (!Number.isNaN(startDate.getTime())) {
+    const today = new Date();
+    const diffTime = Math.abs(today - startDate);
+    const daysElapsed = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    // Resolve harvest days by trying several crop identifiers
+    let harvestDays = null;
+    const tryKeys = [targetCrop.n, targetCrop.nameEn, targetCrop.ar, targetCrop.lat, targetCrop.id];
+    for (const k of tryKeys) {
+      if (!k) continue;
+      const raw = String(k).trim();
+      if (raw === "") continue;
+      if (CROP_HARVEST_DAYS[raw]) { harvestDays = CROP_HARVEST_DAYS[raw]; break; }
+      const lower = raw.toLowerCase();
+      if (CROP_HARVEST_DAYS[lower]) { harvestDays = CROP_HARVEST_DAYS[lower]; break; }
+      const norm = lower.replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+      if (CROP_HARVEST_DAYS[norm]) { harvestDays = CROP_HARVEST_DAYS[norm]; break; }
+    }
+    if (harvestDays == null) harvestDays = 90; // sensible default
+
+    const pct = Math.min(Math.round((daysElapsed / harvestDays) * 100), 100);
+    let status = "early_growth";
+    if (pct >= 100) status = "ready_for_harvest";
+    else if (pct >= 75) status = "nearly_ready";
+    else if (pct >= 50) status = "mid_growth";
+
+    growthData = {
+      percentage: pct,
+      status,
+      daysElapsed,
+      harvestDays,
+    };
+  }
+}
+
+// Computed growth level (null when not computed)
+let growthLevelComputed = growthData ? growthData.percentage : null;
+const width = 720;
   const height = 500;
   const frameRatio = mapSnapshot?.size?.width && mapSnapshot?.size?.height
     ? `${mapSnapshot.size.width} / ${mapSnapshot.size.height}`
@@ -3031,7 +3148,7 @@ function DashboardView({
   const activeZoneScore = activeZoneResult ? calcScore(activeZoneResult, crops) : 0;
   const analyzedZoneCount = zoneResults.filter(Boolean).length;
   const analyzedZonePct = zoneResults.length ? Math.round((analyzedZoneCount / zoneResults.length) * 100) : 0;
-  const growthLevel = Math.max(48, Math.min(96, Math.round(activeZoneScore + 8)));
+  const growthLevel = (growthLevelComputed != null) ? growthLevelComputed : 0;
   const focusCropForReadiness = dashboardCropId
     ? rankedCrops.find((crop) => String(crop.id) === String(dashboardCropId)) || rankedCrops[0] || null
     : rankedCrops[0] || null;
@@ -3270,6 +3387,7 @@ function DashboardView({
                   <div className="sd-studio-growth-inner">
                     <strong>{growthLevel}%</strong>
                     <span>Growth Level</span>
+                    <span className={`sd-studio-growth-status ${getStatusClass(growthData?.status)}`}>{getStatusLabel(growthData?.status)} </span>
                   </div>
                 </div>
               </div>
@@ -4213,10 +4331,6 @@ setAnalysisHistory([current, previous].filter(Boolean));
   const result = zoneResults[activeZone];
   const doneCount = zoneResults.filter(Boolean).length;
   const allZonesDone = doneCount === n && n > 0;
-
-  console.log("zoneResults:", zoneResults);
-  console.log("activeZone:", activeZone);
-  console.log("current result:", zoneResults[activeZone]);
 
   return (
     <PortalOverlay zIndex={2500}>

@@ -2660,6 +2660,40 @@
   overflow: hidden;
 }
 
+/* Add status text inside growth gauge */
+.sd-studio-growth-status {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #4a5d54;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: rgba(93, 200, 157, 0.15);
+}
+
+.sd-studio-growth-status--ready {
+  background: rgba(42, 179, 107, 0.2);
+  color: #1a7a50;
+}
+
+.sd-studio-growth-status--nearly {
+  background: rgba(244, 182, 63, 0.2);
+  color: #9b6700;
+}
+
+.sd-studio-growth-status--mid {
+  background: rgba(47, 142, 243, 0.15);
+  color: #296db6;
+}
+
+.sd-studio-growth-status--early {
+  background: rgba(127, 119, 221, 0.15);
+  color: #5a509d;
+}
+
 .sd-studio-growth-arc {
   position: absolute;
   inset: 0;
