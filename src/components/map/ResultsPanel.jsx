@@ -201,7 +201,7 @@ const TABS = [
 ];
 
 const PALETTE    = ["#81C8F5","#A8E6CF","#FFB6C1","#FFDAB9","#C8B9F5","#B5EAD7"];
-const GEAR_EMOJIS= ["🔧","🪣","🛍","📡","🧤","📋","🗂","⚗"];
+const GEAR_EMOJIS= ["⛏️","🪣","🛰️","🖊️","🧤","📋","🗂️","⚗️"];
 export default function ResultsPanel({
   open, onClose,
   cultureId,
@@ -623,7 +623,6 @@ export default function ResultsPanel({
             </svg>
             Télécharger KML
           </button>
-          <button className="cy-footer-close" onClick={onClose}>Fermer ✕</button>
         </div>
 
         <SoilDiagnostic
