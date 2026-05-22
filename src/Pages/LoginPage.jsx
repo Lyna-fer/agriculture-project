@@ -16,9 +16,22 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // 1. Strict Email Validation Regex
+  const isValidEmail = (email) => {
+    // Regex breakdown:
+    // ^[a-zA-Z]              : Must start with a letter (case-insensitive)
+    // [a-zA-Z0-9]* : Followed by zero or more letters or digits
+    // @                      : The literal '@' symbol
+    // (gmail\.com|yahoo\.fr|ent\.usthb\.dz)$ : Exactly one of these domains at the end
+    const emailRegex = /^[a-zA-Z][a-zA-Z0-9]*@(gmail\.com|yahoo\.fr|ent\.usthb\.dz)$/;
+    return emailRegex.test(email);
+  };
+
+  // 2. Update the canSubmit logic to use the regex for the register mode
   const canSubmit = mode === "login"
     ? username.trim().length > 0 && password.length > 0
-    : email.trim().length > 0 && username.trim().length > 0 && password.length >= 6;
+    : isValidEmail(email.trim()) && username.trim().length > 0 && password.length >= 6;
+
 
   const switchMode = (nextMode) => {
     setMode(nextMode);
@@ -146,6 +159,7 @@ export default function LoginPage() {
                     autoComplete="email"
                     required
                   />
+                  
                   <button
                     type="button"
                     className={`input-clear ${email ? "" : "hidden"}`}

@@ -623,7 +623,6 @@ export default function ResultsPanel({
             </svg>
             Télécharger KML
           </button>
-          <button className="cy-footer-close" onClick={onClose}>Fermer ✕</button>
         </div>
 
         <SoilDiagnostic
