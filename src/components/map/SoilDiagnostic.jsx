@@ -2233,7 +2233,13 @@ function ZoneForm({ zoneIdx, color, light, diagMode, st, onChange, crops, cultur
                   <span className="sd-sel-option-icon">✨</span>
                   <span className="sd-sel-option-copy">
                     <strong>Recommend for me</strong>
-                    <span>Auto-selected crop</span>
+                    <span>{(() => {
+                      const ranked = getRankedCropsForState(st, crops);
+                      if (ranked.length > 0) {
+                        return `Comparing to: ${ranked[0].n}`;
+                      }
+                      return "Auto-selected crop";
+                    })()}</span>
                   </span>
                 </button>
                 {crops.map((c) => {
@@ -2482,6 +2488,15 @@ const alts = tgt ? scored.filter(c => c.id !== st.crop).slice(0, 3) : [];
     );
   }
 })()}
+
+          {/* Reference crop hint when auto-recommending */}
+          {!tgt && focusCrop && (
+            <div className="sd-ref-crop-hint sd-a2" style={{ background: "#f0f8f4", borderColor: "#d4f0e3", borderLeft: "4px solid #1d9e75", paddingLeft: "12px" }}>
+              <span style={{ fontSize: "12px", color: "#1a7a50", fontWeight: "600" }}>
+                Comparing soil to: <strong>{focusCrop.n}</strong>
+              </span>
+            </div>
+          )}
 
           {/* 6 param pills */}
           <div className="sd-param-pills sd-a2">
