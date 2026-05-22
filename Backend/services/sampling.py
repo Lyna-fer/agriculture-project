@@ -73,35 +73,7 @@ def generate_points(poly: Polygon, area_ha: float, strategy: dict, density_facto
 
     minx, miny, maxx, maxy = poly.bounds  # (minLng, minLat, maxLng, maxLat)
 
-    # ✅ Extract polygon vertices and identify extremes (tips)
-    exterior_coords = list(poly.exterior.coords[:-1])
-    vertex_candidates = []
-    if len(exterior_coords) >= 3:
-        # Find extreme vertices: leftmost, rightmost, topmost, bottommost
-        extreme_indices = set()
-        min_x_idx = min(range(len(exterior_coords)), key=lambda i: exterior_coords[i][0])
-        max_x_idx = max(range(len(exterior_coords)), key=lambda i: exterior_coords[i][0])
-        min_y_idx = min(range(len(exterior_coords)), key=lambda i: exterior_coords[i][1])
-        max_y_idx = max(range(len(exterior_coords)), key=lambda i: exterior_coords[i][1])
-        extreme_indices.update([min_x_idx, max_x_idx, min_y_idx, max_y_idx])
-
-        # For triangular or sharp polygons, also include vertices that deviate from average edge length
-        if len(exterior_coords) <= 5:
-            extreme_indices.update(range(len(exterior_coords)))
-
-        for idx in extreme_indices:
-            x, y = exterior_coords[idx]
-            pt = Point(x, y)
-            if poly.contains(pt) or poly.touches(pt):
-                vertex_candidates.append({
-                    "lng": x,
-                    "lat": y,
-                    "x": x,
-                    "y": y,
-                    "col": -1,  # Mark as vertex
-                    "row": -1,
-                    "is_vertex": True
-                })
+   
 
     # ✅ Virtual grid centroid sampling with staggered (hexagonal) pattern
     def build_candidate_centroids(cell_side_km: float) -> list[dict]:
@@ -153,7 +125,7 @@ def generate_points(poly: Polygon, area_ha: float, strategy: dict, density_facto
             break
 
     # Combine vertex candidates with centroid candidates
-    all_candidates = vertex_candidates + candidates
+    all_candidates = candidates
 
     # Sort retained candidates into serpentine order
     def serpentine_compare(a, b):
@@ -231,48 +203,70 @@ list[dict]:
         })
         return zones
 
-    def choose_row_counts(num_zones: int, width: float, height: float) -> list[int]:
-        best = None
-        best_counts = [num_zones]
-        for rows in range(1, num_zones + 1):
-            base = num_zones // rows
-            if base == 0:
-                break
-            extra = num_zones % rows
-            counts = [base + 1] * extra + [base] * (rows - extra)
-            heights = [height * count / num_zones for count in counts]
-            distortions = []
-            for count, row_height in zip(counts, heights):
-                cell_width = width / count
-                if row_height <= 0:
-                    distortions.append(float('inf'))
-                else:
-                    distortions.append(max(cell_width / row_height, row_height / cell_width))
-            score = max(distortions)
-            if best is None or score < best:
-                best = score
-                best_counts = counts
-        return best_counts
-
     def split_rectangle_into_squares(poly: Polygon, zones_needed: int, total_area_ha: float) -> list[Polygon]:
+        """
+        Create a near-square grid covering the polygon bounding box. This function will
+        prefer square-like cells by choosing cols x rows from the bbox aspect ratio.
+
+        It will auto-adjust the number of zones upward to fill a complete grid (cols*rows),
+        and will reduce the target zone count if any resulting cell falls below the
+        minimum area threshold (0.05 ha) to avoid creating tiny cells and gaps.
+        """
+        MIN_ZONE_HA = 0.05
+
         minx, miny, maxx, maxy = poly.bounds
         width = maxx - minx
         height = maxy - miny
 
-        row_counts = choose_row_counts(zones_needed, width, height)
-        y0 = miny
-        squares = []
-        for count in row_counts:
-            row_height = height * count / zones_needed
-            x0 = minx
-            for _ in range(count):
-                x1 = x0 + width / count
-                y1 = y0 + row_height
-                squares.append(box(x0, y0, x1, y1))
-                x0 = x1
-            y0 = y1
+        if width <= 0 or height <= 0:
+            return [poly]
 
-        return squares
+        # Start with the requested target and allow adjustments
+        target = max(1, int(zones_needed))
+
+        # Try increasing to the nearest full grid (cols*rows) that gives square-like cells.
+        # If cells become too small (< MIN_ZONE_HA), decrement target and retry.
+        while True:
+            aspect = (width / height) if height > 0 else 1.0
+            cols = max(1, int(round(math.sqrt(target * aspect))))
+            rows = max(1, int(math.ceil(target / cols)))
+            # full grid cell count
+            grid_cells = cols * rows
+
+            # Prefer full grid to avoid skinny leftovers: use grid_cells as actual count
+            used_zones = grid_cells
+
+            cell_w = width / cols
+            cell_h = height / rows
+
+            # Build candidate boxes and evaluate min area
+            candidates = []
+            for r in range(rows):
+                y0 = miny + r * cell_h
+                y1 = maxy if (r == rows - 1) else (y0 + cell_h)
+                for c in range(cols):
+                    x0 = minx + c * cell_w
+                    x1 = maxx if (c == cols - 1) else (x0 + cell_w)
+                    candidates.append(box(x0, y0, x1, y1))
+
+            # compute geodesic areas for candidates
+            areas = []
+            for b in candidates:
+                coords = [[p[1], p[0]] for p in list(b.exterior.coords)[:-1]]
+                areas.append(calculate_area_hectares(coords))
+
+            min_area = min(areas) if areas else 0
+
+            if min_area >= MIN_ZONE_HA or used_zones == 1:
+                # accept this tiling
+                # return exactly used_zones boxes (grid fills used_zones)
+                return candidates[:used_zones]
+
+            # If the smallest zone is too tiny, reduce target zones and retry
+            # Decrease target by 1 but not below 1
+            if target <= 1:
+                return candidates[:used_zones]
+            target = max(1, target - 1)
 
     def split_polygon(poly: Polygon, zones_needed: int) -> list[Polygon]:
         if zones_needed <= 1:
@@ -317,9 +311,6 @@ list[dict]:
     for clipped in zone_polygons:
         zone_coords = [[c[1], c[0]] for c in list(clipped.exterior.coords)[:-1]]
         ha = calculate_area_hectares(zone_coords)
-
-        if ha < 0.05:
-            continue
 
         points = generate_points(clipped, ha, strategy, density_factor)
         zones.append({
