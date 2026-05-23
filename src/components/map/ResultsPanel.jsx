@@ -224,6 +224,15 @@ export default function ResultsPanel({
   const resolvedParcelleHa = parcelleHa > 0
     ? parcelleHa
     : Number(parcelle?.area || 0) / 10000;
+  const diagnosticParcelKey = useMemo(() => {
+    if (parcelle?.id != null) return `parcel:${parcelle.id}`;
+    const coords = JSON.stringify(
+      (parcelle?.latlngs || [])
+        .map(normalizeLatLngPoint)
+        .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
+    );
+    return `draft:${parcelle?.name || region || "parcel"}:${coords}`;
+  }, [parcelle, region]);
   const weatherPolygonPoints = useMemo(
     () => (parcelle?.latlngs || [])
       .map((point) => {
@@ -622,6 +631,7 @@ export default function ResultsPanel({
         </div>
 
         <SoilDiagnostic
+          key={diagnosticParcelKey}
           open={diagOpen}
           onClose={()=>setDiagOpen(false)}
           parcelleName={parcelle?.name || region || "Parcel A"}

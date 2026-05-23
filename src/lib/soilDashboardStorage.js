@@ -17,22 +17,47 @@ function buildParcelCoordsKey(parcelle) {
 }
 
 function buildParcelStorageBase(parcelleName, parcelle, cultureGroupId) {
-  // ✅ SAVED PARCEL: Use real ID (100% unique)
   if (parcelle?.id) {
     return `${cultureGroupId}:parcel:${parcelle.id}`;
   }
-  // ✅ NEW PARCEL: Generate guaranteed unique key using name + random string
-  const namePart = (parcelleName || "unnamed").trim().toLowerCase().replace(/\s+/g, '_');
-  const randPart = Math.random().toString(36).substring(2, 8);
-  return `${cultureGroupId}:parcel:new:${namePart}:${randPart}`;
+
+  const namePart = (parcelleName || "unnamed").trim().toLowerCase().replace(/\s+/g, "_");
+  const coordsKey = buildParcelCoordsKey(parcelle);
+
+  if (coordsKey && coordsKey !== "[]") {
+    return `${cultureGroupId}:parcel:draft:${namePart}:${coordsKey}`;
+  }
+
+  return `${cultureGroupId}:parcel:draft:${namePart}`;
+}
+
+function isHistoryItemForParcel(item, parcelleName, parcelle, cultureGroupId) {
+  if (!item) return false;
+
+  if (parcelle?.id != null && item.parcelleId != null) {
+    return Number(item.parcelleId) === Number(parcelle.id);
+  }
+
+  const expectedSig = buildParcelStorageBase(parcelleName, parcelle, cultureGroupId);
+  if (item.parcelSignature) {
+    return item.parcelSignature === expectedSig;
+  }
+
+  if (parcelleName && item.parcelleName) {
+    return item.parcelleName === parcelleName;
+  }
+
+  return false;
 }
 
 export function getHistoryKey(parcelleName, parcelle, cultureGroupId) {
   return `soil-dashboard-history:${buildParcelStorageBase(parcelleName, parcelle, cultureGroupId)}`;
 }
+
 export function getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId) {
   return `soil-dashboard-current-analysis:${buildParcelStorageBase(parcelleName, parcelle, cultureGroupId)}`;
 }
+
 export function getDashboardStateKey(parcelleName, parcelle, cultureGroupId) {
   return `soil-dashboard-state:${buildParcelStorageBase(parcelleName, parcelle, cultureGroupId)}`;
 }
@@ -48,47 +73,47 @@ export function readStoredDashboardState(parcelleName, parcelle, cultureGroupId)
   }
 }
 
-/**
- * Returns { previous: Object|null, current: Object|null }
- * Keeps exactly max 2 items in localStorage
- */
 export function getDashboardHistory(parcelleName, parcelle, cultureGroupId) {
   if (!parcelle || !cultureGroupId) return { current: null, previous: null };
+
   try {
     const historyKey = getHistoryKey(parcelleName, parcelle, cultureGroupId);
     console.debug("[soilDashboardStorage] getDashboardHistory reading key=", historyKey);
     const raw = localStorage.getItem(historyKey);
+
     if (!raw) {
+      if (parcelle?.id == null) {
+        return { current: null, previous: null };
+      }
       const legacy = readStoredDashboardState(parcelleName, parcelle, cultureGroupId);
       return { current: legacy, previous: null };
     }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return { current: null, previous: null };
 
-    // If we have a parcelle id (preferred), filter history to entries that belong to this parcel
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return { current: null, previous: null };
+    }
+
     let filtered = parsed;
+
     try {
       const expectedSig = buildParcelStorageBase(parcelleName, parcelle, cultureGroupId);
-      filtered = parsed.filter(item => {
-        if (!item) return false;
-        if (parcelle && parcelle.id != null && item.parcelleId != null) {
-          const match = Number(item.parcelleId) === Number(parcelle.id);
-          if (!match) console.debug('[soilDashboardStorage] history item parcelleId mismatch', { itemParcelleId: item.parcelleId, expectedParcelleId: parcelle.id, fingerprint: item.fingerprint });
-          return match;
+      filtered = parsed.filter((item) => {
+        const match = isHistoryItemForParcel(item, parcelleName, parcelle, cultureGroupId);
+        if (!match) {
+          console.debug("[soilDashboardStorage] history item rejected for parcel", {
+            fingerprint: item?.fingerprint,
+            itemParcelleId: item?.parcelleId,
+            expectedParcelleId: parcelle?.id ?? null,
+            itemSignature: item?.parcelSignature,
+            expectedSignature: expectedSig,
+            itemName: item?.parcelleName,
+            expectedName: parcelleName,
+          });
         }
-        if (item.parcelSignature) {
-          const match = item.parcelSignature === expectedSig;
-          if (!match) console.debug('[soilDashboardStorage] history item parcelSignature mismatch', { itemSignature: item.parcelSignature, expectedSignature: expectedSig, fingerprint: item.fingerprint });
-          return match;
-        }
-        if (parcelleName && item.parcelleName) {
-          const match = item.parcelleName === parcelleName;
-          if (!match) console.debug('[soilDashboardStorage] history item parcelleName mismatch', { itemName: item.parcelleName, expectedName: parcelleName, fingerprint: item.fingerprint });
-          return match;
-        }
-        return false;
+        return match;
       });
-    } catch (err) {
+    } catch (error) {
       filtered = parsed;
     }
 
@@ -103,33 +128,52 @@ export function getDashboardHistory(parcelleName, parcelle, cultureGroupId) {
   }
 }
 
-/**
- * Pushes new state to history. Automatically shifts old 'current' → 'previous'.
- */
 export function saveDashboardState(parcelleName, parcelle, cultureGroupId, newState) {
   if (!parcelle || !cultureGroupId || !newState) return;
+
   try {
     const historyKey = getHistoryKey(parcelleName, parcelle, cultureGroupId);
     const raw = localStorage.getItem(historyKey);
     let historyArray = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(historyArray)) historyArray = [];
-    // Annotate newState with parcel identity so it cannot be reused for another parcel
+    historyArray = historyArray.filter((item) =>
+      isHistoryItemForParcel(item, parcelleName, parcelle, cultureGroupId)
+    );
+
     const parcelSig = buildParcelStorageBase(parcelleName, parcelle, cultureGroupId);
     const annotatedState = {
       ...newState,
+      zoneResults: Array.isArray(newState?.zoneResults) ? [...newState.zoneResults] : [],
+      parcelle,
       parcelleId: parcelle?.id ?? null,
       parcelleName: parcelleName ?? null,
       parcelSignature: parcelSig,
-      zoneIndex: Number.isFinite(Number(newState?.zoneIndex)) ? Number(newState.zoneIndex) : Number.isFinite(Number(newState?.activeZone)) ? Number(newState.activeZone) : null,
+      nZones: Number.isFinite(Number(newState?.nZones))
+        ? Number(newState.nZones)
+        : Array.isArray(newState?.zoneResults)
+        ? newState.zoneResults.length
+        : null,
+      zoneIndex: Number.isFinite(Number(newState?.zoneIndex))
+        ? Number(newState.zoneIndex)
+        : Number.isFinite(Number(newState?.activeZone))
+        ? Number(newState.activeZone)
+        : null,
     };
 
-    console.debug('[soilDashboardStorage] saveDashboardState writing key=', historyKey, { parcelleId: annotatedState.parcelleId, parcelSignature: parcelSig, fingerprint: annotatedState.fingerprint });
+    console.debug("[soilDashboardStorage] saveDashboardState writing key=", historyKey, {
+      parcelleId: annotatedState.parcelleId,
+      parcelSignature: parcelSig,
+      fingerprint: annotatedState.fingerprint,
+    });
 
     historyArray.push(annotatedState);
-    const trimmed = historyArray.slice(-2); // Keep only last 2
+    const trimmed = historyArray.slice(-2);
 
     localStorage.setItem(historyKey, JSON.stringify(trimmed));
-    localStorage.setItem(getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId), JSON.stringify(annotatedState));
+    localStorage.setItem(
+      getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId),
+      JSON.stringify(annotatedState)
+    );
     localStorage.setItem(
       getDashboardStateKey(parcelleName, parcelle, cultureGroupId),
       JSON.stringify({
@@ -158,18 +202,21 @@ export function hasStoredDashboardAnalysis(parcelleName, parcelle, cultureGroupI
 
 export function isParcelleAnalysisComplete(parcelleName, parcelle, cultureGroupId, nZones = 1) {
   const { current } = getDashboardHistory(parcelleName, parcelle, cultureGroupId);
+
   if (!current || !Array.isArray(current.zoneResults)) {
     const legacy = readStoredDashboardState(parcelleName, parcelle, cultureGroupId);
     if (!legacy || !Array.isArray(legacy.zoneResults)) return false;
     const expected = legacy.nZones || nZones || 1;
-    return legacy.zoneResults.slice(0, expected).every(r => r !== null && r !== undefined);
+    return legacy.zoneResults.slice(0, expected).every((r) => r !== null && r !== undefined);
   }
+
   const expected = current.nZones || nZones || 1;
-  return current.zoneResults.slice(0, expected).every(r => r !== null && r !== undefined);
+  return current.zoneResults.slice(0, expected).every((r) => r !== null && r !== undefined);
 }
 
 export function clearDashboardHistory(parcelleName, parcelle, cultureGroupId) {
   if (!parcelle || !cultureGroupId) return;
+
   try {
     localStorage.removeItem(getHistoryKey(parcelleName, parcelle, cultureGroupId));
     localStorage.removeItem(getDashboardStateKey(parcelleName, parcelle, cultureGroupId));

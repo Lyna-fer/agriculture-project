@@ -2848,13 +2848,14 @@ function buildAnalysisSnapshot({ zoneResults, crops, parcelleName, parcelleHa, c
     id: `${Date.now()}-${fingerprint}`,
     timestamp: new Date().toISOString(),
     zoneIndex: Number.isInteger(activeZone) ? activeZone : null,
+    nZones: zoneResults.length,
     parcelleName,
     parcelleHa,
     cultureLabel,
     avgScore,
     zoneCount: completed.length,
     scores,
-    zoneResults, // Store full zone data for zone-specific dashboard queries
+    zoneResults: [...zoneResults], // Store the full parcel snapshot for history comparisons
     avgPh: averageMetric(completed, "ph"),
     avgCe: averageMetric(completed, "ce"),
     avgN: averageMetric(completed, "n"),
@@ -3038,12 +3039,7 @@ const width = 720;
   const bounds = getParcelBounds(parcelLatLngs);
   const activeZoneResult = zoneResults[activeZone] || null;
   const safeHistory = Array.isArray(analysisHistory) ? analysisHistory.filter(Boolean) : [];
-  const zoneScopedHistory = safeHistory.filter((item) => {
-    if (item == null) return false;
-    if (item.zoneIndex == null) return true;
-    return Number(item.zoneIndex) === Number(activeZone);
-  });
-  const orderedHistory = [...zoneScopedHistory].sort((a, b) => {
+  const orderedHistory = [...safeHistory].sort((a, b) => {
     const aTime = new Date(a?.timestamp || 0).getTime();
     const bTime = new Date(b?.timestamp || 0).getTime();
     return bTime - aTime;
@@ -3062,9 +3058,37 @@ const width = 720;
   }
   // Prevent using a snapshot that belongs to a different parcel
   try {
+    const activeParcelSignature = currentAnalysis?.parcelSignature || currentSnapshot?.parcelSignature || "";
     if (previousSnapshot && previousSnapshot.parcelleId != null && parcelle && parcelle.id != null) {
       if (Number(previousSnapshot.parcelleId) !== Number(parcelle.id)) {
         console.warn('[SoilDiagnostic] previousSnapshot rejected (parcel id mismatch)', { prevParcelleId: previousSnapshot.parcelleId, activeParcelleId: parcelle.id, fingerprint: previousSnapshot.fingerprint });
+        previousSnapshot = null;
+      }
+    } else if (
+      previousSnapshot &&
+      activeParcelSignature &&
+      previousSnapshot.parcelSignature &&
+      previousSnapshot.parcelSignature !== activeParcelSignature
+    ) {
+      console.warn('[SoilDiagnostic] previousSnapshot rejected (parcel signature mismatch)', {
+        prevParcelSignature: previousSnapshot.parcelSignature,
+        activeParcelSignature,
+        fingerprint: previousSnapshot.fingerprint,
+      });
+      previousSnapshot = null;
+    } else if (
+      previousSnapshot &&
+      parcelle &&
+      Array.isArray(parcelle.latlngs) &&
+      parcelle.latlngs.length > 0 &&
+      previousSnapshot.parcelleId == null
+    ) {
+      const previousCoords = JSON.stringify((previousSnapshot?.parcelle?.latlngs || []).map(normalizeLatLngPoint));
+      const activeCoords = JSON.stringify(parcelle.latlngs.map(normalizeLatLngPoint));
+      if (previousCoords && previousCoords !== "[]" && previousCoords !== activeCoords) {
+        console.warn('[SoilDiagnostic] previousSnapshot rejected (parcel coords mismatch)', {
+          fingerprint: previousSnapshot.fingerprint,
+        });
         previousSnapshot = null;
       }
     }
@@ -3586,6 +3610,7 @@ export default function SoilDiagnostic({
   const satCacheRef = useRef(new Map());
   const lastStoredFingerprintRef = useRef("");
   const n = Math.max(1, nZones);
+  const allZonesAnalyzed = zoneResults.slice(0, n).every((result) => result !== null && result !== undefined);
 
   const CROPS = useMemo(() => rawCrops.map(toCrop), [rawCrops]);
   const cultureLabel = cultureGroupId===1?"Vegetables":cultureGroupId===2?"Cereals":"Permanent";
@@ -4524,8 +4549,11 @@ setAnalysisHistory([current, previous].filter(Boolean));
                     nZones={n}
                     onNext={() => setActiveZone(prev => Math.min(n - 1, prev + 1))}
                     onDownloadReport={handleDownloadZoneReport}
-                    onOpenDashboard={() => setShowDashboard(true)}
-                    showDashboardAction={Boolean(analysisHistory?.length > 0 || currentAnalysis)}
+                    onOpenDashboard={() => {
+                      if (!allZonesAnalyzed) return;
+                      setShowDashboard(true);
+                    }}
+                    showDashboardAction={allZonesAnalyzed && activeZone === n - 1}
                   />
                 )}
               </div>

@@ -425,9 +425,9 @@ export default function Map() {
 // ... inside handleSaveParcelle, after response.ok check and before showToast ...
 // ✅ MIGRATE TEMP LOCALSTORAGE KEY TO PERMANENT DB ID KEY
 try {
-const oldTempKey = getDashboardStateKey(parcelleName, { id: undefined, name: pendingParcelleInfo.name }, cultureGroupId);
-const oldHistoryKey = getHistoryKey(parcelleName, { id: undefined, name: pendingParcelleInfo.name }, cultureGroupId);
-const oldCurrentKey = getCurrentAnalysisKey(parcelleName, { id: undefined, name: pendingParcelleInfo.name }, cultureGroupId);
+const oldTempKey = getDashboardStateKey(name, pendingParcelleInfo, cultureGroupId);
+const oldHistoryKey = getHistoryKey(name, pendingParcelleInfo, cultureGroupId);
+const oldCurrentKey = getCurrentAnalysisKey(name, pendingParcelleInfo, cultureGroupId);
 // If temp keys exist, copy them to permanent keys & cleanup
 const tempState = localStorage.getItem(oldTempKey);
 if (tempState && newP.id) {
