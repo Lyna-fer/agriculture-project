@@ -3063,7 +3063,7 @@ const width = 720;
     orderedHistory[0] ||
     currentAnalysis ||
     null;
-  let previousSnapshot = orderedHistory.find((item) => String(item?.id) !== String(currentSnapshot?.id)) || null;
+  let previousSnapshot = orderedHistory.length > 1 ? orderedHistory[1] : null;
 
   // If there's no meaningful history (first-time analysis), do not show a previous snapshot
   if (!orderedHistory || orderedHistory.length <= 1) {
@@ -3770,6 +3770,7 @@ useEffect(() => {
     setActiveZone(0);
     setAnalyzing(false);
     setZoneStates(Array.from({ length: n }, () => freshSt(initialDiagMode)));
+    let restoredFingerprint = "";
 
     if (startInDashboard && persistedDashboardData) {
       // Loading dashboard view - keep all stored zone results
@@ -3787,8 +3788,17 @@ useEffect(() => {
         cultureGroupId
       );
       const historyArray = [current, previous].filter(Boolean);
+      const resolvedCurrentAnalysis =
+        current ||
+        persistedDashboardData?.currentAnalysis ||
+        historyArray[0] ||
+        null;
+      restoredFingerprint =
+        resolvedCurrentAnalysis?.fingerprint ||
+        persistedDashboardData?.analysisHistory?.find?.((item) => item?.fingerprint)?.fingerprint ||
+        "";
       setAnalysisHistory(historyArray);
-      setCurrentAnalysis(current || persistedDashboardData?.currentAnalysis || null);
+      setCurrentAnalysis(resolvedCurrentAnalysis);
       setShowDashboard(true);
 
       // Notify other components
@@ -3803,7 +3813,7 @@ useEffect(() => {
       setCurrentAnalysis(null);
       setShowDashboard(false);
     }
-    lastStoredFingerprintRef.current = persistedDashboardData?.currentAnalysis?.fingerprint || "";
+    lastStoredFingerprintRef.current = restoredFingerprint;
   }
 }, [open, initialDiagMode, n, persistedDashboardData, startInDashboard, parcelle, parcelleName, cultureGroupId]);
   useEffect(() => {
@@ -4033,6 +4043,18 @@ setZoneStates(prev => {
     });
   }, [open, activeZone, zoneStates, CROPS, windByMonth]);
 
+  useEffect(() => {
+    if (!open || startInDashboard || parcelle?.id || !parcelle) return;
+
+    try {
+      localStorage.removeItem(getHistoryKey(parcelleName, parcelle, cultureGroupId));
+      localStorage.removeItem(getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId));
+      localStorage.removeItem(getDashboardStateKey(parcelleName, parcelle, cultureGroupId));
+    } catch (error) {
+      console.warn("Failed to clear draft dashboard history:", error);
+    }
+  }, [open, startInDashboard, parcelle, parcelle?.id, parcelleName, cultureGroupId]);
+
 
   /* Analyze and Save to Database */
   const handleAnalyze = useCallback(async () => {
@@ -4256,6 +4278,7 @@ const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
 
   useEffect(() => {
     if (!open) return;
+    if (startInDashboard && persistedDashboardData) return;
 
     // Only run this if ALL zones have been analyzed
     if (zoneResults.some((item) => !item)) return;
@@ -4287,26 +4310,33 @@ const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
       return;
     }
 
+    const parcelNameForSave = (parcelle?.name) || parcelleName;
+    const { current: existingCurrent, previous: existingPrevious } = getDashboardHistory(
+      parcelNameForSave,
+      parcelle,
+      cultureGroupId
+    );
+
+    if (existingCurrent?.fingerprint && existingCurrent.fingerprint === snapshot.fingerprint) {
+      setCurrentAnalysis(existingCurrent);
+      setAnalysisHistory([existingCurrent, existingPrevious].filter(Boolean));
+      lastStoredFingerprintRef.current = snapshot.fingerprint;
+      return;
+    }
+
     try {
       localStorage.setItem(getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId), JSON.stringify(snapshot));
     } catch (error) {
       console.warn("Current analysis save failed:", error);
     }
 
-    // Safely update analysisHistory, ensuring it stays an array
-    // ✅ PASTE THIS INSTEAD:
-const parcelNameForSave = (parcelle?.name) || parcelleName;
+    snapshot.parcelleId = parcelle?.id ?? null;
+    snapshot.parcelleName = (parcelle && parcelle.name) || parcelleName;
+    saveDashboardState(parcelNameForSave, parcelle, cultureGroupId, snapshot);
 
-  // Ensure snapshot is annotated with parcel identity to avoid cross-parcel history
-  snapshot.parcelleId = parcelle?.id ?? null;
-  snapshot.parcelleName = (parcelle && parcelle.name) || parcelleName;
-  // Automatically shifts old 'current' → 'previous' & keeps max 2 in localStorage
-  saveDashboardState(parcelNameForSave, parcelle, cultureGroupId, snapshot);
-
-// Sync React state for UI rendering
-const { current, previous } = getDashboardHistory(parcelNameForSave, parcelle, cultureGroupId);
-setCurrentAnalysis(current);
-setAnalysisHistory([current, previous].filter(Boolean));
+    const { current, previous } = getDashboardHistory(parcelNameForSave, parcelle, cultureGroupId);
+    setCurrentAnalysis(current);
+    setAnalysisHistory([current, previous].filter(Boolean));
     try {
       const canonicalHistory = [current, previous].filter(Boolean);
       localStorage.setItem(
@@ -4338,7 +4368,7 @@ setAnalysisHistory([current, previous].filter(Boolean));
     }
 
     lastStoredFingerprintRef.current = snapshot.fingerprint;
-  }, [open, zoneResults, CROPS, parcelleName, parcelle, cultureGroupId, parcelleHa, cultureLabel, analysisHistory, activeZone, diagMode, mapSnapshot, zones, n, weatherData, parcelWeather]);
+  }, [open, startInDashboard, persistedDashboardData, zoneResults, CROPS, parcelleName, parcelle, cultureGroupId, parcelleHa, cultureLabel, analysisHistory, activeZone, diagMode, mapSnapshot, zones, n, weatherData, parcelWeather]);
 
   const parcelImageUrls = buildParcelImageUrls(parcelle?.latlngs || [], mapSnapshot);
 

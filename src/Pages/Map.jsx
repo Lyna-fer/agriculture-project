@@ -70,6 +70,17 @@ const normalizeLatLngPairs = (latlngs) => {
     .filter((point) => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]));
 };
 
+const coordsEqual = (left, right) => {
+  const a = normalizeLatLngPairs(left);
+  const b = normalizeLatLngPairs(right);
+  if (a.length === 0 || b.length === 0 || a.length !== b.length) return false;
+
+  const EPSILON = 0.00001;
+  return a.every((point, index) =>
+    Math.abs(point[0] - b[index][0]) < EPSILON && Math.abs(point[1] - b[index][1]) < EPSILON
+  );
+};
+
 const buildParcelSignature = (parcelle, parcelleName = "") => {
   if (!parcelle) return "";
 
@@ -291,6 +302,66 @@ const buildDashboardSessionFromDb = ({
     weatherData: weatherData || null,
   };
 };
+
+const normalizeStoredDashboardSession = ({
+  session,
+  selectedParcelle,
+  selectedParcelleName,
+  fallbackMapSnapshot,
+  fallbackZones,
+  fallbackWeatherData,
+  fallbackCultureGroupId,
+}) => {
+  if (!session) return null;
+
+  const analysisHistory = Array.isArray(session.analysisHistory)
+    ? session.analysisHistory.filter(Boolean)
+    : [];
+  const currentAnalysis =
+    session.currentAnalysis ||
+    analysisHistory[analysisHistory.length - 1] ||
+    analysisHistory[0] ||
+    null;
+  const hydratedParcelle = {
+    ...(session.parcelle || {}),
+    ...(selectedParcelle || {}),
+  };
+  const resolvedZoneResults = Array.isArray(session.zoneResults) && session.zoneResults.length
+    ? session.zoneResults
+    : Array.isArray(currentAnalysis?.zoneResults) && currentAnalysis.zoneResults.length
+    ? currentAnalysis.zoneResults
+    : [];
+
+  return {
+    ...session,
+    parcelle: hydratedParcelle,
+    parcelleName: selectedParcelleName || session.parcelleName || hydratedParcelle?.name || "Parcel",
+    cultureGroupId: session.cultureGroupId || fallbackCultureGroupId,
+    mapSnapshot: session.mapSnapshot || fallbackMapSnapshot || null,
+    zones: Array.isArray(session.zones) && session.zones.length ? session.zones : fallbackZones || [],
+    weatherData: session.weatherData || fallbackWeatherData || null,
+    zoneResults: resolvedZoneResults,
+    nZones:
+      session.nZones ||
+      resolvedZoneResults.length ||
+      currentAnalysis?.nZones ||
+      fallbackZones?.length ||
+      1,
+    analysisHistory,
+    currentAnalysis,
+  };
+};
+
+const isDashboardSessionComplete = (session) => {
+  if (!session) return false;
+  const zoneResults = Array.isArray(session.zoneResults) ? session.zoneResults : [];
+  const expected = Number.isFinite(Number(session.nZones))
+    ? Number(session.nZones)
+    : zoneResults.length;
+
+  if (expected <= 0) return false;
+  return zoneResults.slice(0, expected).every((item) => item !== null && item !== undefined);
+};
 export default function Map() {
   useEffect(() => { document.body.className = "page-map"; }, []);
   const navigate = useNavigate();
@@ -367,7 +438,7 @@ export default function Map() {
       selectedParcelle.name,
       selectedParcelle,
       cultureGroupId,
-      1 // minimum 1 zone
+      selectedParcelle?.nZones || nZonesFromBackend || 1
     );
 
     setDashboardReadyForSelected(isComplete);
@@ -390,7 +461,7 @@ export default function Map() {
             selectedParcelle.name,
             selectedParcelle,
             cultureGroupId,
-            1
+            selectedParcelle?.nZones || nZonesFromBackend || 1
           );
           setDashboardReadyForSelected(isComplete);
         }
@@ -969,6 +1040,16 @@ showToast(`❌ ${error.message}`);
     const cultureGroupId = Number(selectedParcelle.groupId || selectedGroupId);
     const cachedStateKey = getDashboardStateKey(selectedParcelle.name, selectedParcelle, cultureGroupId);
     const selectedParcelSignature = buildParcelSignature(selectedParcelle, selectedParcelle?.name || "Parcel");
+    const hydrateDashboardSession = (session) =>
+      normalizeStoredDashboardSession({
+        session,
+        selectedParcelle,
+        selectedParcelleName: selectedParcelle?.name || "Parcel",
+        fallbackMapSnapshot: analysisMapSnapshot,
+        fallbackZones: analyzedZones,
+        fallbackWeatherData: parcelWeather,
+        fallbackCultureGroupId: cultureGroupId,
+      });
 
     const findStoredDashboardFallback = () => {
       try {
@@ -983,7 +1064,8 @@ showToast(`❌ ${error.message}`);
           const idMatch = cachedParcel?.id != null && selectedParcelle?.id != null && String(cachedParcel.id) === String(selectedParcelle.id);
           const signatureMatch = cachedSignature && cachedSignature === selectedParcelSignature;
           if ((idMatch || signatureMatch) && parsed?.zoneResults?.length > 0) {
-            return parsed;
+            const hydrated = hydrateDashboardSession(parsed);
+            return isDashboardSessionComplete(hydrated) ? hydrated : null;
           }
         }
       } catch (error) {
@@ -1036,8 +1118,13 @@ showToast(`❌ ${error.message}`);
         const signatureMatch = cachedParcelSignature && selectedParcelSignature && cachedParcelSignature === selectedParcelSignature;
 
         if ((signatureMatch || idsMatch || coordsMatch) && parsedState?.zoneResults?.length > 0) {
+          const hydrated = hydrateDashboardSession(parsedState);
+          if (!isDashboardSessionComplete(hydrated)) {
+            showToast("❌ Finish analyzing all zones before opening the dashboard");
+            return;
+          }
           console.log("✅ Loading dashboard from local cache (verified parcel match)");
-          setStoredDashboardSession(parsedState);
+          setStoredDashboardSession(hydrated);
           setStoredDashboardOpen(true);
           return;
         }
@@ -1091,6 +1178,11 @@ showToast(`❌ ${error.message}`);
       });
 
       // 💾 Cache DB response for offline/future use
+      if (!isDashboardSessionComplete(storedSession)) {
+        showToast("❌ Finish analyzing all zones before opening the dashboard");
+        return;
+      }
+
       try {
         localStorage.setItem(cachedStateKey, JSON.stringify(storedSession));
         if (storedSession.analysisHistory?.length > 0) {
@@ -1109,7 +1201,7 @@ showToast(`❌ ${error.message}`);
         console.warn("⚠️ Could not cache dashboard to localStorage:", e);
       }
 
-      setStoredDashboardSession(storedSession);
+      setStoredDashboardSession(hydrateDashboardSession(storedSession));
       setStoredDashboardOpen(true);
     } catch (error) {
       console.warn("Failed to load dashboard from DB:", error);
@@ -1177,12 +1269,12 @@ showToast(`❌ ${error.message}`);
         parcelleName={storedDashboardSession?.parcelleName || selectedParcelle?.name || pendingParcelleInfo?.name || "Parcel"}
         parcelleHa={storedDashboardSession?.parcelleHa || (selectedParcelle?.area || pendingParcelleInfo?.area || 0) / 10000}
         cultureGroupId={storedDashboardSession?.cultureGroupId || Number(selectedParcelle?.groupId || selectedGroupId || 1)}
-        parcelle={pendingParcelleInfo || storedDashboardSession?.parcelle || selectedParcelle}
-        mapSnapshot={storedDashboardSession?.mapSnapshot || null}
-        zones={storedDashboardSession?.zones || []}
+        parcelle={selectedParcelle || pendingParcelleInfo || storedDashboardSession?.parcelle}
+        mapSnapshot={storedDashboardSession?.mapSnapshot || analysisMapSnapshot || null}
+        zones={storedDashboardSession?.zones?.length ? storedDashboardSession.zones : analyzedZones}
         nZones={storedDashboardSession?.nZones || storedDashboardSession?.zoneResults?.length || 1}
         initialDiagMode={storedDashboardSession?.diagMode || "standard"}
-        weatherData={storedDashboardSession?.weatherData || null}
+        weatherData={storedDashboardSession?.weatherData || parcelWeather || null}
         persistedDashboardData={storedDashboardSession}
         startInDashboard
       />

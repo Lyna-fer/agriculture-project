@@ -28,6 +28,22 @@ function cloneStoredValue(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function areHistoryEntriesEquivalent(left, right) {
+  if (!left || !right) return false;
+
+  const leftFingerprint = left?.fingerprint != null ? String(left.fingerprint) : "";
+  const rightFingerprint = right?.fingerprint != null ? String(right.fingerprint) : "";
+  if (leftFingerprint && rightFingerprint && leftFingerprint === rightFingerprint) return true;
+
+  const leftId = left?.id != null ? String(left.id) : "";
+  const rightId = right?.id != null ? String(right.id) : "";
+  if (leftId && rightId && leftId === rightId) return true;
+
+  const leftTimestamp = left?.timestamp != null ? String(left.timestamp) : "";
+  const rightTimestamp = right?.timestamp != null ? String(right.timestamp) : "";
+  return !!leftTimestamp && !!rightTimestamp && leftTimestamp === rightTimestamp;
+}
+
 function buildParcelStorageBase(parcelleName, parcelle, cultureGroupId) {
   if (parcelle?.id) {
     return `${cultureGroupId}:parcel:${parcelle.id}`;
@@ -53,10 +69,6 @@ function isHistoryItemForParcel(item, parcelleName, parcelle, cultureGroupId) {
   const expectedSig = buildParcelStorageBase(parcelleName, parcelle, cultureGroupId);
   if (item.parcelSignature) {
     return item.parcelSignature === expectedSig;
-  }
-
-  if (parcelleName && item.parcelleName) {
-    return item.parcelleName === parcelleName;
   }
 
   return false;
@@ -129,21 +141,9 @@ export function getDashboardHistory(parcelleName, parcelle, cultureGroupId) {
       filtered = parsed;
     }
 
-    const deduped = filtered.filter((item, index, array) => {
-      const currentId = item?.id != null ? String(item.id) : "";
-      const currentFingerprint = item?.fingerprint != null ? String(item.fingerprint) : "";
-      const currentTimestamp = item?.timestamp != null ? String(item.timestamp) : "";
-
-      return index === array.findIndex((candidate) => {
-        const candidateId = candidate?.id != null ? String(candidate.id) : "";
-        const candidateFingerprint = candidate?.fingerprint != null ? String(candidate.fingerprint) : "";
-        const candidateTimestamp = candidate?.timestamp != null ? String(candidate.timestamp) : "";
-
-        if (currentId && candidateId) return candidateId === currentId;
-        if (currentFingerprint && candidateFingerprint) return candidateFingerprint === currentFingerprint;
-        return currentTimestamp && candidateTimestamp && candidateTimestamp === currentTimestamp;
-      });
-    });
+    const deduped = filtered.filter(
+      (item, index, array) => index === array.findIndex((candidate) => areHistoryEntriesEquivalent(item, candidate))
+    );
 
     const history = deduped.slice(-2);
     const current = history.length > 0 ? history[history.length - 1] : null;
@@ -209,8 +209,14 @@ export function saveDashboardState(parcelleName, parcelle, cultureGroupId, newSt
       fingerprint: annotatedState.fingerprint,
     });
 
-    historyArray.push(annotatedState);
-    const trimmed = historyArray.slice(-2);
+    const lastEntry = historyArray.length ? historyArray[historyArray.length - 1] : null;
+    const nextHistory = areHistoryEntriesEquivalent(lastEntry, annotatedState)
+      ? [...historyArray.slice(0, -1), annotatedState]
+      : [...historyArray, annotatedState];
+    const deduped = nextHistory.filter(
+      (item, index, array) => index === array.findIndex((candidate) => areHistoryEntriesEquivalent(item, candidate))
+    );
+    const trimmed = deduped.slice(-2);
 
     localStorage.setItem(historyKey, JSON.stringify(trimmed));
     localStorage.setItem(
@@ -265,7 +271,10 @@ export function updateCurrentDashboardState(parcelleName, parcelle, cultureGroup
     const nextHistory = historyArray.length
       ? [...historyArray.slice(0, -1), annotatedState]
       : [annotatedState];
-    const trimmed = nextHistory.slice(-2);
+    const deduped = nextHistory.filter(
+      (item, index, array) => index === array.findIndex((candidate) => areHistoryEntriesEquivalent(item, candidate))
+    );
+    const trimmed = deduped.slice(-2);
 
     localStorage.setItem(historyKey, JSON.stringify(trimmed));
     localStorage.setItem(
