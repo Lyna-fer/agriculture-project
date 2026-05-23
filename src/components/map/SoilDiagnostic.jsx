@@ -4469,9 +4469,6 @@ setAnalysisHistory([current, previous].filter(Boolean));
                   <div className="sd-dashboard-eyebrow">Yield Heatmap Dashboard</div>
                   <div className="sd-card-title">Vue detaillee de la parcelle</div>
                 </div>
-                <button className="sd-dashboard-sheet-close" onClick={() => setShowDashboard(false)}>
-                  Retour
-                </button>
               </div>
               <div className="sd-dashboard-sheet-body">
                 <DashboardView
