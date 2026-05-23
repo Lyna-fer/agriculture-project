@@ -389,27 +389,31 @@ function pollutionMultiplier(st, crop) {
 
 // âœ… NEW: Severe contamination check (Pb > 800 OR Cd > 15 blocks ALL crops)
 // ✅ UPDATED: Severe contamination check based on parcel category tolerance
+// ✅ UPDATED: Severe contamination check that correctly handles deep-rooted crops
 function isSoilToxic(st, cultureGroupId = 1) {
-  const pb = Number(st?.pb || 0);
-  const cd = Number(st?.cd || 0);
+  // For trees/permanent crops, heavy metals are stored in depth objects
+  const isPermanent = cultureGroupId === 3;
+  const top = isPermanent ? (st?.permanentDepths?.depth0_20 || st) : st;
+  const sub = isPermanent ? (st?.permanentDepths?.depth20_40 || st) : st;
 
-  // Category-based lethal thresholds (Pb in mg/kg, Cd in mg/kg)
-  // 1: Vegetables/Maraîchère (most sensitive)
-  // 2: Cereals (moderate)
-  // 3: Permanent/Trees (most tolerant)
+  // Get the highest contamination value across relevant depths
+  const pb = Math.max(Number(top?.pb || 0), Number(sub?.pb || 0));
+  const cd = Math.max(Number(top?.cd || 0), Number(sub?.cd || 0));
+
   const CATEGORY_THRESHOLDS = {
     1: { pb: 150, cd: 2 },
     2: { pb: 400, cd: 5 },
     3: { pb: 800, cd: 15 },
   };
-
   const thresholds = CATEGORY_THRESHOLDS[cultureGroupId] || CATEGORY_THRESHOLDS[1];
 
+  const isToxic = pb > thresholds.pb || cd > thresholds.cd;
+
   return {
-    isToxic: pb > thresholds.pb || cd > thresholds.cd,
+    isToxic,
     pb, cd,
-    pbExcess: pb > thresholds.pb ? pb - thresholds.pb : 0,
-    cdExcess: cd > thresholds.cd ? cd - thresholds.cd : 0,
+    pbExcess: isToxic && pb > thresholds.pb ? pb - thresholds.pb : 0,
+    cdExcess: isToxic && cd > thresholds.cd ? cd - thresholds.cd : 0,
   };
 }
 
