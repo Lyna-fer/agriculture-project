@@ -4131,37 +4131,18 @@ const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
   // 2. Always save to localStorage for cross-session persistence
   try {
     const parcelNameForSave = (parcelle?.name) || parcelleName;
+    const nextZoneResults = zoneResults.map((z, i) => i === zoneIndex ? lockedZone : z);
     const snapshot = buildAnalysisSnapshot({
-      zoneResults: zoneResults.map((z, i) => i === zoneIndex ? lockedZone : z),
+      zoneResults: nextZoneResults,
       crops: CROPS,
       parcelleName: parcelNameForSave,
       parcelleHa,
       cultureLabel,
-      // ✅ FIX: Ensure the parcel object itself is passed into the snapshot
-      parcelle: parcelle, 
     });
 
-    // ✅ FIX: Directly update the dashboard state in localStorage to ensure the parcelle object isn't lost
-    const cachedStateKey = getDashboardStateKey(parcelNameForSave, parcelle, cultureGroupId);
-    const existingCache = localStorage.getItem(cachedStateKey);
-    
-    if (existingCache) {
-       const parsedCache = JSON.parse(existingCache);
-       // Update ONLY the zoneResults, currentAnalysis, and history. Keep the parcelle exactly as it was!
-       parsedCache.zoneResults = zoneResults.map((z, i) => i === zoneIndex ? lockedZone : z);
-       parsedCache.currentAnalysis = snapshot;
-       parsedCache.analysisHistory = Array.isArray(parsedCache.analysisHistory) 
-          ? [snapshot, ...parsedCache.analysisHistory.filter(i => i.fingerprint !== snapshot.fingerprint)].slice(0,8) 
-          : [snapshot];
-          
-       localStorage.setItem(cachedStateKey, JSON.stringify(parsedCache));
-    } else {
-       // Fallback if no cache existed
-       saveDashboardState(parcelNameForSave, parcelle, cultureGroupId, snapshot);
-    }
-
-    setCurrentAnalysis(snapshot);
+    saveDashboardState(parcelNameForSave, parcelle, cultureGroupId, snapshot);
     const { current, previous } = getDashboardHistory(parcelNameForSave, parcelle, cultureGroupId);
+    setCurrentAnalysis(current || snapshot);
     setAnalysisHistory([current, previous].filter(Boolean));
     
   } catch (error) {
@@ -4334,6 +4315,7 @@ const { current, previous } = getDashboardHistory(parcelNameForSave, parcelle, c
 setCurrentAnalysis(current);
 setAnalysisHistory([current, previous].filter(Boolean));
     try {
+      const canonicalHistory = [current, previous].filter(Boolean);
       localStorage.setItem(
         getDashboardStateKey(parcelleName, parcelle, cultureGroupId),
         JSON.stringify({
@@ -4348,9 +4330,8 @@ setAnalysisHistory([current, previous].filter(Boolean));
           zones,
           nZones: n,
           zoneResults,
-          currentAnalysis: snapshot,
-          // Use the safe array we just generated, or fallback to an empty array
-          analysisHistory: Array.isArray(analysisHistory) ? [snapshot, ...analysisHistory.filter(i => i.fingerprint !== snapshot.fingerprint)].slice(0,8) : [snapshot],
+          currentAnalysis: current || snapshot,
+          analysisHistory: canonicalHistory,
           weatherData: weatherData || parcelWeather || null,
         })
       );

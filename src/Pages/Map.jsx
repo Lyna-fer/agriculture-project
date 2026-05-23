@@ -105,6 +105,122 @@ const buildDashboardSnapshotFromRow = (row) => {
     depthAverages: metrics.permanentDepths || null,
   };
 };
+
+const averageSnapshotMetric = (zoneResults, key) => {
+  const values = zoneResults
+    .filter(Boolean)
+    .map((zone) => Number(zone?.[key]))
+    .filter((value) => Number.isFinite(value));
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+};
+
+const averageSnapshotDepthMetric = (zoneResults, depthKey, metricKey) => {
+  const values = zoneResults
+    .filter(Boolean)
+    .map((zone) => Number(zone?.permanentDepths?.[depthKey]?.[metricKey]))
+    .filter((value) => Number.isFinite(value));
+  if (!values.length) return null;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+};
+
+const buildParcelAnalysisSnapshot = ({
+  rowsByZone,
+  parcelle,
+  parcelleName,
+  parcelleHa,
+  parcelSignature,
+  nZones,
+}) => {
+  const zoneResults = Array(Math.max(1, nZones)).fill(null);
+  const rows = [];
+
+  rowsByZone.forEach(({ zoneIndex, row }) => {
+    if (!Number.isInteger(zoneIndex) || !row) return;
+    const metrics = row.soilMetrics || null;
+    zoneResults[zoneIndex] = metrics
+      ? {
+          ...metrics,
+          analysisCropId: metrics.analysisCropId || row.targetCropId || null,
+          analysisCropMode:
+            metrics.analysisCropMode ||
+            (metrics.crop ? "manual" : row.targetCropId ? "recommended" : null),
+        }
+      : null;
+    rows.push({ zoneIndex, row });
+  });
+
+  if (!rows.length) return null;
+
+  const completed = zoneResults.filter(Boolean);
+  const latestRow = rows
+    .slice()
+    .sort((a, b) => new Date(b.row?.analyzedAt || 0).getTime() - new Date(a.row?.analyzedAt || 0).getTime())[0];
+  const timestamp = latestRow?.row?.analyzedAt || null;
+  const fingerprint = rows
+    .map(({ row }) => String(row?.id ?? ""))
+    .filter(Boolean)
+    .join("|");
+  const hasPermanentDepths = completed.some((zone) => zone?.permanentDepths);
+
+  return {
+    id: fingerprint || String(timestamp || Date.now()),
+    fingerprint: fingerprint || String(timestamp || Date.now()),
+    timestamp,
+    zoneIndex: latestRow?.zoneIndex ?? 0,
+    diagMode: latestRow?.row?.diagMode || "standard",
+    targetCropId: latestRow?.row?.targetCropId ?? null,
+    parcelleId: parcelle?.id ?? null,
+    parcelleName: parcelleName ?? null,
+    parcelSignature,
+    parcelle,
+    parcelleHa,
+    nZones: Math.max(1, nZones),
+    zoneCount: completed.length,
+    zoneResults,
+    avgScore: rows.length
+      ? Math.round(
+          rows
+            .map(({ row }) => Number(row?.compatibilityScore))
+            .filter((value) => Number.isFinite(value))
+            .reduce((sum, value, _, arr) => sum + value / Math.max(1, arr.length), 0)
+        )
+      : 0,
+    avgPh: averageSnapshotMetric(completed, "ph"),
+    avgCe: averageSnapshotMetric(completed, "ce"),
+    avgN: averageSnapshotMetric(completed, "n"),
+    avgP: averageSnapshotMetric(completed, "p"),
+    avgK: averageSnapshotMetric(completed, "k"),
+    avgLime: averageSnapshotMetric(completed, "lime"),
+    avgPb: averageSnapshotMetric(completed, "pb"),
+    avgCd: averageSnapshotMetric(completed, "cd"),
+    depthAverages: hasPermanentDepths
+      ? {
+          depth0_20: {
+            ph: averageSnapshotDepthMetric(completed, "depth0_20", "ph"),
+            ce: averageSnapshotDepthMetric(completed, "depth0_20", "ce"),
+            n: averageSnapshotDepthMetric(completed, "depth0_20", "n"),
+            p: averageSnapshotDepthMetric(completed, "depth0_20", "p"),
+            k: averageSnapshotDepthMetric(completed, "depth0_20", "k"),
+            lime: averageSnapshotDepthMetric(completed, "depth0_20", "lime"),
+            pb: averageSnapshotDepthMetric(completed, "depth0_20", "pb"),
+            cd: averageSnapshotDepthMetric(completed, "depth0_20", "cd"),
+          },
+          depth20_40: {
+            ph: averageSnapshotDepthMetric(completed, "depth20_40", "ph"),
+            ce: averageSnapshotDepthMetric(completed, "depth20_40", "ce"),
+            n: averageSnapshotDepthMetric(completed, "depth20_40", "n"),
+            p: averageSnapshotDepthMetric(completed, "depth20_40", "p"),
+            k: averageSnapshotDepthMetric(completed, "depth20_40", "k"),
+            lime: averageSnapshotDepthMetric(completed, "depth20_40", "lime"),
+            pb: averageSnapshotDepthMetric(completed, "depth20_40", "pb"),
+            cd: averageSnapshotDepthMetric(completed, "depth20_40", "cd"),
+          },
+        }
+      : null,
+  };
+};
+
 const buildDashboardSessionFromDb = ({
   parcelle,
   parcelleName,
@@ -130,65 +246,48 @@ const buildDashboardSessionFromDb = ({
       };
     })
     .filter((entry) => Number.isInteger(entry.zoneIndex) && entry.latestRow);
-
-  const zoneResults = [];
-  zoneEntries.forEach((entry) => {
-    const metrics = entry.latestRow.soilMetrics || null;
-    zoneResults[entry.zoneIndex] = metrics
-      ? {
-          ...metrics,
-          analysisCropId: metrics.analysisCropId || entry.latestRow.targetCropId || null,
-          analysisCropMode:
-            metrics.analysisCropMode ||
-            (metrics.crop ? "manual" : entry.latestRow.targetCropId ? "recommended" : null),
-        }
-      : null;
-  });
-
-  // Collect ALL snapshots from ALL zones to build complete analysis history
-  const allSnapshots = [];
-  zoneEntries.forEach((entry) => {
-    if (Array.isArray(entry.snapshots)) {
-      allSnapshots.push(...entry.snapshots);
-    }
-  });
-
-  // Sort all snapshots by timestamp (newest first)
-  const sortedAllSnapshots = allSnapshots.sort((a, b) => {
-    const aTime = new Date(a?.timestamp || 0).getTime();
-    const bTime = new Date(b?.timestamp || 0).getTime();
-    return bTime - aTime;
-  });
-
-  // Annotate snapshots with parcel identity so history can't cross parcels
-  const annotatedSnapshots = sortedAllSnapshots.map(s => ({
-    ...s,
-    parcelleId: parcelle?.id ?? null,
-    parcelleName: parcelleName ?? null,
-  }));
-
-  const activeZoneEntry = zoneEntries
-    .slice()
-    .sort((a, b) => new Date(b.latestRow.analyzedAt).getTime() - new Date(a.latestRow.analyzedAt).getTime())[0] || null;
-
-  const activeZone = activeZoneEntry?.zoneIndex ?? 0;
-  const activeZoneHistory = activeZoneEntry?.snapshots || [];
   const parcelSignature = buildParcelSignature(parcelle, parcelleName);
+  const historyDepth = zoneEntries.reduce(
+    (max, entry) => Math.max(max, Array.isArray(entry.snapshots) ? entry.snapshots.length : 0),
+    0
+  );
+  const parcelAnalysisHistory = Array.from({ length: historyDepth }, (_, historyIndex) =>
+    buildParcelAnalysisSnapshot({
+      rowsByZone: zoneEntries
+        .map((entry) => ({
+          zoneIndex: entry.zoneIndex,
+          row: Array.isArray(responseData?.[`zone_${entry.zoneIndex}`])
+            ? responseData[`zone_${entry.zoneIndex}`][historyIndex] || null
+            : null,
+        }))
+        .filter((entry) => entry.row),
+      parcelle,
+      parcelleName,
+      parcelleHa,
+      parcelSignature,
+      nZones: Math.max(1, zoneEntries.length || zones?.length || 1),
+    })
+  ).filter(Boolean);
+  const currentAnalysis = parcelAnalysisHistory[0] || null;
+  const activeZone = currentAnalysis?.zoneIndex ?? 0;
+
   return {
     savedAt: new Date().toISOString(),
     parcelSignature,
     activeZone,
-    diagMode: activeZoneHistory[0]?.diagMode || "standard",
+    diagMode: currentAnalysis?.diagMode || "standard",
     parcelleName,
     parcelleHa,
     cultureGroupId,
     parcelle,
     mapSnapshot,
     zones,
-    nZones: Math.max(1, zoneResults.length || zones?.length || 1),
-    zoneResults: zoneResults.length ? zoneResults : Array(Math.max(1, zones?.length || 1)).fill(null),
-    currentAnalysis: activeZoneHistory[0] || null,
-    analysisHistory: annotatedSnapshots,
+    nZones: Math.max(1, currentAnalysis?.zoneResults?.length || zones?.length || 1),
+    zoneResults: currentAnalysis?.zoneResults?.length
+      ? currentAnalysis.zoneResults
+      : Array(Math.max(1, zones?.length || 1)).fill(null),
+    currentAnalysis,
+    analysisHistory: parcelAnalysisHistory,
     weatherData: weatherData || null,
   };
 };
