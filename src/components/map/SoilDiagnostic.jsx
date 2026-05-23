@@ -10,6 +10,7 @@ import {
   dispatchDashboardUpdated,
   getDashboardHistory, // ✅ ADD
   saveDashboardState,  // ✅ ADD
+  updateCurrentDashboardState,
 } from "../../lib/soilDashboardStorage";
 // ─── CROP HARVEST DAYS (From Excel) ──────────────────────────────────────
 const CROP_HARVEST_DAYS = {
@@ -3621,6 +3622,7 @@ export default function SoilDiagnostic({
   // In-memory cache for satellite responses to avoid repeated network calls
   const satCacheRef = useRef(new Map());
   const lastStoredFingerprintRef = useRef("");
+  const skipNextDashboardHistoryPersistRef = useRef(false);
   const n = Math.max(1, nZones);
   const allZonesAnalyzed = zoneResults.slice(0, n).every((result) => result !== null && result !== undefined);
 
@@ -4104,43 +4106,14 @@ const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
     analysisCropMode: "recommended-locked",
   };
 
-  // Update UI state immediately
+  skipNextDashboardHistoryPersistRef.current = true;
+
   setZoneResults((prev) => {
     const next = [...prev];
     next[zoneIndex] = lockedZone;
     return next;
   });
 
-  // 1. Save to backend (if parcel exists)
-  if (parcelle?.id) {
-    try {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE}/api/analysis/save-zone`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          parcelleId: parcelle.id,
-          zoneIndex,
-          diagMode,
-          targetCropId: cropId,
-          soilMetrics: lockedZone,
-          compatibilityScore: calcScore(lockedZone, CROPS),
-        }),
-      });
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        console.error("Failed to persist locked dashboard crop:", errData);
-      }
-    } catch (error) {
-      console.error("Failed to save locked dashboard crop to DB:", error);
-    }
-  }
-
-  // 2. Always save to localStorage for cross-session persistence
-  // 2. Always save to localStorage for cross-session persistence
   try {
     const parcelNameForSave = (parcelle?.name) || parcelleName;
     const nextZoneResults = zoneResults.map((z, i) => i === zoneIndex ? lockedZone : z);
@@ -4152,15 +4125,17 @@ const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
       cultureLabel,
     });
 
-    saveDashboardState(parcelNameForSave, parcelle, cultureGroupId, snapshot);
+    updateCurrentDashboardState(parcelNameForSave, parcelle, cultureGroupId, snapshot);
     const { current, previous } = getDashboardHistory(parcelNameForSave, parcelle, cultureGroupId);
     setCurrentAnalysis(current || snapshot);
     setAnalysisHistory([current, previous].filter(Boolean));
+    lastStoredFingerprintRef.current = snapshot.fingerprint || lastStoredFingerprintRef.current;
+    dispatchDashboardUpdated({ parcelId: parcelle?.id, cultureGroupId });
     
   } catch (error) {
     console.warn("localStorage save failed for locked crop:", error);
   }
-}, [zoneResults, parcelle, diagMode, CROPS, parcelleName, parcelleHa, cultureLabel, cultureGroupId]);
+}, [zoneResults, parcelle, CROPS, parcelleName, parcelleHa, cultureLabel, cultureGroupId]);
 
 
   const resetZone = useCallback(idx => {
@@ -4293,6 +4268,12 @@ const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
       cultureLabel,
       activeZone,
     });
+
+    if (skipNextDashboardHistoryPersistRef.current) {
+      skipNextDashboardHistoryPersistRef.current = false;
+      lastStoredFingerprintRef.current = snapshot.fingerprint || lastStoredFingerprintRef.current;
+      return;
+    }
 
     if (!snapshot.fingerprint || lastStoredFingerprintRef.current === snapshot.fingerprint) return;
 

@@ -230,6 +230,61 @@ export function saveDashboardState(parcelleName, parcelle, cultureGroupId, newSt
   }
 }
 
+export function updateCurrentDashboardState(parcelleName, parcelle, cultureGroupId, newState) {
+  if (!parcelle || !cultureGroupId || !newState) return;
+
+  try {
+    const historyKey = getHistoryKey(parcelleName, parcelle, cultureGroupId);
+    const raw = localStorage.getItem(historyKey);
+    let historyArray = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(historyArray)) historyArray = [];
+    historyArray = historyArray.filter((item) =>
+      isHistoryItemForParcel(item, parcelleName, parcelle, cultureGroupId)
+    );
+
+    const parcelSig = buildParcelStorageBase(parcelleName, parcelle, cultureGroupId);
+    const annotatedState = {
+      ...newState,
+      zoneResults: Array.isArray(newState?.zoneResults) ? cloneStoredValue(newState.zoneResults) : [],
+      parcelle: cloneStoredValue(parcelle),
+      parcelleId: parcelle?.id ?? null,
+      parcelleName: parcelleName ?? null,
+      parcelSignature: parcelSig,
+      nZones: Number.isFinite(Number(newState?.nZones))
+        ? Number(newState.nZones)
+        : Array.isArray(newState?.zoneResults)
+        ? newState.zoneResults.length
+        : null,
+      zoneIndex: Number.isFinite(Number(newState?.zoneIndex))
+        ? Number(newState.zoneIndex)
+        : Number.isFinite(Number(newState?.activeZone))
+        ? Number(newState.activeZone)
+        : null,
+    };
+
+    const nextHistory = historyArray.length
+      ? [...historyArray.slice(0, -1), annotatedState]
+      : [annotatedState];
+    const trimmed = nextHistory.slice(-2);
+
+    localStorage.setItem(historyKey, JSON.stringify(trimmed));
+    localStorage.setItem(
+      getCurrentAnalysisKey(parcelleName, parcelle, cultureGroupId),
+      JSON.stringify(annotatedState)
+    );
+    localStorage.setItem(
+      getDashboardStateKey(parcelleName, parcelle, cultureGroupId),
+      JSON.stringify({
+        ...annotatedState,
+        analysisHistory: trimmed,
+        parcelSignature: parcelSig,
+      })
+    );
+  } catch (error) {
+    console.warn("Current dashboard state update failed:", error);
+  }
+}
+
 export function dispatchDashboardUpdated(detail = {}) {
   try {
     window.dispatchEvent(new CustomEvent(SOIL_DASHBOARD_UPDATED_EVENT, { detail }));
