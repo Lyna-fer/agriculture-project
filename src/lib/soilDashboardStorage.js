@@ -16,6 +16,18 @@ function buildParcelCoordsKey(parcelle) {
   );
 }
 
+function cloneStoredValue(value) {
+  if (value == null) return value;
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(value);
+    } catch (error) {
+      // Fall back to JSON cloning for plain storage payloads.
+    }
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+
 function buildParcelStorageBase(parcelleName, parcelle, cultureGroupId) {
   if (parcelle?.id) {
     return `${cultureGroupId}:parcel:${parcelle.id}`;
@@ -174,8 +186,8 @@ export function saveDashboardState(parcelleName, parcelle, cultureGroupId, newSt
     const parcelSig = buildParcelStorageBase(parcelleName, parcelle, cultureGroupId);
     const annotatedState = {
       ...newState,
-      zoneResults: Array.isArray(newState?.zoneResults) ? [...newState.zoneResults] : [],
-      parcelle,
+      zoneResults: Array.isArray(newState?.zoneResults) ? cloneStoredValue(newState.zoneResults) : [],
+      parcelle: cloneStoredValue(parcelle),
       parcelleId: parcelle?.id ?? null,
       parcelleName: parcelleName ?? null,
       parcelSignature: parcelSig,

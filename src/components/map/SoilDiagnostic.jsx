@@ -2824,6 +2824,18 @@ function averageMetric(zoneResults, key, parser = Number) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function cloneSnapshotValue(value) {
+  if (value == null) return value;
+  if (typeof structuredClone === "function") {
+    try {
+      return structuredClone(value);
+    } catch (error) {
+      // Fall back to JSON cloning for plain snapshot data.
+    }
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+
 function buildAnalysisSnapshot({ zoneResults, crops, parcelleName, parcelleHa, cultureLabel, activeZone }) {
   const completed = zoneResults.filter(Boolean);
   const scores = completed.map((zone, index) => ({
@@ -2855,7 +2867,7 @@ function buildAnalysisSnapshot({ zoneResults, crops, parcelleName, parcelleHa, c
     avgScore,
     zoneCount: completed.length,
     scores,
-    zoneResults: [...zoneResults], // Store the full parcel snapshot for history comparisons
+    zoneResults: cloneSnapshotValue(zoneResults), // Freeze zone values so previous history cannot mutate later
     avgPh: averageMetric(completed, "ph"),
     avgCe: averageMetric(completed, "ce"),
     avgN: averageMetric(completed, "n"),
