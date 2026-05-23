@@ -62,7 +62,7 @@ export const CULTURES = [
       },
       {
         title: "Depth",
-        text: "0-20 cm (primary), 20-40 cm if needed.",
+        text: "0-20 cm.",
       },
       {
         title: "Timing",
@@ -122,16 +122,28 @@ export const CULTURES = [
 
     steps: [
       {
+        title: "Required equipment",
+        text: "Soil auger or soil probe, kraft bags, labels, GPS.",
+      },
+      {
         title: "Number of samples",
         text: "3-5 points per hectare.",
       },
       {
         title: "Pattern",
-        text: "Walk in an X or W pattern.",
+        text: "Walk in a zigzag pattern.",
+      },
+      {
+        title: "Depth",
+        text: "0-30 cm.",
       },
       {
         title: "Timing",
         text: "After harvest or before sowing.",
+      },
+      {
+        title: "Shipping",
+        text: "Air-dry the sample and send it within 5 days.",
       },
     ],
 
@@ -186,16 +198,28 @@ export const CULTURES = [
         text: "Under the tree canopy projection.",
       },
       {
+        title: "Number of samples",
+        text: "Take several points per tree row or block.",
+      },
+      {
         title: "Depth",
-        text: "0-20, 20-40, 40-80 cm separated.",
+        text: "Collect 0-20 and 20-40 cm separately.",
       },
       {
         title: "Frequency",
         text: "Every 3-5 years.",
       },
+      {
+        title: "Composition",
+        text: "Keep each depth in a separate, clearly labeled bag.",
+      },
+      {
+        title: "Shipping",
+        text: "Air-dry and send the layers separately within 5 days.",
+      },
     ],
 
-    alerts: ["Do not mix layers", "Avoid localized irrigation zones"],
+    alerts: ["Avoid localized irrigation zones"],
   },
 ];
 

@@ -491,10 +491,6 @@ export default function ResultsPanel({
                     <span>{item.text}</span>
                   </div>
                 ))}
-                <div className="cy-weather-alert cy-weather-alert--info">
-                  <strong>Avoid sampling after rain</strong>
-                  <span>Wet soil can leach NPK, change pH temporarily, and become sticky so the final sample is less reliable.</span>
-                </div>
               </div>
 
               <div className="cy-weather-season-card">
@@ -541,7 +537,7 @@ export default function ResultsPanel({
                   <div className="cy-hz-bottom">
                     <span className="cy-prio" style={{background:d.color,color:"#fff"}}>Required</span>
                     <div className="cy-hz-prog"><div className="cy-hz-prog-fill" style={{width:i===0?"100%":i===1?"65%":"40%",background:d.color}}/></div>
-                    <span className="cy-hz-prog-lbl">{i===0?"Highest priority":i===1?"If deficiency":"Long term"}</span>
+                    {i===2 && <span className="cy-hz-prog-lbl">Long term</span>}
                   </div>
                 </div>
               </div>
