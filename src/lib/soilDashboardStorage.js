@@ -117,10 +117,41 @@ export function getDashboardHistory(parcelleName, parcelle, cultureGroupId) {
       filtered = parsed;
     }
 
-    const history = filtered.slice(-2);
+    const deduped = filtered.filter((item, index, array) => {
+      const currentId = item?.id != null ? String(item.id) : "";
+      const currentFingerprint = item?.fingerprint != null ? String(item.fingerprint) : "";
+      const currentTimestamp = item?.timestamp != null ? String(item.timestamp) : "";
+
+      return index === array.findIndex((candidate) => {
+        const candidateId = candidate?.id != null ? String(candidate.id) : "";
+        const candidateFingerprint = candidate?.fingerprint != null ? String(candidate.fingerprint) : "";
+        const candidateTimestamp = candidate?.timestamp != null ? String(candidate.timestamp) : "";
+
+        if (currentId && candidateId) return candidateId === currentId;
+        if (currentFingerprint && candidateFingerprint) return candidateFingerprint === currentFingerprint;
+        return currentTimestamp && candidateTimestamp && candidateTimestamp === currentTimestamp;
+      });
+    });
+
+    const history = deduped.slice(-2);
+    const current = history.length > 0 ? history[history.length - 1] : null;
+    let previous = history.length > 1 ? history[0] : null;
+
+    if (
+      current &&
+      previous &&
+      (
+        (current?.id && previous?.id && String(current.id) === String(previous.id)) ||
+        (current?.fingerprint && previous?.fingerprint && String(current.fingerprint) === String(previous.fingerprint)) ||
+        (current?.timestamp && previous?.timestamp && String(current.timestamp) === String(previous.timestamp))
+      )
+    ) {
+      previous = null;
+    }
+
     return {
-      previous: history.length > 1 ? history[0] : null,
-      current: history.length > 0 ? history[history.length - 1] : null,
+      previous,
+      current,
     };
   } catch (error) {
     console.warn("Dashboard history load failed:", error);
