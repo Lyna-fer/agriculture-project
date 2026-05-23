@@ -2725,7 +2725,7 @@ const alts = tgt ? scored.filter(c => c.id !== st.crop).slice(0, 3) : [];
               <rect x="1.2" y="6.8" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
               <rect x="6.8" y="6.8" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.4" />
             </svg>
-            Dashboard
+            Detailed view
           </button>
         )}
         {nZones > 1 && zoneIdx < nZones - 1 && (
@@ -4475,12 +4475,6 @@ const handleLockDashboardCrop = useCallback(async (zoneIndex, cropId) => {
           {/* TWO-COLUMN LAYOUT */}
           {showDashboard && (analysisHistory?.length > 0 || currentAnalysis) ? (
             <div className="sd-dashboard-sheet">
-              <div className="sd-dashboard-sheet-head">
-                <div>
-                  <div className="sd-dashboard-eyebrow">Yield Heatmap Dashboard</div>
-                  <div className="sd-card-title">Vue detaillee de la parcelle</div>
-                </div>
-              </div>
               <div className="sd-dashboard-sheet-body">
                 <DashboardView
                   parcelle={parcelle}
